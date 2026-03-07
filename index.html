@@ -927,7 +927,7 @@ async function aiLookupQA(){
   gv('qa-loading').classList.add('show');
   try{
     const res = await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST', headers:{'Content-Type':'application/json','x-api-key':'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','anthropic-version':'2023-06-01'},
+      method:'POST', headers:{'Content-Type':'application/json','x-api-key':'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'},
       body: JSON.stringify({model:'claude-sonnet-4-20250514', max_tokens:400,
         system:'Return ONLY valid JSON, no markdown: {"emoji":"single emoji","calories":number,"protein":number,"carbs":number,"fat":number}',
         messages:[{role:'user',content:`Nutrition facts for: ${name}. Use official label if branded product.`}]})
@@ -1052,7 +1052,7 @@ async function analyzeMeal(){
   content.push({type:'text',text:prompt});
   try{
     const res = await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',headers:{'Content-Type':'application/json','x-api-key':'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','anthropic-version':'2023-06-01'},
+      method:'POST',headers:{'Content-Type':'application/json','x-api-key':'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'},
       body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:800,
         system:`Precise nutrition expert with knowledge of official product nutrition labels.
 Return ONLY valid JSON, no markdown, no backticks:
