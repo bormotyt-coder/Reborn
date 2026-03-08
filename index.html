@@ -39,8 +39,8 @@ body{
   background-attachment:fixed;
 }
 #app{position:fixed;inset:0;max-width:480px;margin:0 auto;display:flex;flex-direction:column;overflow:hidden}
-.page{display:none;flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding-bottom:88px}
-.page.active{display:block;animation:fu .25s ease}
+.page{display:none;flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding-bottom:100px;height:100%}
+.page.active{display:flex;flex-direction:column;animation:fu .25s ease}
 @keyframes fu{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 
 /* NAV */
@@ -66,7 +66,33 @@ body{
 .gc-in{position:relative;z-index:1}
 .sec-lbl{font-family:var(--font);font-size:12px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);padding:14px 14px 8px}
 
-/* SCAN BANNER */
+/* WELCOME CARD */
+.welcome-card{margin:8px 14px 0;border-radius:20px;overflow:hidden;position:relative;min-height:110px}
+.wc-bg{position:absolute;inset:0;background:linear-gradient(135deg,#0c1a2e,#1a2a1a);transition:background 2s ease}
+.wc-bg canvas{position:absolute;inset:0;width:100%;height:100%;opacity:0.55}
+.wc-overlay{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0.1) 0%,rgba(0,0,0,0.45) 100%)}
+.wc-content{position:relative;z-index:2;padding:16px 18px 14px;display:flex;flex-direction:column;gap:4px}
+.wc-greeting{font-family:var(--font);font-size:28px;font-weight:800;color:#fff;letter-spacing:.5px;line-height:1;text-shadow:0 1px 8px rgba(0,0,0,0.4)}
+.wc-sub{font-family:var(--font-body);font-size:13px;color:rgba(255,255,255,0.82);line-height:1.5;margin-top:2px;text-shadow:0 1px 4px rgba(0,0,0,0.4)}
+.wc-weather{display:flex;align-items:center;gap:6px;margin-top:8px}
+.wc-weather-icon{font-size:18px}
+.wc-weather-text{font-family:var(--font);font-size:14px;font-weight:600;color:rgba(255,255,255,0.9)}
+.wc-weather-sub{font-family:var(--font-body);font-size:11px;color:rgba(255,255,255,0.6);margin-left:2px}
+
+/* COACH CHAT */
+.coach-chat{margin-top:12px;display:none}
+.coach-chat.show{display:block;animation:fu .25s ease}
+.chat-messages{display:flex;flex-direction:column;gap:10px;margin-bottom:12px;max-height:380px;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.chat-msg{max-width:88%;padding:11px 14px;border-radius:16px;font-family:var(--font-body);font-size:13px;line-height:1.7}
+.chat-msg.user{align-self:flex-end;background:rgba(200,241,53,0.12);border:1px solid rgba(200,241,53,0.25);color:var(--text);border-bottom-right-radius:4px}
+.chat-msg.coach{align-self:flex-start;background:var(--glass2);border:1px solid var(--border);color:var(--text2);border-bottom-left-radius:4px}
+.chat-msg.loading{background:var(--glass);border:1px solid var(--border);color:var(--muted)}
+.chat-input-row{display:flex;gap:8px;align-items:flex-end}
+.chat-input{flex:1;background:rgba(255,255,255,0.07);border:1px solid var(--border);border-radius:14px;padding:12px 14px;color:var(--text);font-family:var(--font-body);font-size:14px;outline:none;resize:none;max-height:100px;transition:border-color .2s}
+.chat-input:focus{border-color:var(--lime)}
+.chat-send{background:linear-gradient(135deg,var(--lime),rgba(200,241,53,0.75));border:none;border-radius:12px;width:44px;height:44px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:opacity .15s}
+.chat-send:active{opacity:.8}
+.chat-send svg{width:18px;height:18px;stroke:#0a0a0a;stroke-width:2.5;fill:none}
 .scan-banner{margin:10px 14px 0;background:linear-gradient(135deg,rgba(200,241,53,0.07),rgba(245,166,35,0.04));border:1px solid rgba(200,241,53,0.16);border-radius:18px;padding:12px 16px}
 .sb-label{font-family:var(--font);font-size:11px;font-weight:700;color:var(--lime);letter-spacing:.14em;text-transform:uppercase;margin-bottom:9px}
 .sb-row{display:flex;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
@@ -344,6 +370,21 @@ input:focus,textarea:focus,select:focus{border-color:var(--lime)}
       <div class="sb-s"><div class="sb-v">−5.6kg</div><div class="sb-l">Fat Goal</div></div>
     </div>
   </div>
+  <!-- WELCOME CARD -->
+  <div class="welcome-card" id="welcome-card">
+    <div class="wc-bg" id="wc-bg"><canvas id="wc-canvas"></canvas></div>
+    <div class="wc-overlay"></div>
+    <div class="wc-content">
+      <div class="wc-greeting" id="wc-greeting">Good morning, Borna</div>
+      <div class="wc-sub" id="wc-sub">Loading your day summary…</div>
+      <div class="wc-weather" id="wc-weather" style="display:none">
+        <span class="wc-weather-icon" id="wc-wicon">☀️</span>
+        <span class="wc-weather-text" id="wc-wtemp">—°C</span>
+        <span class="wc-weather-sub" id="wc-wdesc">Dubai</span>
+      </div>
+    </div>
+  </div>
+
   <div class="whoop-card">
     <div class="wh-top">
       <div class="wh-brand"><div class="wh-dot"></div><div class="wh-logo">WHOOP</div></div>
@@ -451,6 +492,16 @@ input:focus,textarea:focus,select:focus{border-color:var(--lime)}
       <div class="coach-spin"></div><br>Analysing your day…
     </div>
     <div class="coach-response" id="coach-response"></div>
+    <div class="coach-chat" id="coach-chat">
+      <div style="font-family:var(--font);font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px">Ask Your Coach</div>
+      <div class="chat-messages" id="chat-messages"></div>
+      <div class="chat-input-row">
+        <textarea class="chat-input" id="chat-input" rows="1" placeholder="Ask anything about today…" onkeydown="handleChatKey(event)" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,100)+'px'"></textarea>
+        <button class="chat-send" onclick="sendChatMessage()">
+          <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -695,11 +746,14 @@ const _n=new Date();
 gv('hdr-date').innerHTML=_n.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})+'<br>'+_n.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
 gv('coach-date').textContent=_n.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
 renderAll();
+initWelcomeCard();
 
 function renderAll(){
   renderWhoopCard();renderSummary();renderRings();
   renderCups();renderFoodList();renderQuickAdd();
   renderProgress();buildCalendar();updateCoachStats();
+  // refresh smart subtitle with latest stats
+  const sub=gv('wc-sub');if(sub)sub.textContent=getSmartSub();
 }
 
 // NAV
@@ -1020,28 +1074,195 @@ function updateCoachStats(){
   gv('cs-protein').textContent=Math.round(t.p)||'—';
   gv('cs-water').textContent=cups*ML_PER_CUP||'—';
 }
+// Day context string — reused for coach chat
+function getDayContext(){
+  const t=getTotals();
+  const ws=whoopSnaps;
+  const mealSum=meals.map(m=>`${m.name}: ${Math.round(m.calories)} kcal, ${Math.round(m.protein)}g P, ${Math.round(m.carbs)}g C, ${Math.round(m.fat)}g F`).join('\n');
+  const whoopSum=`Wake: Sleep ${ws[0]?.sleep??'—'}h, Recovery ${ws[0]?.recovery??'—'}%\n1PM: Strain ${ws[1]?.strain??'—'}, Burned ${ws[1]?.burned??'—'} kcal, Steps ${ws[1]?.steps??'—'}\nEOD: Strain ${ws[2]?.strain??'—'}, Burned ${ws[2]?.burned??'—'} kcal, Steps ${ws[2]?.steps??'—'}`;
+  return `BORNA'S DATA TODAY:\nMEALS:\n${mealSum||'None logged'}\nTOTALS: ${Math.round(t.cal)} kcal, ${Math.round(t.p)}g P, ${Math.round(t.c)}g C, ${Math.round(t.f)}g F\nTARGET: ${getCalTarget()} kcal (cut phase)\nMACRO TARGETS: 128g P, 200g C, 65g F\nWHOOP:\n${whoopSum}\nWATER: ${cups} cups (${cups*ML_PER_CUP}ml) / 8 cups\nPROFILE: Male, 26, 89.1kg, 25.1% BF, goal 20.1% BF by Apr 27 2026`;
+}
+
+let chatHistory=[];
+
 async function generateCoachReport(){
   if(!meals.length&&!whoopSnaps.some(s=>s!==null)){alert('Log some meals or Whoop data first.');return;}
   gv('coach-loading').classList.add('show');gv('coach-response').classList.remove('show');
-  const t=getTotals();
-  const mealSum=meals.map(m=>`${m.name}: ${Math.round(m.calories)} kcal, ${Math.round(m.protein)}g P, ${Math.round(m.carbs)}g C, ${Math.round(m.fat)}g F`).join('\n');
-  const ws=whoopSnaps;
-  const whoopSum=`Wake: Sleep ${ws[0]?.sleep??'—'}h, Recovery ${ws[0]?.recovery??'—'}%\n1PM: Strain ${ws[1]?.strain??'—'}, Burned ${ws[1]?.burned??'—'} kcal, Steps ${ws[1]?.steps??'—'}\nEOD: Strain ${ws[2]?.strain??'—'}, Burned ${ws[2]?.burned??'—'} kcal, Steps ${ws[2]?.steps??'—'}`;
-  const tgt=getCalTarget();
-  const prompt=`My data today:\n\nMEALS:\n${mealSum||'None'}\n\nTOTALS: ${Math.round(t.cal)} kcal, ${Math.round(t.p)}g P, ${Math.round(t.c)}g C, ${Math.round(t.f)}g F\nTARGET: ${tgt} kcal (cut)\nMACRO TARGETS: 128g P, 200g C, 65g F\n\nWHOOP:\n${whoopSum}\n\nWATER: ${cups} cups (${cups*ML_PER_CUP}ml) / 8 cups\n\nPROFILE: Male, 26, 89.1kg, 25.1% BF, goal 20.1% by Apr 27.\n\nGive me a direct daily debrief:\n1. OVERALL SCORE (1-10, one punchy line)\n2. NUTRITION (specific callouts)\n3. RECOVERY & ACTIVITY\n4. TOP 3 ACTIONS FOR TOMORROW\n\nDirect. No fluff.`;
+  gv('coach-chat').classList.remove('show');
+  chatHistory=[];
+  const ctx=getDayContext();
+  const prompt=`${ctx}\n\nGive me a direct daily debrief:\n1. OVERALL SCORE (1-10, one punchy line)\n2. NUTRITION (specific callouts)\n3. RECOVERY & ACTIVITY\n4. TOP 3 ACTIONS FOR TOMORROW\n\nDirect. No fluff.`;
   try{
     const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:900,
-        system:'Direct, no-nonsense performance coach. Honest, specific, actionable. No filler.',
+        system:'You are a direct, no-nonsense performance and nutrition coach for Borna. Honest, specific, actionable. No filler.',
         messages:[{role:'user',content:prompt}]})});
     const data=await res.json();
     const text=data.content.map(b=>b.text||'').join('').trim();
     const re=gv('coach-response');
     re.innerHTML=`<div class="cr-header"><div class="cr-icon">🧠</div><div><div class="cr-title">Daily Debrief</div><div class="cr-time">${new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'})}</div></div></div><div class="cr-body">${text.replace(/\n/g,'<br>')}</div>`;
     re.classList.add('show');
+    // Store debrief in chat history as context
+    chatHistory=[
+      {role:'user',content:prompt},
+      {role:'assistant',content:text}
+    ];
+    // Show chat
+    gv('chat-messages').innerHTML='';
+    gv('coach-chat').classList.add('show');
   }catch(err){alert('Report failed.');console.error(err);}
   finally{gv('coach-loading').classList.remove('show');}
 }
+
+function handleChatKey(e){
+  if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendChatMessage();}
+}
+
+async function sendChatMessage(){
+  const inp=gv('chat-input');
+  const msg=inp.value.trim();if(!msg)return;
+  inp.value='';inp.style.height='auto';
+
+  const msgEl=gv('chat-messages');
+  // Add user bubble
+  const uDiv=document.createElement('div');
+  uDiv.className='chat-msg user';uDiv.textContent=msg;
+  msgEl.appendChild(uDiv);
+
+  // Add loading bubble
+  const lDiv=document.createElement('div');
+  lDiv.className='chat-msg loading';lDiv.textContent='…';
+  msgEl.appendChild(lDiv);
+  msgEl.scrollTop=msgEl.scrollHeight;
+
+  // Build messages — always include day context as system + history
+  chatHistory.push({role:'user',content:msg});
+
+  try{
+    const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:600,
+        system:`You are a direct, no-nonsense performance and nutrition coach for Borna. You have full context of his day. Be specific, honest, and actionable. Keep replies concise.\n\n${getDayContext()}`,
+        messages:chatHistory})});
+    const data=await res.json();
+    const reply=data.content.map(b=>b.text||'').join('').trim();
+    chatHistory.push({role:'assistant',content:reply});
+    lDiv.className='chat-msg coach';
+    lDiv.innerHTML=reply.replace(/\n/g,'<br>');
+  }catch(err){
+    lDiv.className='chat-msg coach';
+    lDiv.textContent='Something went wrong. Try again.';
+    chatHistory.pop();
+  }
+  msgEl.scrollTop=msgEl.scrollHeight;
+}
+
+// ── WELCOME CARD ──────────────────────────────────
+const WMO_CODES={0:'Clear sky',1:'Mainly clear',2:'Partly cloudy',3:'Overcast',45:'Foggy',48:'Icy fog',51:'Light drizzle',53:'Drizzle',55:'Heavy drizzle',61:'Light rain',63:'Rain',65:'Heavy rain',71:'Light snow',73:'Snow',75:'Heavy snow',80:'Rain showers',81:'Heavy showers',82:'Violent showers',95:'Thunderstorm',96:'Thunderstorm',99:'Thunderstorm'};
+const WMO_EMOJI={0:'☀️',1:'🌤️',2:'⛅',3:'☁️',45:'🌫️',48:'🌫️',51:'🌦️',53:'🌦️',55:'🌧️',61:'🌧️',63:'🌧️',65:'🌧️',71:'🌨️',73:'❄️',75:'❄️',80:'🌦️',81:'🌧️',82:'⛈️',95:'⛈️',96:'⛈️',99:'⛈️'};
+
+function getTimeOfDay(h){
+  if(h>=5&&h<12)return'morning';
+  if(h>=12&&h<17)return'afternoon';
+  if(h>=17&&h<21)return'evening';
+  return'night';
+}
+
+function getGreeting(h){
+  const tod=getTimeOfDay(h);
+  const greetings={morning:'Good morning, Borna 🌅',afternoon:'Good afternoon, Borna ☀️',evening:'Good evening, Borna 🌆',night:'Late night, Borna 🌙'};
+  return greetings[tod];
+}
+
+function getSmartSub(){
+  const t=getTotals();
+  const tgt=getCalTarget();
+  const rem=tgt-t.cal;
+  const h=new Date().getHours();
+  const hints=[];
+  if(cups<4)hints.push('💧 You\'re behind on water — drink up');
+  else if(cups>=8)hints.push('💧 Hydration on point today');
+  if(t.p<TARGETS.p*0.5)hints.push(`🥩 Only ${Math.round(t.p)}g protein — hit those targets`);
+  else if(t.p>=TARGETS.p)hints.push(`🥩 Protein target crushed — ${Math.round(t.p)}g`);
+  if(rem>800&&h>=14)hints.push(`🍽️ ${Math.round(rem)} kcal left — don't skip meals`);
+  else if(rem<0)hints.push(`⚠️ Over target by ${Math.abs(Math.round(rem))} kcal`);
+  else if(rem<200)hints.push(`✅ Almost at your ${tgt} kcal target`);
+  if(!meals.length&&h>=10)hints.push('🍽️ No meals logged yet today');
+  if(whoopSnaps[0]?.recovery&&whoopSnaps[0].recovery<33)hints.push('😴 Low recovery — keep training light');
+  else if(whoopSnaps[0]?.recovery&&whoopSnaps[0].recovery>=67)hints.push(`💪 ${whoopSnaps[0].recovery}% recovery — ready to push`);
+  if(!hints.length)hints.push('Track your meals and Whoop data below');
+  return hints[0];
+}
+
+function setBgForTime(h,weatherCode){
+  requestAnimationFrame(()=>{
+  const canvas=gv('wc-canvas');
+  const bg=gv('wc-bg');
+  if(!canvas||!bg)return;
+  const ctx=canvas.getContext('2d');
+  canvas.width=canvas.parentElement.offsetWidth||400;
+  canvas.height=canvas.parentElement.offsetHeight||120;
+  const tod=getTimeOfDay(h);
+  const gradients={
+    morning:{bg:'linear-gradient(135deg,#0c2240,#1a3520)',c1:'#ff9a3c',c2:'#ffd06f'},
+    afternoon:{bg:'linear-gradient(135deg,#08172e,#0c2818)',c1:'#f5c842',c2:'#ffe08a'},
+    evening:{bg:'linear-gradient(135deg,#1c0a30,#280e0e)',c1:'#ff6b35',c2:'#ff9a3c'},
+    night:{bg:'linear-gradient(135deg,#04060e,#080816)',c1:'#3a5a8a',c2:'#6090c4'},
+  };
+  const g=gradients[tod];
+  bg.style.background=g.bg;
+  const w=canvas.width,ch=canvas.height;
+  ctx.clearRect(0,0,w,ch);
+  // Ambient glow
+  const grd=ctx.createRadialGradient(w*0.75,ch*0.25,0,w*0.75,ch*0.25,w*0.55);
+  grd.addColorStop(0,g.c1+'66');
+  grd.addColorStop(0.5,g.c1+'22');
+  grd.addColorStop(1,'transparent');
+  ctx.fillStyle=grd;
+  ctx.fillRect(0,0,w,ch);
+  // Secondary glow bottom-left
+  const grd2=ctx.createRadialGradient(w*0.1,ch*0.9,0,w*0.1,ch*0.9,w*0.4);
+  grd2.addColorStop(0,g.c2+'33');
+  grd2.addColorStop(1,'transparent');
+  ctx.fillStyle=grd2;
+  ctx.fillRect(0,0,w,ch);
+  // Stars at night/evening
+  if(tod==='night'||tod==='evening'){
+    ctx.fillStyle='rgba(255,255,255,0.75)';
+    const seed=42;
+    for(let i=0;i<28;i++){
+      const x=((seed*i*137.5)%1)*w;
+      const y=((seed*i*97.3)%1)*ch*0.65;
+      const r=((i%3)===0)?1.2:0.6;
+      ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
+    }
+  }
+  });
+}
+
+async function initWelcomeCard(){
+  const h=new Date().getHours();
+  gv('wc-greeting').textContent=getGreeting(h);
+  gv('wc-sub').textContent=getSmartSub();
+  setBgForTime(h,0);
+  // Fetch Dubai weather from Open-Meteo (no API key needed)
+  try{
+    const r=await fetch('https://api.open-meteo.com/v1/forecast?latitude=25.2048&longitude=55.2708&current=temperature_2m,weathercode,windspeed_10m&timezone=Asia/Dubai');
+    const d=await r.json();
+    const temp=Math.round(d.current.temperature_2m);
+    const code=d.current.weathercode;
+    const desc=WMO_CODES[code]||'Dubai';
+    const emoji=WMO_EMOJI[code]||'🌡️';
+    gv('wc-wicon').textContent=emoji;
+    gv('wc-wtemp').textContent=`${temp}°C`;
+    gv('wc-wdesc').textContent=desc+' · Dubai';
+    gv('wc-weather').style.display='flex';
+    setBgForTime(h,code);
+  }catch(e){
+    // Weather failed silently — card still shows
+  }
+}
+
+
 
 // CALENDAR
 function buildCalendar(){
