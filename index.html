@@ -3,290 +3,182 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="reBorn">
 <meta name="theme-color" content="#090b10">
 <title>Project reBorn</title>
 <link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxODAgMTgwIj48cmVjdCB3aWR0aD0iMTgwIiBoZWlnaHQ9IjE4MCIgcng9IjQwIiBmaWxsPSIjMDkwYjEwIi8+PHRleHQgeD0iNTAlIiB5PSI1NCUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJHZW9yZ2lhLHNlcmlmIiBmb250LXNpemU9IjkwIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0iI2Q0ZjUzYyI+ckI8L3RleHQ+PC9zdmc+">
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='40' fill='%23090b10'/%3E%3Ctext x='50%25' y='54%25' dominant-baseline='middle' text-anchor='middle' font-family='Georgia,serif' font-size='90' font-weight='bold' fill='%23d4f53c'%3ErB%3C/text%3E%3C/svg%3E">
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@300;400;500&family=SF+Pro+Display:wght@300;400;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
 :root{
   --bg:#090b10;
-  --glass:rgba(255,255,255,0.06);
-  --glass2:rgba(255,255,255,0.10);
-  --glass3:rgba(255,255,255,0.04);
-  --border:rgba(255,255,255,0.10);
-  --border2:rgba(255,255,255,0.06);
-  --text:#ffffff;--text2:rgba(255,255,255,0.7);--muted:rgba(255,255,255,0.35);
-  --lime:#c8f135;--lime2:rgba(200,241,53,0.15);
-  --cyan:#30d5c8;--cyan2:rgba(48,213,200,0.15);
-  --orange:#ff8a3d;--orange2:rgba(255,138,61,0.15);
-  --purple:#bf5af2;--purple2:rgba(191,90,242,0.15);
-  --red:#ff453a;--blue:#0a84ff;--blue2:rgba(10,132,255,0.15);
-  --whoop-red:#ff3b5c;--whoop-green:#00e5be;--whoop-bg:#0a0f1e;
+  --glass:rgba(255,255,255,0.06);--glass2:rgba(255,255,255,0.10);--glass3:rgba(255,255,255,0.03);
+  --border:rgba(255,255,255,0.10);--border2:rgba(255,255,255,0.06);
+  --text:#fff;--text2:rgba(255,255,255,0.7);--muted:rgba(255,255,255,0.35);
+  --lime:#c8f135;--cyan:#30d5c8;--orange:#ff8a3d;--purple:#bf5af2;--red:#ff453a;--blue:#0a84ff;
+  --whoop-green:#00e5be;
   --pc:#ff8a3d;--cc:#30d5c8;--fc:#bf5af2;--wc:#0a84ff;
-  --circ:232.5;
+  --circ:232.5;--wg:2500;
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-html{height:100%}
+html,body{height:100%;overflow:hidden;background:var(--bg)}
 body{
-  background:var(--bg);color:var(--text);
-  font-family:-apple-system,'SF Pro Display','DM Mono',sans-serif;
-  max-width:480px;margin:0 auto;
-  min-height:100vh;overflow-x:hidden;
-  -webkit-font-smoothing:antialiased;
-  /* Layered background for depth */
+  color:var(--text);font-family:-apple-system,'DM Mono',sans-serif;
+  max-width:480px;margin:0 auto;-webkit-font-smoothing:antialiased;
   background-image:
-    radial-gradient(ellipse 80% 50% at 20% -10%, rgba(200,241,53,0.08) 0%, transparent 60%),
-    radial-gradient(ellipse 60% 40% at 80% 100%, rgba(48,213,200,0.06) 0%, transparent 60%),
-    radial-gradient(ellipse 50% 30% at 50% 50%, rgba(191,90,242,0.04) 0%, transparent 70%);
+    radial-gradient(ellipse 80% 50% at 20% -10%,rgba(200,241,53,0.08) 0%,transparent 60%),
+    radial-gradient(ellipse 60% 40% at 80% 100%,rgba(48,213,200,0.06) 0%,transparent 60%),
+    radial-gradient(ellipse 50% 30% at 50% 50%,rgba(191,90,242,0.04) 0%,transparent 70%);
   background-attachment:fixed;
 }
-
-/* ── SCROLL FIX: page layout ── */
-html,body{height:100%;overflow:hidden}
 #app{position:fixed;inset:0;max-width:480px;margin:0 auto;display:flex;flex-direction:column;overflow:hidden}
-.page{display:none;flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding-bottom:80px}
-.page.active{display:block}
-@keyframes fu{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
-.page.active{animation:fu 0.28s ease}
+.page{display:none;flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding-bottom:88px}
+.page.active{display:block;animation:fu .25s ease}
+@keyframes fu{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 
-/* ── LIQUID GLASS CARD ── */
-.glass-card{
-  background:var(--glass);
-  backdrop-filter:blur(40px) saturate(180%);
-  -webkit-backdrop-filter:blur(40px) saturate(180%);
-  border:1px solid var(--border);
-  border-radius:22px;
-  padding:16px;
-  margin:8px 14px 0;
-  position:relative;
-  overflow:hidden;
-}
-.glass-card::before{
-  content:'';position:absolute;inset:0;border-radius:22px;
-  background:linear-gradient(135deg,rgba(255,255,255,0.08) 0%,transparent 60%);
-  pointer-events:none;
-}
-.glass-card-inner{position:relative;z-index:1}
+/* NAV */
+.bnav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;z-index:50;padding:8px 12px max(16px,env(safe-area-inset-bottom))}
+.bnav-inner{background:rgba(20,22,28,0.88);backdrop-filter:blur(40px) saturate(200%);-webkit-backdrop-filter:blur(40px) saturate(200%);border:1px solid var(--border);border-radius:24px;display:flex;padding:6px;box-shadow:0 8px 32px rgba(0,0,0,0.4)}
+.nb{flex:1;background:none;border:none;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;padding:8px 4px;border-radius:18px;transition:all .2s}
+.nb svg{width:21px;height:21px;stroke-width:1.8}
+.nb span{font-size:9px;letter-spacing:.04em}
+.nb.active{color:var(--lime);background:rgba(200,241,53,0.12)}
 
-/* ── HEADER ── */
-.hdr{
-  padding:16px 16px 12px;
-  display:flex;align-items:center;justify-content:space-between;
-  position:sticky;top:0;z-index:20;
-  background:rgba(9,11,16,0.7);
-  backdrop-filter:blur(40px) saturate(200%);
-  -webkit-backdrop-filter:blur(40px) saturate(200%);
-  border-bottom:1px solid var(--border2);
-}
+/* HEADER */
+.hdr{padding:16px 16px 12px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:20;background:rgba(9,11,16,0.8);backdrop-filter:blur(40px);-webkit-backdrop-filter:blur(40px);border-bottom:1px solid var(--border2)}
 .logo-wrap{display:flex;align-items:center;gap:10px}
-.logo-icon{
-  width:38px;height:38px;
-  background:linear-gradient(135deg,var(--lime),rgba(200,241,53,0.7));
-  border-radius:12px;
-  display:flex;align-items:center;justify-content:center;
-  box-shadow:0 0 20px rgba(200,241,53,0.3);
-  flex-shrink:0;
-}
-.logo-main{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px;color:var(--lime);line-height:1;text-shadow:0 0 20px rgba(200,241,53,0.4)}
-.logo-sub{font-size:10px;color:var(--muted);letter-spacing:0.08em;margin-top:2px}
+.logo-icon{width:38px;height:38px;background:linear-gradient(135deg,var(--lime),rgba(200,241,53,0.7));border-radius:12px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 20px rgba(200,241,53,0.25);flex-shrink:0}
+.logo-main{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px;color:var(--lime);line-height:1}
+.logo-sub{font-size:10px;color:var(--muted);letter-spacing:.08em;margin-top:2px}
 .hdr-date{text-align:right;font-size:11px;color:var(--muted);line-height:1.7}
 
-/* ── BOTTOM NAV ── */
-.bnav{
-  position:fixed;bottom:0;left:50%;transform:translateX(-50%);
-  width:100%;max-width:480px;z-index:50;
-  padding:8px 12px max(16px,env(safe-area-inset-bottom));
-}
-.bnav-inner{
-  background:rgba(20,22,28,0.85);
-  backdrop-filter:blur(40px) saturate(200%);
-  -webkit-backdrop-filter:blur(40px) saturate(200%);
-  border:1px solid var(--border);
-  border-radius:24px;
-  display:flex;
-  padding:6px;
-  box-shadow:0 8px 32px rgba(0,0,0,0.4),0 0 0 0.5px rgba(255,255,255,0.05) inset;
-}
-.nb{
-  flex:1;background:none;border:none;color:var(--muted);
-  display:flex;flex-direction:column;align-items:center;gap:3px;
-  cursor:pointer;padding:8px 4px;border-radius:18px;transition:all 0.2s;
-}
-.nb svg{width:22px;height:22px;stroke-width:1.8}
-.nb span{font-size:10px;letter-spacing:0.04em}
-.nb.active{
-  color:var(--lime);
-  background:rgba(200,241,53,0.12);
-  box-shadow:0 0 16px rgba(200,241,53,0.1) inset;
-}
+/* GLASS CARD */
+.gc{background:var(--glass);backdrop-filter:blur(40px) saturate(180%);-webkit-backdrop-filter:blur(40px) saturate(180%);border:1px solid var(--border);border-radius:22px;padding:16px;margin:8px 14px 0;position:relative;overflow:hidden}
+.gc::before{content:'';position:absolute;inset:0;border-radius:22px;background:linear-gradient(135deg,rgba(255,255,255,0.07) 0%,transparent 60%);pointer-events:none}
+.gc-in{position:relative;z-index:1}
+.sec-lbl{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);padding:14px 14px 8px;font-weight:500}
 
-/* ── SECTION LABEL ── */
-.sec-lbl{font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);padding:14px 14px 8px;font-weight:500}
-
-/* ── SCAN BANNER ── */
-.scan-banner{
-  margin:10px 14px 0;
-  background:linear-gradient(135deg,rgba(200,241,53,0.08),rgba(48,213,200,0.05));
-  border:1px solid rgba(200,241,53,0.18);
-  border-radius:20px;padding:13px 16px;
-}
-.sb-label{font-size:10px;color:var(--lime);letter-spacing:0.12em;text-transform:uppercase;margin-bottom:9px;font-weight:600}
+/* SCAN BANNER */
+.scan-banner{margin:10px 14px 0;background:linear-gradient(135deg,rgba(200,241,53,0.07),rgba(48,213,200,0.04));border:1px solid rgba(200,241,53,0.18);border-radius:20px;padding:13px 16px}
+.sb-label{font-size:10px;color:var(--lime);letter-spacing:.12em;text-transform:uppercase;margin-bottom:9px;font-weight:600}
 .sb-row{display:flex;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
 .sb-row::-webkit-scrollbar{display:none}
 .sb-s{flex:0 0 auto;text-align:center;padding:0 14px;border-right:1px solid var(--border2)}
 .sb-s:last-child{border-right:none}
 .sb-v{font-family:'Bebas Neue',sans-serif;font-size:22px;line-height:1}
-.sb-l{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;margin-top:3px}
+.sb-l{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-top:3px}
 
-/* ── WHOOP CARD (Whoop-branded) ── */
-.whoop-card{
-  margin:8px 14px 0;
-  background:linear-gradient(160deg,#0d1428 0%,#0a1020 100%);
-  border:1px solid rgba(0,229,190,0.2);
-  border-radius:22px;padding:16px;
-  position:relative;overflow:hidden;
-}
-.whoop-card::after{
-  content:'';position:absolute;top:-40px;right:-40px;
-  width:160px;height:160px;
-  background:radial-gradient(circle,rgba(0,229,190,0.12) 0%,transparent 70%);
-  pointer-events:none;
-}
+/* WHOOP */
+.whoop-card{margin:8px 14px 0;background:linear-gradient(160deg,#0d1428,#0a1020);border:1px solid rgba(0,229,190,0.2);border-radius:22px;padding:16px;position:relative;overflow:hidden}
+.whoop-card::after{content:'';position:absolute;top:-40px;right:-40px;width:160px;height:160px;background:radial-gradient(circle,rgba(0,229,190,0.1) 0%,transparent 70%);pointer-events:none}
 .wh-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;position:relative;z-index:1}
 .wh-brand{display:flex;align-items:center;gap:8px}
-.wh-logo{font-size:13px;font-weight:700;letter-spacing:0.2em;color:var(--whoop-green);text-transform:uppercase}
+.wh-logo{font-size:13px;font-weight:700;letter-spacing:.2em;color:var(--whoop-green);text-transform:uppercase}
 .wh-dot{width:6px;height:6px;border-radius:50%;background:var(--whoop-green);animation:blink 2s infinite}
-@keyframes blink{0%,100%{opacity:1;box-shadow:0 0 6px var(--whoop-green)}50%{opacity:0.4;box-shadow:none}}
-.wh-btn{
-  background:rgba(0,229,190,0.1);border:1px solid rgba(0,229,190,0.3);
-  border-radius:10px;color:var(--whoop-green);font-size:12px;
-  cursor:pointer;padding:6px 14px;font-family:'DM Mono',monospace;
-  transition:all 0.2s;
-}
-.wh-btn:hover{background:rgba(0,229,190,0.18)}
+@keyframes blink{0%,100%{opacity:1;box-shadow:0 0 6px var(--whoop-green)}50%{opacity:.4;box-shadow:none}}
+.wh-btn{background:rgba(0,229,190,0.1);border:1px solid rgba(0,229,190,0.3);border-radius:10px;color:var(--whoop-green);font-size:12px;cursor:pointer;padding:6px 14px;font-family:'DM Mono',monospace;transition:all .2s}
 .wh-grid{display:grid;grid-template-columns:repeat(5,1fr);position:relative;z-index:1}
 .wh-s{text-align:center;padding:2px 0}
 .wh-s+.wh-s{border-left:1px solid rgba(255,255,255,0.07)}
-.wh-v{font-family:'Bebas Neue',sans-serif;font-size:26px;color:var(--whoop-green);line-height:1;letter-spacing:0.5px}
-.wh-l{font-size:8px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:0.1em;margin-top:4px}
+.wh-v{font-family:'Bebas Neue',sans-serif;font-size:26px;color:var(--whoop-green);line-height:1}
+.wh-l{font-size:8px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.1em;margin-top:4px}
 
-/* ── CALORIE HERO ── */
+/* CALORIES */
 .cal-top{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:10px}
-.cal-big{font-family:'Bebas Neue',sans-serif;font-size:64px;color:var(--lime);line-height:1;letter-spacing:1px;text-shadow:0 0 30px rgba(200,241,53,0.3)}
+.cal-big{font-family:'Bebas Neue',sans-serif;font-size:64px;color:var(--lime);line-height:1;text-shadow:0 0 30px rgba(200,241,53,0.25)}
 .cal-big sup{font-size:14px;color:var(--muted);font-family:'DM Mono',monospace;vertical-align:super}
 .cal-right{text-align:right;padding-bottom:6px}
-.cal-rem{font-family:'Bebas Neue',sans-serif;font-size:26px;line-height:1;color:var(--text)}
+.cal-rem{font-family:'Bebas Neue',sans-serif;font-size:26px;line-height:1}
 .cal-rem.over{color:var(--red)}
 .cal-sub{font-size:10px;color:var(--muted);margin-top:4px}
 .pbar{height:5px;background:rgba(255,255,255,0.08);border-radius:3px;overflow:hidden;margin-top:4px}
-.pbar-f{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--lime),rgba(200,241,53,0.7));transition:width 0.8s cubic-bezier(0.34,1.56,0.64,1);box-shadow:0 0 10px rgba(200,241,53,0.4)}
+.pbar-f{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--lime),rgba(200,241,53,0.7));transition:width .8s cubic-bezier(.34,1.56,.64,1);box-shadow:0 0 10px rgba(200,241,53,0.35)}
 .pbar-f.over{background:var(--red);box-shadow:0 0 10px rgba(255,69,58,0.4)}
 
-/* ── MACRO RINGS ── */
+/* RINGS */
 .rings-row{display:flex;justify-content:space-around;padding:6px 0}
 .ring-wrap{display:flex;flex-direction:column;align-items:center;gap:8px}
 .ring-svg-wrap{position:relative;display:inline-flex;align-items:center;justify-content:center}
 .rsvg{transform:rotate(-90deg)}
 .rbg{fill:none;stroke:rgba(255,255,255,0.08);stroke-width:6}
-.rfill{fill:none;stroke-width:6;stroke-linecap:round;transition:stroke-dashoffset 0.9s cubic-bezier(0.34,1.56,0.64,1);filter:drop-shadow(0 0 6px currentColor)}
-.ring-pct{
-  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-  font-family:'Bebas Neue',sans-serif;font-size:18px;line-height:1;
-  text-align:center;
-}
+.rfill{fill:none;stroke-width:6;stroke-linecap:round;transition:stroke-dashoffset .9s cubic-bezier(.34,1.56,.64,1);filter:drop-shadow(0 0 5px currentColor)}
+.ring-pct{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-family:'Bebas Neue',sans-serif;font-size:18px;line-height:1;text-align:center}
 .ring-info{text-align:center}
 .ring-v{font-family:'Bebas Neue',sans-serif;font-size:16px;line-height:1}
-.ring-n{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;margin-top:2px}
+.ring-n{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-top:2px}
 .ring-t{font-size:9px;color:rgba(255,255,255,0.25)}
 
-/* ── WATER ── */
+/* WATER */
 .water-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
-.water-lbl{font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--wc);font-weight:600}
+.water-lbl{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--wc);font-weight:600}
 .water-ct{font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--wc)}
 .water-bar-bg{height:8px;background:rgba(255,255,255,0.08);border-radius:4px;overflow:hidden;margin-bottom:12px}
-.water-bar-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,var(--blue),rgba(10,132,255,0.7));transition:width 0.4s ease;box-shadow:0 0 10px rgba(10,132,255,0.4)}
+.water-bar-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,var(--blue),rgba(10,132,255,0.7));transition:width .4s ease;box-shadow:0 0 10px rgba(10,132,255,0.35)}
 .water-btns{display:flex;gap:7px}
-.wbtn{
-  flex:1;background:var(--glass2);
-  border:1px solid var(--border);border-radius:12px;
-  color:var(--wc);font-family:'DM Mono',monospace;font-size:12px;
-  padding:10px 4px;cursor:pointer;transition:all 0.15s;text-align:center;
-  backdrop-filter:blur(10px);
-}
-.wbtn:active{background:var(--blue2);border-color:var(--blue)}
+.wbtn{flex:1;background:var(--glass2);border:1px solid var(--border);border-radius:12px;color:var(--wc);font-family:'DM Mono',monospace;font-size:12px;padding:10px 4px;cursor:pointer;transition:all .15s;text-align:center;backdrop-filter:blur(10px)}
+.wbtn:active{background:rgba(10,132,255,0.2);border-color:var(--blue)}
 .wbtn-reset{color:var(--muted);flex:0 0 auto;min-width:42px}
 
-/* ── LOG BTN ── */
+/* LOG BTN */
 .log-btn-wrap{padding:10px 14px 0}
-.log-btn{
-  width:100%;
-  background:linear-gradient(135deg,var(--lime),rgba(200,241,53,0.8));
-  color:#0a0a0a;border:none;border-radius:18px;
-  padding:17px;font-family:'Bebas Neue',sans-serif;
-  font-size:20px;letter-spacing:2px;cursor:pointer;
-  display:flex;align-items:center;justify-content:center;gap:10px;
-  transition:transform 0.1s,opacity 0.1s;
-  box-shadow:0 4px 24px rgba(200,241,53,0.25),0 0 0 1px rgba(200,241,53,0.3);
-}
-.log-btn:active{transform:scale(0.97);opacity:0.9}
+.log-btn{width:100%;background:linear-gradient(135deg,var(--lime),rgba(200,241,53,0.8));color:#0a0a0a;border:none;border-radius:18px;padding:17px;font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:2px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;transition:transform .1s,opacity .1s;box-shadow:0 4px 24px rgba(200,241,53,0.2)}
+.log-btn:active{transform:scale(.97);opacity:.9}
 .log-btn svg{width:21px;height:21px;stroke:#0a0a0a;stroke-width:2.5;fill:none}
 
-/* ── QUICK ADD ── */
-.qa-scroll{display:flex;gap:8px;overflow-x:auto;padding:0 14px;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:4px}
+/* QUICK ADD */
+.qa-scroll{display:flex;gap:8px;overflow-x:auto;padding:0 14px 4px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
 .qa-scroll::-webkit-scrollbar{display:none}
-.qa-item{
-  flex:0 0 auto;
-  background:var(--glass);
-  backdrop-filter:blur(20px);
-  border:1px solid var(--border);
-  border-radius:14px;padding:10px 13px;
-  cursor:pointer;transition:all 0.15s;
-  display:flex;flex-direction:column;align-items:center;gap:4px;
-  min-width:72px;
-}
-.qa-item:active{transform:scale(0.95);background:var(--glass2)}
+.qa-item{flex:0 0 auto;background:var(--glass);backdrop-filter:blur(20px);border:1px solid var(--border);border-radius:14px;padding:10px 12px;cursor:pointer;transition:all .15s;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:70px}
+.qa-item:active{transform:scale(.95);background:var(--glass2)}
 .qa-icon{font-size:20px;line-height:1}
-.qa-name{font-size:9px;color:var(--muted);text-align:center;line-height:1.3;max-width:68px}
+.qa-name{font-size:9px;color:var(--muted);text-align:center;line-height:1.3;max-width:66px}
 .qa-kcal{font-family:'Bebas Neue',sans-serif;font-size:13px;color:var(--lime);line-height:1}
-.qa-add{
-  flex:0 0 auto;
-  background:var(--glass3);
-  border:1.5px dashed var(--border);
-  border-radius:14px;padding:10px 13px;
-  cursor:pointer;transition:all 0.15s;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
-  min-width:58px;color:var(--muted);
-}
+.qa-add{flex:0 0 auto;background:var(--glass3);border:1.5px dashed var(--border);border-radius:14px;padding:10px 12px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-width:54px;color:var(--muted)}
 .qa-add:active{background:var(--glass2)}
-.qa-add-icon{font-size:20px;line-height:1}
-.qa-add-lbl{font-size:9px;text-align:center;line-height:1.3}
 
-/* ── FOOD LIST ── */
+/* FOOD LIST */
 .food-list{padding:0 14px;display:flex;flex-direction:column;gap:8px;padding-bottom:6px}
-.fi{
-  background:var(--glass);
-  backdrop-filter:blur(20px);
-  border:1px solid var(--border);
-  border-radius:16px;padding:13px;
-  display:flex;gap:11px;align-items:center;
-  animation:fu 0.25s ease;
-}
+.fi{background:var(--glass);backdrop-filter:blur(20px);border:1px solid var(--border);border-radius:16px;padding:13px;display:flex;gap:11px;align-items:center;animation:fu .25s ease}
 .fi-thumb{width:50px;height:50px;border-radius:12px;object-fit:cover;flex-shrink:0;background:var(--glass2);display:flex;align-items:center;justify-content:center;font-size:20px}
 .fi-info{flex:1;min-width:0}
-.fi-name{font-family:'Bebas Neue',sans-serif;font-size:17px;letter-spacing:0.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:6px}
+.fi-name{font-family:'Bebas Neue',sans-serif;font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:6px}
 .fi-tags{display:flex;gap:5px;flex-wrap:wrap}
 .ft{font-size:10px;padding:3px 8px;border-radius:6px;background:rgba(255,255,255,0.07);border:1px solid var(--border2)}
 .ftcal{color:var(--lime)}.ftp{color:var(--pc)}.ftc{color:var(--cc)}.ftf{color:var(--fc)}
-.fi-del{background:none;border:none;color:var(--muted);cursor:pointer;padding:8px;font-size:15px;flex-shrink:0;transition:color 0.2s}
-.fi-del:hover{color:var(--red)}
+.fi-del{background:none;border:none;color:var(--muted);cursor:pointer;padding:8px;font-size:15px;flex-shrink:0}
 .empty-st{text-align:center;padding:32px 20px;color:var(--muted);font-size:13px;line-height:2.5}
 .empty-icon{font-size:40px;display:block;margin-bottom:8px}
 
-/* ── CALENDAR ── */
+/* AI COACH */
+.coach-pg{padding:0 14px}
+.coach-hdr{padding:16px 0 12px;display:flex;justify-content:space-between;align-items:center}
+.coach-title{font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:1px;color:var(--lime)}
+.coach-date{font-size:11px;color:var(--muted)}
+.coach-generate{width:100%;background:linear-gradient(135deg,rgba(200,241,53,0.12),rgba(48,213,200,0.08));border:1px solid rgba(200,241,53,0.25);border-radius:18px;padding:18px;cursor:pointer;margin-bottom:14px;transition:all .2s}
+.coach-generate:active{transform:scale(.98)}
+.cg-icon{font-size:32px;margin-bottom:8px}
+.cg-title{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1px;color:var(--lime);margin-bottom:4px}
+.cg-sub{font-size:12px;color:var(--muted);line-height:1.6}
+.coach-response{background:var(--glass);backdrop-filter:blur(20px);border:1px solid var(--border);border-radius:20px;padding:18px;margin-bottom:12px;display:none}
+.coach-response.show{display:block;animation:fu .3s ease}
+.cr-header{display:flex;align-items:center;gap:10px;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--border2)}
+.cr-icon{font-size:28px}
+.cr-title{font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:.5px;color:var(--lime)}
+.cr-time{font-size:10px;color:var(--muted);margin-top:2px}
+.cr-body{font-size:13px;color:var(--text2);line-height:1.9;white-space:pre-wrap}
+.cr-section{margin-bottom:16px}
+.cr-section-title{font-family:'Bebas Neue',sans-serif;font-size:14px;letter-spacing:.5px;color:var(--cyan);margin-bottom:6px;text-transform:uppercase}
+.coach-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+.cs-card{background:var(--glass);border:1px solid var(--border);border-radius:14px;padding:12px;text-align:center}
+.cs-v{font-family:'Bebas Neue',sans-serif;font-size:22px;line-height:1}
+.cs-l{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-top:3px}
+.coach-loading{text-align:center;padding:40px 20px;color:var(--lime);font-size:13px;line-height:2.5;display:none}
+.coach-loading.show{display:block}
+.coach-spin{display:inline-block;width:28px;height:28px;border:2px solid rgba(200,241,53,0.15);border-top-color:var(--lime);border-radius:50%;animation:spin .65s linear infinite;margin-bottom:8px}
+
+/* CALENDAR */
 .cal-pg{padding:0 14px}
 .cal-nav{display:flex;align-items:center;justify-content:space-between;padding:16px 0 10px}
 .cal-month{font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:1px;color:var(--lime)}
@@ -294,34 +186,34 @@ html,body{height:100%;overflow:hidden}
 .cal-dow-row{display:grid;grid-template-columns:repeat(7,1fr);text-align:center;margin-bottom:5px}
 .cal-dow{font-size:10px;color:var(--muted);text-transform:uppercase;padding:3px 0}
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
-.cc{aspect-ratio:1;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;border:1px solid transparent;transition:all 0.15s;background:var(--glass3);position:relative}
+.cc{aspect-ratio:1;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;border:1px solid transparent;transition:all .15s;background:var(--glass3);position:relative}
 .cc.empty{background:transparent;border-color:transparent;cursor:default}
-.cc.today{border-color:var(--lime);box-shadow:0 0 10px rgba(200,241,53,0.15) inset}
+.cc.today{border-color:var(--lime);box-shadow:0 0 10px rgba(200,241,53,0.12) inset}
 .cc.sel{background:var(--lime);color:#0a0a0a}
 .cc.has-data::after{content:'';position:absolute;bottom:3px;width:4px;height:4px;border-radius:50%;background:var(--cyan)}
 .cc.sel.has-data::after{background:#0a0a0a}
 .cc-num{font-family:'Bebas Neue',sans-serif;font-size:16px;line-height:1}
 .day-detail{margin-top:12px}
 .ddc{background:var(--glass);backdrop-filter:blur(20px);border:1px solid var(--border);border-radius:18px;padding:16px;margin-bottom:10px}
-.ddc-title{font-family:'Bebas Neue',sans-serif;font-size:14px;letter-spacing:0.5px;margin-bottom:12px;color:rgba(255,255,255,0.5)}
+.ddc-title{font-family:'Bebas Neue',sans-serif;font-size:14px;letter-spacing:.5px;margin-bottom:12px;color:rgba(255,255,255,0.5)}
 .ddc-row{display:flex;flex-wrap:wrap}
 .ddc-s{flex:1;min-width:55px;text-align:center;padding:4px 2px}
 .ddc-s+.ddc-s{border-left:1px solid var(--border2)}
 .ddc-v{font-family:'Bebas Neue',sans-serif;font-size:22px;line-height:1}
-.ddc-l{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;margin-top:3px}
+.ddc-l{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-top:3px}
 .dm-item{background:rgba(255,255,255,0.04);border-radius:10px;padding:11px 14px;display:flex;justify-content:space-between;align-items:center;margin-top:7px}
 .dm-name{font-size:13px;color:var(--text2)}
-.dm-cal{font-size:11px;color:var(--lime);font-family:'Bebas Neue',sans-serif;font-size:15px}
+.dm-cal{font-family:'Bebas Neue',sans-serif;font-size:15px;color:var(--lime)}
 .no-data{text-align:center;padding:20px;color:var(--muted);font-size:12px}
 
-/* ── PROGRESS ── */
+/* PROGRESS */
 .prog-pg{padding:0 14px}
 .prog-hdr{display:flex;justify-content:space-between;align-items:center;padding:16px 0 12px}
 .prog-title{font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:1px;color:var(--lime)}
 .add-btn{background:var(--glass2);backdrop-filter:blur(20px);border:1px solid var(--border);border-radius:11px;padding:9px 16px;color:var(--text);font-family:'DM Mono',monospace;font-size:12px;cursor:pointer}
 .stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
 .sc{background:var(--glass);backdrop-filter:blur(20px);border:1px solid var(--border);border-radius:18px;padding:16px}
-.sc-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:7px}
+.sc-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:7px}
 .sc-val{font-family:'Bebas Neue',sans-serif;font-size:38px;line-height:1}
 .sc-unit{font-size:12px;color:rgba(255,255,255,0.4);margin-top:2px}
 .sc-delta{font-size:11px;margin-top:5px}
@@ -335,7 +227,7 @@ html,body{height:100%;overflow:hidden}
 .goal-detail{font-size:11px;color:var(--muted);line-height:1.7;margin-bottom:8px}
 .goal-dates{display:flex;justify-content:space-between;font-size:10px;color:var(--muted)}
 .chart-card{background:var(--glass);backdrop-filter:blur(20px);border:1px solid var(--border);border-radius:18px;padding:16px;margin-bottom:10px}
-.chart-title{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:14px}
+.chart-title{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:14px}
 .chart-area{height:100px;display:flex;align-items:flex-end;gap:5px}
 .cb-wrap{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;justify-content:flex-end}
 .cb{width:100%;border-radius:4px 4px 0 0;min-height:3px;position:relative}
@@ -351,73 +243,72 @@ html,body{height:100%;overflow:hidden}
 .ei-vl{font-size:9px;color:var(--muted);text-transform:uppercase}
 .ei-del{background:none;border:none;color:var(--muted);cursor:pointer;padding:6px;font-size:14px}
 
-/* ── MODALS ── */
-.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:100;align-items:flex-end;justify-content:center;backdrop-filter:blur(8px)}
+/* MODALS */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:100;align-items:flex-end;justify-content:center;backdrop-filter:blur(8px)}
 .overlay.open{display:flex}
-.modal{
-  background:rgba(18,20,26,0.95);
-  backdrop-filter:blur(60px) saturate(200%);
-  -webkit-backdrop-filter:blur(60px) saturate(200%);
-  border-radius:26px 26px 0 0;
-  border-top:1px solid var(--border);
-  border-left:1px solid var(--border);
-  border-right:1px solid var(--border);
-  padding:20px 18px max(36px,calc(env(safe-area-inset-bottom)+24px));
-  width:100%;max-width:480px;
-  animation:slideup 0.32s cubic-bezier(0.34,1.56,0.64,1);
-  max-height:92vh;overflow-y:auto;
-}
+.modal{background:rgba(14,16,22,0.97);backdrop-filter:blur(60px) saturate(200%);-webkit-backdrop-filter:blur(60px) saturate(200%);border-radius:26px 26px 0 0;border-top:1px solid var(--border);border-left:1px solid var(--border);border-right:1px solid var(--border);padding:20px 18px max(36px,calc(env(safe-area-inset-bottom)+24px));width:100%;max-width:480px;animation:slideup .32s cubic-bezier(.34,1.56,.64,1);max-height:92vh;overflow-y:auto}
 @keyframes slideup{from{transform:translateY(100%)}to{transform:translateY(0)}}
 .m-handle{width:36px;height:4px;background:rgba(255,255,255,0.15);border-radius:2px;margin:0 auto 18px}
 .m-title{font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:1px;margin-bottom:4px}
 .m-sub{font-size:12px;color:var(--muted);line-height:1.7;margin-bottom:16px}
-.flbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;display:block;margin-bottom:6px;margin-top:14px}
+.flbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;display:block;margin-bottom:6px;margin-top:14px}
 .frow{display:flex;gap:10px}
 .frow>div{flex:1}
-input[type=number],input[type=text],textarea,select{
-  width:100%;background:rgba(255,255,255,0.07);
-  border:1px solid var(--border);border-radius:13px;
-  padding:13px 14px;color:var(--text);
-  font-family:'DM Mono',monospace;font-size:14px;
-  outline:none;transition:border-color 0.2s;resize:none;
-  -webkit-appearance:none;appearance:none;
-}
+input[type=number],input[type=text],textarea,select{width:100%;background:rgba(255,255,255,0.07);border:1px solid var(--border);border-radius:13px;padding:13px 14px;color:var(--text);font-family:'DM Mono',monospace;font-size:14px;outline:none;transition:border-color .2s;resize:none;-webkit-appearance:none;appearance:none}
 input:focus,textarea:focus,select:focus{border-color:var(--lime)}
-.btn-p{width:100%;background:linear-gradient(135deg,var(--lime),rgba(200,241,53,0.8));color:#0a0a0a;border:none;border-radius:14px;padding:16px;font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1px;cursor:pointer;margin-top:14px;transition:opacity 0.2s;box-shadow:0 4px 20px rgba(200,241,53,0.2)}
-.btn-p:disabled{opacity:0.35;cursor:not-allowed}
+.btn-p{width:100%;background:linear-gradient(135deg,var(--lime),rgba(200,241,53,0.8));color:#0a0a0a;border:none;border-radius:14px;padding:16px;font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1px;cursor:pointer;margin-top:14px;box-shadow:0 4px 20px rgba(200,241,53,0.2)}
+.btn-p:disabled{opacity:.35;cursor:not-allowed}
 .btn-s{width:100%;background:none;border:1px solid var(--border);border-radius:14px;padding:14px;font-family:'DM Mono',monospace;font-size:13px;color:var(--muted);cursor:pointer;margin-top:8px}
-.btn-confirm{width:100%;background:rgba(200,241,53,0.1);border:1px solid rgba(200,241,53,0.4);border-radius:14px;padding:14px;font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px;color:var(--lime);cursor:pointer;margin-top:10px;transition:background 0.2s}
-.btn-confirm:hover{background:rgba(200,241,53,0.15)}
+.btn-confirm{width:100%;background:rgba(200,241,53,0.1);border:1px solid rgba(200,241,53,0.4);border-radius:14px;padding:14px;font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px;color:var(--lime);cursor:pointer;margin-top:10px;transition:background .2s}
 
 /* PHOTO ZONE */
-.photo-zone{border:1.5px dashed rgba(255,255,255,0.15);border-radius:16px;padding:20px;text-align:center;cursor:pointer;transition:border-color 0.2s;margin-bottom:10px;background:rgba(255,255,255,0.03)}
+.photo-zone{border:1.5px dashed rgba(255,255,255,0.15);border-radius:16px;padding:20px;text-align:center;cursor:pointer;transition:border-color .2s;margin-bottom:10px;background:rgba(255,255,255,0.03)}
 .photo-zone.has-img,.photo-zone:hover{border-color:var(--lime)}
 .photo-zone img{max-width:100%;max-height:140px;border-radius:10px;object-fit:cover}
 .ph-ph{color:var(--muted);font-size:12px;line-height:2.3}
 .ph-icon{font-size:28px;display:block}
 
-/* RESULT */
-.result-card{display:none;background:rgba(255,255,255,0.05);border-radius:16px;padding:15px;margin-bottom:10px}
-.result-card.show{display:block;animation:fu 0.3s ease}
-.rc-name{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:0.3px;margin-bottom:11px}
-.rc-macros{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:11px}
-.rcm{background:rgba(255,255,255,0.06);border-radius:10px;padding:10px 4px;text-align:center}
-.rcm-v{font-family:'Bebas Neue',sans-serif;font-size:18px;line-height:1}
-.rcm-l{font-size:9px;color:var(--muted);text-transform:uppercase;margin-top:3px}
-.rc-notes{font-size:11px;color:var(--muted);line-height:1.7;border-top:1px solid var(--border);padding-top:10px}
+/* CONFIDENCE BADGE */
+.conf-badge{display:inline-flex;align-items:center;gap:6px;border-radius:8px;padding:5px 10px;font-size:11px;font-weight:600;letter-spacing:.05em;margin-bottom:10px}
+.conf-high{background:rgba(48,213,200,0.12);border:1px solid rgba(48,213,200,0.3);color:var(--cyan)}
+.conf-medium{background:rgba(255,138,61,0.12);border:1px solid rgba(255,138,61,0.3);color:var(--orange)}
+.conf-low{background:rgba(255,69,58,0.12);border:1px solid rgba(255,69,58,0.3);color:var(--red)}
+.conf-tip{font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:12px;padding:8px 10px;background:rgba(255,255,255,0.04);border-radius:10px;display:none}
+.conf-tip.show{display:block}
+
+/* INGREDIENT LIST */
+.ing-list{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+.ing-item{background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:14px;padding:12px 14px;transition:all .15s}
+.ing-item.selected{border-color:rgba(200,241,53,0.4);background:rgba(200,241,53,0.05)}
+.ing-top{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.ing-check{width:20px;height:20px;border-radius:6px;border:1.5px solid var(--border);background:transparent;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .15s;cursor:pointer}
+.ing-item.selected .ing-check{background:var(--lime);border-color:var(--lime)}
+.ing-check-icon{display:none;color:#0a0a0a;font-size:13px;font-weight:700}
+.ing-item.selected .ing-check-icon{display:block}
+.ing-name{font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:.3px;flex:1}
+.ing-emoji{font-size:18px}
+.ing-macros{display:flex;gap:6px;flex-wrap:wrap;padding-left:30px}
+.ing-m{font-size:10px;padding:2px 7px;border-radius:5px;background:rgba(255,255,255,0.07)}
+/* PORTION */
+.portion-row{display:flex;align-items:center;gap:6px;padding-left:30px;margin-top:8px}
+.portion-lbl{font-size:10px;color:var(--muted);flex-shrink:0}
+.portion-btns{display:flex;gap:4px}
+.pbtn{background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:7px;color:var(--muted);font-size:11px;padding:4px 8px;cursor:pointer;transition:all .15s;font-family:'DM Mono',monospace}
+.pbtn.active{background:rgba(200,241,53,0.15);border-color:rgba(200,241,53,0.4);color:var(--lime)}
+
+/* LOADING */
 .loading{display:none;text-align:center;padding:16px;color:var(--lime);font-size:12px;line-height:2.3}
 .loading.show{display:block}
-.spin{display:inline-block;width:20px;height:20px;border:2px solid rgba(255,255,255,0.1);border-top-color:var(--lime);border-radius:50%;animation:spin 0.65s linear infinite}
+.spin{display:inline-block;width:20px;height:20px;border:2px solid rgba(255,255,255,0.1);border-top-color:var(--lime);border-radius:50%;animation:spin .65s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 
-/* ADD QUICK ITEM FORM */
 .qa-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 </style>
 </head>
 <body>
 <div id="app">
 
-<!-- ═══════════════ PAGE: TODAY ═══════════════ -->
+<!-- ═══ TODAY ═══ -->
 <div id="pg-today" class="page active">
   <div class="hdr">
     <div class="logo-wrap">
@@ -426,8 +317,6 @@ input:focus,textarea:focus,select:focus{border-color:var(--lime)}
     </div>
     <div class="hdr-date" id="hdr-date"></div>
   </div>
-
-  <!-- Styku Banner -->
   <div class="scan-banner">
     <div class="sb-label">🔬 Styku · Mar 4, 2026</div>
     <div class="sb-row">
@@ -438,8 +327,6 @@ input:focus,textarea:focus,select:focus{border-color:var(--lime)}
       <div class="sb-s"><div class="sb-v">−5.6kg</div><div class="sb-l">Fat Goal</div></div>
     </div>
   </div>
-
-  <!-- Whoop -->
   <div class="whoop-card">
     <div class="wh-top">
       <div class="wh-brand"><div class="wh-dot"></div><div class="wh-logo">WHOOP</div></div>
@@ -453,52 +340,36 @@ input:focus,textarea:focus,select:focus{border-color:var(--lime)}
       <div class="wh-s"><div class="wh-v" id="w-steps">—</div><div class="wh-l">Steps</div></div>
     </div>
   </div>
-
-  <!-- Calories -->
-  <div class="glass-card">
-    <div class="glass-card-inner">
+  <div class="gc">
+    <div class="gc-in">
       <div class="cal-top">
         <div><div class="cal-big" id="cal-num">0<sup>kcal</sup></div><div style="font-size:11px;color:var(--muted);margin-top:4px">consumed today</div></div>
-        <div class="cal-right">
-          <div class="cal-rem" id="cal-rem">— left</div>
-          <div class="cal-sub" id="cal-tlbl">Set Whoop data ↑</div>
-        </div>
+        <div class="cal-right"><div class="cal-rem" id="cal-rem">— left</div><div class="cal-sub" id="cal-tlbl">Set Whoop data ↑</div></div>
       </div>
       <div class="pbar"><div class="pbar-f" id="cal-bar" style="width:0%"></div></div>
     </div>
   </div>
-
-  <!-- Macro Rings -->
-  <div class="glass-card">
-    <div class="glass-card-inner">
+  <div class="gc">
+    <div class="gc-in">
       <div class="sec-lbl" style="padding:0 0 10px;font-size:10px">Macro Targets</div>
       <div class="rings-row">
         <div class="ring-wrap">
           <div class="ring-svg-wrap">
-            <svg class="rsvg" width="90" height="90" viewBox="0 0 90 90">
-              <circle class="rbg" cx="45" cy="45" r="37"/>
-              <circle class="rfill" cx="45" cy="45" r="37" stroke="var(--pc)" id="rp" stroke-dasharray="232.5" stroke-dashoffset="232.5"/>
-            </svg>
+            <svg class="rsvg" width="90" height="90" viewBox="0 0 90 90"><circle class="rbg" cx="45" cy="45" r="37"/><circle class="rfill" cx="45" cy="45" r="37" stroke="var(--pc)" id="rp" stroke-dasharray="232.5" stroke-dashoffset="232.5"/></svg>
             <div class="ring-pct" style="color:var(--pc)" id="rp-pct">0%</div>
           </div>
           <div class="ring-info"><div class="ring-v" style="color:var(--pc)" id="rp-v">0g</div><div class="ring-n">Protein</div><div class="ring-t">/ 128g</div></div>
         </div>
         <div class="ring-wrap">
           <div class="ring-svg-wrap">
-            <svg class="rsvg" width="90" height="90" viewBox="0 0 90 90">
-              <circle class="rbg" cx="45" cy="45" r="37"/>
-              <circle class="rfill" cx="45" cy="45" r="37" stroke="var(--cc)" id="rc" stroke-dasharray="232.5" stroke-dashoffset="232.5"/>
-            </svg>
+            <svg class="rsvg" width="90" height="90" viewBox="0 0 90 90"><circle class="rbg" cx="45" cy="45" r="37"/><circle class="rfill" cx="45" cy="45" r="37" stroke="var(--cc)" id="rc" stroke-dasharray="232.5" stroke-dashoffset="232.5"/></svg>
             <div class="ring-pct" style="color:var(--cc)" id="rc-pct">0%</div>
           </div>
           <div class="ring-info"><div class="ring-v" style="color:var(--cc)" id="rc-v">0g</div><div class="ring-n">Carbs</div><div class="ring-t">/ 200g</div></div>
         </div>
         <div class="ring-wrap">
           <div class="ring-svg-wrap">
-            <svg class="rsvg" width="90" height="90" viewBox="0 0 90 90">
-              <circle class="rbg" cx="45" cy="45" r="37"/>
-              <circle class="rfill" cx="45" cy="45" r="37" stroke="var(--fc)" id="rf" stroke-dasharray="232.5" stroke-dashoffset="232.5"/>
-            </svg>
+            <svg class="rsvg" width="90" height="90" viewBox="0 0 90 90"><circle class="rbg" cx="45" cy="45" r="37"/><circle class="rfill" cx="45" cy="45" r="37" stroke="var(--fc)" id="rf" stroke-dasharray="232.5" stroke-dashoffset="232.5"/></svg>
             <div class="ring-pct" style="color:var(--fc)" id="rf-pct">0%</div>
           </div>
           <div class="ring-info"><div class="ring-v" style="color:var(--fc)" id="rf-v">0g</div><div class="ring-n">Fat</div><div class="ring-t">/ 65g</div></div>
@@ -506,10 +377,8 @@ input:focus,textarea:focus,select:focus{border-color:var(--lime)}
       </div>
     </div>
   </div>
-
-  <!-- Water -->
-  <div class="glass-card">
-    <div class="glass-card-inner">
+  <div class="gc">
+    <div class="gc-in">
       <div class="water-top">
         <div class="water-lbl">💧 Hydration</div>
         <div class="water-ct"><span id="water-ml">0</span><span style="font-size:12px;color:var(--muted)">&thinsp;/ 2,500 mL</span></div>
@@ -524,27 +393,49 @@ input:focus,textarea:focus,select:focus{border-color:var(--lime)}
       </div>
     </div>
   </div>
-
-  <!-- Log Meal Button -->
   <div class="log-btn-wrap">
     <button class="log-btn" onclick="openLogModal()">
       <svg viewBox="0 0 24 24"><path d="M14.5 2h-5L7 4H4a2 2 0 00-2 2v12a2 2 0 002 2h16a2 2 0 002-2V6a2 2 0 00-2-2h-3l-2.5-2z"/><circle cx="12" cy="13" r="3"/></svg>
       LOG A MEAL
     </button>
   </div>
-
-  <!-- Quick Add -->
   <div class="sec-lbl">Quick Add</div>
-  <div class="qa-scroll" id="qa-scroll">
-    <!-- populated by JS -->
-  </div>
-
-  <!-- Today's Meals -->
+  <div class="qa-scroll" id="qa-scroll"></div>
   <div class="sec-lbl">Today's Meals</div>
   <div id="food-list" class="food-list"></div>
 </div>
 
-<!-- ═══════════════ PAGE: CALENDAR ═══════════════ -->
+<!-- ═══ AI COACH ═══ -->
+<div id="pg-coach" class="page">
+  <div class="hdr">
+    <div class="logo-wrap">
+      <div class="logo-icon"><svg width="38" height="38" viewBox="0 0 38 38"><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" font-family="Georgia,serif" font-size="20" font-weight="bold" fill="#0a0a0a">rB</text></svg></div>
+      <div><div class="logo-main">AI Coach</div><div class="logo-sub">Daily Debrief</div></div>
+    </div>
+  </div>
+  <div class="coach-pg">
+    <div class="coach-hdr">
+      <div class="coach-title">Today's Report</div>
+      <div class="coach-date" id="coach-date"></div>
+    </div>
+    <div class="coach-stats">
+      <div class="cs-card"><div class="cs-v" id="cs-cal" style="color:var(--lime)">—</div><div class="cs-l">kcal eaten</div></div>
+      <div class="cs-card"><div class="cs-v" id="cs-protein" style="color:var(--pc)">—</div><div class="cs-l">protein g</div></div>
+      <div class="cs-card"><div class="cs-v" id="cs-water" style="color:var(--wc)">—</div><div class="cs-l">water mL</div></div>
+    </div>
+    <button class="coach-generate" onclick="generateCoachReport()">
+      <div class="cg-icon">🧠</div>
+      <div class="cg-title">Generate Daily Debrief</div>
+      <div class="cg-sub">Claude analyses your meals, macros, Whoop data and hydration — and gives you a direct, honest breakdown.</div>
+    </button>
+    <div class="coach-loading" id="coach-loading">
+      <div class="coach-spin"></div><br>Analysing your day…
+    </div>
+    <div class="coach-response" id="coach-response"></div>
+  </div>
+</div>
+
+<!-- ═══ CALENDAR ═══ -->
 <div id="pg-calendar" class="page">
   <div class="hdr">
     <div class="logo-wrap">
@@ -564,7 +455,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--lime)}
   </div>
 </div>
 
-<!-- ═══════════════ PAGE: PROGRESS ═══════════════ -->
+<!-- ═══ PROGRESS ═══ -->
 <div id="pg-progress" class="page">
   <div class="hdr">
     <div class="logo-wrap">
@@ -573,10 +464,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--lime)}
     </div>
   </div>
   <div class="prog-pg">
-    <div class="prog-hdr">
-      <div class="prog-title">Body Tracker</div>
-      <button class="add-btn" onclick="openEntryModal()">+ Log Entry</button>
-    </div>
+    <div class="prog-hdr"><div class="prog-title">Body Tracker</div><button class="add-btn" onclick="openEntryModal()">+ Log Entry</button></div>
     <div class="stats-grid">
       <div class="sc"><div class="sc-lbl">Weight</div><div class="sc-val" id="p-weight" style="color:var(--lime)">89.1</div><div class="sc-unit">kg</div><div class="sc-delta" id="p-w-delta"></div></div>
       <div class="sc"><div class="sc-lbl">Body Fat</div><div class="sc-val" id="p-bf" style="color:var(--cyan)">25.1</div><div class="sc-unit">%</div><div class="sc-delta" id="p-bf-delta"></div></div>
@@ -596,12 +484,16 @@ input:focus,textarea:focus,select:focus{border-color:var(--lime)}
 
 </div><!-- #app -->
 
-<!-- BOTTOM NAV (outside #app so it overlays) -->
+<!-- BOTTOM NAV -->
 <nav class="bnav">
   <div class="bnav-inner">
     <button class="nb active" onclick="showPage('today',this)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
       <span>Today</span>
+    </button>
+    <button class="nb" onclick="showPage('coach',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2a10 10 0 110 20A10 10 0 0112 2z"/><path d="M12 16v-4M12 8h.01"/></svg>
+      <span>Coach</span>
     </button>
     <button class="nb" onclick="showPage('calendar',this)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
@@ -619,39 +511,34 @@ input:focus,textarea:focus,select:focus{border-color:var(--lime)}
   <div class="modal">
     <div class="m-handle"></div>
     <div class="m-title">Log a Meal</div>
-    <div class="m-sub">Photo or type a name — branded products (e.g. "Coca-Cola Zero 330ml") return exact label macros.</div>
+    <div class="m-sub">Photo or describe your meal. Claude identifies each ingredient separately so you can select exactly what's on your plate.</div>
     <div class="photo-zone" id="photo-zone" onclick="document.getElementById('file-meal').click()">
       <div id="ph-ph"><span class="ph-icon">📷</span>Tap to take photo or upload<br><span style="font-size:10px;color:rgba(255,255,255,0.25)">optional — description alone works</span></div>
       <img id="preview" style="display:none"/>
     </div>
     <input type="file" id="file-meal" accept="image/*" capture="environment" onchange="handleMealPhoto(event)" style="display:none"/>
     <label class="flbl">Meal / Product Description</label>
-    <textarea id="meal-desc" rows="2" placeholder="e.g. Coca-Cola Zero 330ml, grilled chicken 200g, Big Mac…"></textarea>
-    <div class="loading" id="meal-loading"><div class="spin"></div><br>Analysing…</div>
-    <div class="result-card" id="result-card">
-      <div class="rc-name" id="rc-name"></div>
-      <div style="font-size:10px;color:var(--muted);margin-bottom:8px;letter-spacing:0.05em">✏️ Tap any value to edit before adding</div>
-      <div class="rc-macros">
-        <div class="rcm">
-          <input type="number" id="rc-cal" step="1" style="background:transparent;border:none;border-bottom:1px solid rgba(200,241,53,0.3);border-radius:0;padding:2px 4px;color:var(--lime);font-family:'Bebas Neue',sans-serif;font-size:22px;width:100%;text-align:center;outline:none"/>
-          <div class="rcm-l">kcal</div>
-        </div>
-        <div class="rcm">
-          <input type="number" id="rc-p" step="0.1" style="background:transparent;border:none;border-bottom:1px solid rgba(255,138,61,0.3);border-radius:0;padding:2px 4px;color:var(--pc);font-family:'Bebas Neue',sans-serif;font-size:22px;width:100%;text-align:center;outline:none"/>
-          <div class="rcm-l">protein g</div>
-        </div>
-        <div class="rcm">
-          <input type="number" id="rc-c" step="0.1" style="background:transparent;border:none;border-bottom:1px solid rgba(48,213,200,0.3);border-radius:0;padding:2px 4px;color:var(--cc);font-family:'Bebas Neue',sans-serif;font-size:22px;width:100%;text-align:center;outline:none"/>
-          <div class="rcm-l">carbs g</div>
-        </div>
-        <div class="rcm">
-          <input type="number" id="rc-f" step="0.1" style="background:transparent;border:none;border-bottom:1px solid rgba(191,90,242,0.3);border-radius:0;padding:2px 4px;color:var(--fc);font-family:'Bebas Neue',sans-serif;font-size:22px;width:100%;text-align:center;outline:none"/>
-          <div class="rcm-l">fat g</div>
-        </div>
+    <textarea id="meal-desc" rows="2" placeholder="e.g. avocado toast with egg, Big Mac, GHOST whey 1 scoop…"></textarea>
+    <div class="loading" id="meal-loading"><div class="spin"></div><br>Identifying ingredients…</div>
+
+    <!-- INGREDIENT RESULTS -->
+    <div id="ing-results" style="display:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;margin-top:4px">
+        <div id="conf-badge-wrap"></div>
+        <div style="font-size:11px;color:var(--muted)">Select what's on your plate</div>
       </div>
-      <div class="rc-notes" id="rc-notes"></div>
+      <div id="conf-tip" class="conf-tip"></div>
+      <div class="ing-list" id="ing-list"></div>
+      <div style="background:rgba(255,255,255,0.04);border-radius:12px;padding:12px;margin-bottom:12px;font-size:11px;color:var(--muted)">
+        <span style="color:var(--text2);font-weight:600">Total: </span>
+        <span id="sel-cal" style="color:var(--lime)">0 kcal</span> ·
+        <span id="sel-p" style="color:var(--pc)">0g P</span> ·
+        <span id="sel-c" style="color:var(--cc)">0g C</span> ·
+        <span id="sel-f" style="color:var(--fc)">0g F</span>
+      </div>
+      <button class="btn-confirm" id="btn-add" onclick="confirmMeal()">+ ADD TO TODAY'S LOG</button>
     </div>
-    <button class="btn-confirm" id="btn-add" style="display:none" onclick="confirmMeal()">+ ADD TO TODAY'S LOG</button>
+
     <button class="btn-p" id="btn-analyze" onclick="analyzeMeal()">ANALYSE MEAL</button>
     <button class="btn-s" onclick="closeLogModal()">Cancel</button>
   </div>
@@ -662,7 +549,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--lime)}
   <div class="modal">
     <div class="m-handle"></div>
     <div class="m-title" style="color:var(--whoop-green)">WHOOP Data</div>
-    <div class="m-sub">Enter today's stats from your Whoop app. Calorie target adjusts automatically.</div>
+    <div class="m-sub">Enter today's stats. Calorie target adjusts automatically.</div>
     <div class="frow">
       <div><label class="flbl">Strain (0–21)</label><input type="number" id="w-strain-in" placeholder="e.g. 14.2" min="0" max="21" step="0.1"/></div>
       <div><label class="flbl">Recovery %</label><input type="number" id="w-rec-in" placeholder="e.g. 72" min="0" max="100"/></div>
@@ -707,18 +594,17 @@ input:focus,textarea:focus,select:focus{border-color:var(--lime)}
   <div class="modal">
     <div class="m-handle"></div>
     <div class="m-title">Add Quick Item</div>
-    <div class="m-sub">Add a custom item to your quick-add bar. You can also use AI to look it up.</div>
+    <div class="m-sub">Type a name and tap AI Lookup, or fill in manually.</div>
     <label class="flbl">Name</label>
     <input type="text" id="qa-name-in" placeholder="e.g. Protein Bar"/>
     <label class="flbl">Emoji</label>
     <input type="text" id="qa-emoji-in" placeholder="e.g. 🍫" maxlength="2"/>
-    <div class="qa-form-grid" style="margin-top:14px;gap:10px">
+    <div class="qa-form-grid" style="margin-top:14px">
       <div><label class="flbl" style="margin-top:0">Calories</label><input type="number" id="qa-cal-in" placeholder="kcal"/></div>
       <div><label class="flbl" style="margin-top:0">Protein (g)</label><input type="number" id="qa-p-in" placeholder="g"/></div>
       <div><label class="flbl" style="margin-top:0">Carbs (g)</label><input type="number" id="qa-c-in" placeholder="g"/></div>
       <div><label class="flbl" style="margin-top:0">Fat (g)</label><input type="number" id="qa-f-in" placeholder="g"/></div>
     </div>
-    <div style="font-size:11px;color:var(--muted);margin-top:10px;line-height:1.6">Or just fill in the name and tap AI Lookup to auto-fill macros.</div>
     <button class="btn-s" style="color:var(--cyan);border-color:rgba(48,213,200,0.3);margin-top:10px" onclick="aiLookupQA()">🔍 AI Lookup Macros</button>
     <div class="loading" id="qa-loading" style="color:var(--cyan)"><div class="spin" style="border-top-color:var(--cyan)"></div><br>Looking up…</div>
     <button class="btn-p" onclick="saveQAItem()">ADD TO QUICK BAR</button>
@@ -727,303 +613,224 @@ input:focus,textarea:focus,select:focus{border-color:var(--lime)}
 </div>
 
 <script>
-// ═══════════════════════════════════════════════════
-// CONSTANTS
-// ═══════════════════════════════════════════════════
-const TARGETS   = {cal:2340,p:128,c:200,f:65};
-const BASELINE  = {weight:89.1,bf:25.1,fatMass:22.4};
-const GOAL_BF   = 20.1;
-const CIRC      = 232.5;
-const WATER_GOAL= 2500;
-const MONTHS    = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-const DOWS      = ['Su','Mo','Tu','We','Th','Fr','Sa'];
-
+const PROXY = 'https://reborn-proxy.bormotyt.workers.dev';
+const TARGETS  = {cal:2340,p:128,c:200,f:65};
+const BASELINE = {weight:89.1,bf:25.1,fatMass:22.4};
+const GOAL_BF  = 20.1;
+const CIRC     = 232.5;
+const WATER_GOAL = 2500;
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const DOWS   = ['Su','Mo','Tu','We','Th','Fr','Sa'];
 const KEY = 'rb3';
+
 const todayKey = () => new Date().toISOString().slice(0,10);
-const load = (k,d) => { try{return JSON.parse(localStorage.getItem(k))??d}catch{return d} };
+const load = (k,d) => {try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}};
 const save = (k,v) => localStorage.setItem(k,JSON.stringify(v));
 const gv   = id => document.getElementById(id);
 
-// DEFAULT QUICK-ADD ITEMS
 const DEFAULT_QA = [
-  {id:'ghost-pre',   name:'GHOST Pre',        emoji:'⚡', calories:5,   protein:0,  carbs:1,  fat:0},
-  {id:'ghost-whey',  name:'GHOST Whey',        emoji:'🥛', calories:110, protein:25, carbs:3,  fat:1},
-  {id:'banana',      name:'Banana',            emoji:'🍌', calories:89,  protein:1,  carbs:23, fat:0},
-  {id:'date',        name:'Date',              emoji:'🟤', calories:20,  protein:0,  carbs:5,  fat:0},
-  {id:'egg',         name:'Hard Boiled Egg',   emoji:'🥚', calories:78,  protein:6,  carbs:1,  fat:5},
-  {id:'nada-yogurt', name:'NADA Yogurt',       emoji:'🫙', calories:130, protein:30, carbs:9,  fat:0},
+  {id:'ghost-pre',   name:'GHOST Pre',      emoji:'⚡',calories:5,  protein:0, carbs:1, fat:0},
+  {id:'ghost-whey',  name:'GHOST Whey',     emoji:'🥛',calories:110,protein:25,carbs:3, fat:1},
+  {id:'banana',      name:'Banana',         emoji:'🍌',calories:89, protein:1, carbs:23,fat:0},
+  {id:'date',        name:'Date',           emoji:'🟤',calories:20, protein:0, carbs:5, fat:0},
+  {id:'egg',         name:'Hard Boiled Egg',emoji:'🥚',calories:78, protein:6, carbs:1, fat:5},
+  {id:'nada-yogurt', name:'NADA Yogurt',    emoji:'🫙',calories:130,protein:30,carbs:9, fat:0},
 ];
 
-// ═══════════════════════════════════════════════════
 // STATE
-// ═══════════════════════════════════════════════════
-let meals       = load(`${KEY}_meals_${todayKey()}`, []);
-let whoop       = load(`${KEY}_whoop_${todayKey()}`, null);
-let waterMl     = parseInt(localStorage.getItem(`${KEY}_water_${todayKey()}`) || '0');
-let entries     = load(`${KEY}_entries`, []);
-let quickItems  = load(`${KEY}_quickitems`, DEFAULT_QA);
-let calViewDate = new Date();
-let calSelKey   = todayKey();
-let mealResult  = null, mealB64 = null;
+let meals      = load(`${KEY}_meals_${todayKey()}`,[]);
+let whoop      = load(`${KEY}_whoop_${todayKey()}`,null);
+let waterMl    = parseInt(localStorage.getItem(`${KEY}_water_${todayKey()}`)||'0');
+let entries    = load(`${KEY}_entries`,[]);
+let quickItems = load(`${KEY}_quickitems`,DEFAULT_QA);
+let calViewDate= new Date();
+let calSelKey  = todayKey();
+let mealB64    = null;
+let ingredients= []; // current analysis results
 
-// ═══════════════════════════════════════════════════
 // BOOT
-// ═══════════════════════════════════════════════════
 const _n = new Date();
 gv('hdr-date').innerHTML = _n.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})+'<br>'+_n.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+gv('coach-date').textContent = _n.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
 renderAll();
 
 function renderAll(){
   renderWhoop(); renderSummary(); renderRings();
   renderWater(); renderFoodList(); renderQuickAdd();
-  renderProgress(); buildCalendar();
+  renderProgress(); buildCalendar(); updateCoachStats();
 }
 
-// ═══════════════════════════════════════════════════
 // NAV
-// ═══════════════════════════════════════════════════
-function showPage(id, btn){
+function showPage(id,btn){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nb').forEach(b=>b.classList.remove('active'));
   gv('pg-'+id).classList.add('active');
   btn.classList.add('active');
+  gv('pg-'+id).scrollTop=0;
   if(id==='calendar') buildCalendar();
-  // Scroll page to top
-  gv('pg-'+id).scrollTop = 0;
+  if(id==='coach') updateCoachStats();
 }
 
-// ═══════════════════════════════════════════════════
 // WHOOP
-// ═══════════════════════════════════════════════════
 function renderWhoop(){
-  gv('w-strain').textContent   = whoop?.strain   != null ? whoop.strain       : '—';
-  gv('w-recovery').textContent = whoop?.recovery != null ? whoop.recovery+'%' : '—';
-  gv('w-burned').textContent   = whoop?.burned   != null ? whoop.burned       : '—';
-  gv('w-sleep').textContent    = whoop?.sleep    != null ? whoop.sleep+'h'    : '—';
-  gv('w-steps').textContent    = whoop?.steps    != null ? Number(whoop.steps).toLocaleString() : '—';
+  gv('w-strain').textContent   = whoop?.strain   !=null?whoop.strain       :'—';
+  gv('w-recovery').textContent = whoop?.recovery !=null?whoop.recovery+'%' :'—';
+  gv('w-burned').textContent   = whoop?.burned   !=null?whoop.burned       :'—';
+  gv('w-sleep').textContent    = whoop?.sleep    !=null?whoop.sleep+'h'    :'—';
+  gv('w-steps').textContent    = whoop?.steps    !=null?Number(whoop.steps).toLocaleString():'—';
 }
-
 function openWhoopModal(){
   if(whoop){
-    if(whoop.strain   != null) gv('w-strain-in').value = whoop.strain;
-    if(whoop.recovery != null) gv('w-rec-in').value    = whoop.recovery;
-    if(whoop.burned   != null) gv('w-burned-in').value = whoop.burned;
-    if(whoop.sleep    != null) gv('w-sleep-in').value  = whoop.sleep;
-    if(whoop.steps    != null) gv('w-steps-in').value  = whoop.steps;
-    gv('w-goal-in').value = whoop.goal || 'cut';
+    if(whoop.strain   !=null) gv('w-strain-in').value=whoop.strain;
+    if(whoop.recovery !=null) gv('w-rec-in').value=whoop.recovery;
+    if(whoop.burned   !=null) gv('w-burned-in').value=whoop.burned;
+    if(whoop.sleep    !=null) gv('w-sleep-in').value=whoop.sleep;
+    if(whoop.steps    !=null) gv('w-steps-in').value=whoop.steps;
+    gv('w-goal-in').value=whoop.goal||'cut';
   }
   gv('whoop-modal').classList.add('open');
 }
 function closeWhoopModal(){ gv('whoop-modal').classList.remove('open'); }
-
 function saveWhoop(){
-  const sv = gv('w-strain-in').value, rv = gv('w-rec-in').value,
-        bv = gv('w-burned-in').value, slv = gv('w-sleep-in').value,
-        stv = gv('w-steps-in').value, goal = gv('w-goal-in').value;
-  const burned = bv !== '' ? parseFloat(bv) : null;
-  let target = (burned && burned > 0) ? burned : 2340;
-  if(goal==='cut')  target -= 400;
-  if(goal==='bulk') target += 300;
-  target = Math.max(1500, Math.round(target));
-  whoop = {
-    strain:   sv  !== '' ? parseFloat(sv)  : null,
-    recovery: rv  !== '' ? parseInt(rv)    : null,
-    burned, sleep: slv !== '' ? parseFloat(slv) : null,
-    steps:  stv !== '' ? parseInt(stv)   : null,
-    goal, target
-  };
-  save(`${KEY}_whoop_${todayKey()}`, whoop);
-  closeWhoopModal();
-  renderAll();
+  const sv=gv('w-strain-in').value,rv=gv('w-rec-in').value,bv=gv('w-burned-in').value,
+        slv=gv('w-sleep-in').value,stv=gv('w-steps-in').value,goal=gv('w-goal-in').value;
+  const burned=bv!==''?parseFloat(bv):null;
+  let target=(burned&&burned>0)?burned:2340;
+  if(goal==='cut') target-=400; if(goal==='bulk') target+=300;
+  target=Math.max(1500,Math.round(target));
+  whoop={strain:sv!==''?parseFloat(sv):null,recovery:rv!==''?parseInt(rv):null,
+    burned,sleep:slv!==''?parseFloat(slv):null,steps:stv!==''?parseInt(stv):null,goal,target};
+  save(`${KEY}_whoop_${todayKey()}`,whoop);
+  closeWhoopModal(); renderAll();
 }
 
-// ═══════════════════════════════════════════════════
 // SUMMARY
-// ═══════════════════════════════════════════════════
 function getTotals(arr){
   return (arr||meals).reduce((a,m)=>({cal:a.cal+m.calories,p:a.p+m.protein,c:a.c+m.carbs,f:a.f+m.fat}),{cal:0,p:0,c:0,f:0});
 }
 function renderSummary(){
-  const t = getTotals();
-  gv('cal-num').innerHTML = Math.round(t.cal)+'<sup>kcal</sup>';
-  const tgt = whoop?.target || TARGETS.cal;
-  const rem = Math.round(tgt - t.cal);
-  const rEl = gv('cal-rem');
-  rEl.textContent = rem>=0 ? rem+' left' : Math.abs(rem)+' over';
-  rEl.className = 'cal-rem'+(rem<0?' over':'');
-  gv('cal-tlbl').textContent = 'of '+tgt.toLocaleString()+' kcal target';
-  const pct = Math.min((t.cal/tgt)*100,100);
-  const bar = gv('cal-bar');
-  bar.style.width = pct+'%';
-  bar.className = 'pbar-f'+(t.cal>tgt?' over':'');
+  const t=getTotals();
+  gv('cal-num').innerHTML=Math.round(t.cal)+'<sup>kcal</sup>';
+  const tgt=whoop?.target||TARGETS.cal;
+  const rem=Math.round(tgt-t.cal);
+  const rEl=gv('cal-rem');
+  rEl.textContent=rem>=0?rem+' left':Math.abs(rem)+' over';
+  rEl.className='cal-rem'+(rem<0?' over':'');
+  gv('cal-tlbl').textContent='of '+tgt.toLocaleString()+' kcal target';
+  const pct=Math.min((t.cal/tgt)*100,100);
+  const bar=gv('cal-bar');
+  bar.style.width=pct+'%';
+  bar.className='pbar-f'+(t.cal>tgt?' over':'');
 }
 
-// ═══════════════════════════════════════════════════
-// RINGS with % in centre
-// ═══════════════════════════════════════════════════
+// RINGS
 function renderRings(){
-  const t = getTotals();
-  setRing('rp','rp-v','rp-pct', t.p, TARGETS.p, 'g');
-  setRing('rc','rc-v','rc-pct', t.c, TARGETS.c, 'g');
-  setRing('rf','rf-v','rf-pct', t.f, TARGETS.f, 'g');
+  const t=getTotals();
+  setRing('rp','rp-v','rp-pct',t.p,TARGETS.p,'g');
+  setRing('rc','rc-v','rc-pct',t.c,TARGETS.c,'g');
+  setRing('rf','rf-v','rf-pct',t.f,TARGETS.f,'g');
 }
-function setRing(id,vid,pid, cur,tgt,unit){
-  const pct = Math.min(cur/tgt,1);
-  gv(id).style.strokeDashoffset = CIRC - pct*CIRC;
-  gv(vid).textContent = Math.round(cur)+unit;
-  gv(pid).textContent = Math.round(pct*100)+'%';
+function setRing(id,vid,pid,cur,tgt,unit){
+  const pct=Math.min(cur/tgt,1);
+  gv(id).style.strokeDashoffset=CIRC-pct*CIRC;
+  gv(vid).textContent=Math.round(cur)+unit;
+  gv(pid).textContent=Math.round(pct*100)+'%';
 }
 
-// ═══════════════════════════════════════════════════
 // WATER
-// ═══════════════════════════════════════════════════
-function addWater(ml){ waterMl=Math.min(waterMl+ml,WATER_GOAL+1000); localStorage.setItem(`${KEY}_water_${todayKey()}`,waterMl); renderWater(); }
-function resetWater(){ waterMl=0; localStorage.setItem(`${KEY}_water_${todayKey()}`,0); renderWater(); }
+function addWater(ml){waterMl=Math.min(waterMl+ml,WATER_GOAL+1000);localStorage.setItem(`${KEY}_water_${todayKey()}`,waterMl);renderWater();}
+function resetWater(){waterMl=0;localStorage.setItem(`${KEY}_water_${todayKey()}`,0);renderWater();}
 function renderWater(){
-  gv('water-ml').textContent = waterMl.toLocaleString();
-  gv('water-bar').style.width = Math.min((waterMl/WATER_GOAL)*100,100)+'%';
+  gv('water-ml').textContent=waterMl.toLocaleString();
+  gv('water-bar').style.width=Math.min((waterMl/WATER_GOAL)*100,100)+'%';
 }
 
-// ═══════════════════════════════════════════════════
 // QUICK ADD
-// ═══════════════════════════════════════════════════
 function renderQuickAdd(){
-  const el = gv('qa-scroll');
-  let html = '';
+  const el=gv('qa-scroll'); let html='';
   for(const item of quickItems){
-    html += `<div class="qa-item" onclick="quickLog('${item.id}')">
+    html+=`<div class="qa-item" onclick="quickLog('${item.id}')">
       <div class="qa-icon">${item.emoji}</div>
       <div class="qa-name">${item.name}</div>
       <div class="qa-kcal">${item.calories} kcal</div>
     </div>`;
   }
-  html += `<div class="qa-add" onclick="openQAModal()"><div class="qa-add-icon">＋</div><div class="qa-add-lbl">Add Item</div></div>`;
-  el.innerHTML = html;
+  html+=`<div class="qa-add" onclick="openQAModal()"><div style="font-size:20px">＋</div><div style="font-size:9px">Add</div></div>`;
+  el.innerHTML=html;
 }
-
 function quickLog(id){
-  const item = quickItems.find(i=>i.id===id);
-  if(!item) return;
-  meals.push({name:item.name, emoji:item.emoji, calories:item.calories, protein:item.protein, carbs:item.carbs, fat:item.fat, thumb:null});
-  save(`${KEY}_meals_${todayKey()}`, meals);
-  renderAll();
-  // Flash feedback
-  const btn = [...document.querySelectorAll('.qa-item')].find(el=>el.onclick?.toString().includes(id));
-  if(btn){ btn.style.borderColor='var(--lime)'; setTimeout(()=>btn.style.borderColor='',600); }
-}
-
-function openQAModal(){
-  gv('qa-name-in').value=''; gv('qa-emoji-in').value='';
-  gv('qa-cal-in').value=''; gv('qa-p-in').value='';
-  gv('qa-c-in').value=''; gv('qa-f-in').value='';
-  gv('qa-loading').classList.remove('show');
-  gv('qa-modal').classList.add('open');
-}
-function closeQAModal(){ gv('qa-modal').classList.remove('open'); }
-
-async function aiLookupQA(){
-  const name = gv('qa-name-in').value.trim();
-  if(!name){ alert('Enter a product or meal name first.'); return; }
-  gv('qa-loading').classList.add('show');
-  try{
-    const res = await fetch('https://reborn-proxy.bormotyt.workers.dev',{
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({model:'claude-sonnet-4-20250514', max_tokens:400,
-        system:'Return ONLY valid JSON, no markdown: {"emoji":"single emoji","calories":number,"protein":number,"carbs":number,"fat":number}',
-        messages:[{role:'user',content:`Nutrition facts for: ${name}. Use official label if branded product.`}]})
-    });
-    const data = await res.json();
-    const raw = data.content.map(b=>b.text||'').join('').replace(/```json|```/g,'').trim();
-    const p = JSON.parse(raw);
-    if(p.emoji)    gv('qa-emoji-in').value  = p.emoji;
-    if(p.calories) gv('qa-cal-in').value    = p.calories;
-    if(p.protein)  gv('qa-p-in').value      = p.protein;
-    if(p.carbs)    gv('qa-c-in').value      = p.carbs;
-    if(p.fat)      gv('qa-f-in').value      = p.fat;
-  }catch(e){ alert('Lookup failed. Fill in manually.'); console.error(e); }
-  finally{ gv('qa-loading').classList.remove('show'); }
-}
-
-function saveQAItem(){
-  const name = gv('qa-name-in').value.trim();
-  if(!name){ alert('Enter a name.'); return; }
-  const item = {
-    id: 'custom_'+Date.now(),
-    name,
-    emoji:    gv('qa-emoji-in').value || '🍽️',
-    calories: parseFloat(gv('qa-cal-in').value)||0,
-    protein:  parseFloat(gv('qa-p-in').value)||0,
-    carbs:    parseFloat(gv('qa-c-in').value)||0,
-    fat:      parseFloat(gv('qa-f-in').value)||0,
-  };
-  quickItems.push(item);
-  save(`${KEY}_quickitems`, quickItems);
-  closeQAModal();
-  renderQuickAdd();
-}
-
-// ═══════════════════════════════════════════════════
-// FOOD LIST (fixed rendering)
-// ═══════════════════════════════════════════════════
-function renderFoodList(){
-  const el = gv('food-list');
-  if(!meals.length){
-    el.innerHTML = '<div class="empty-st"><span class="empty-icon">🍽️</span>No meals logged yet.<br>Tap Log a Meal or Quick Add.</div>';
-    return;
-  }
-  const frags = [];
-  for(let i=0;i<meals.length;i++){
-    const m = meals[i];
-    const div = document.createElement('div');
-    div.className = 'fi';
-    const thumbHTML = m.thumb
-      ? `<img class="fi-thumb" src="${m.thumb}" style="width:50px;height:50px;border-radius:12px;object-fit:cover;flex-shrink:0"/>`
-      : `<div class="fi-thumb">${m.emoji||'🍽️'}</div>`;
-    div.innerHTML = `
-      ${thumbHTML}
-      <div class="fi-info">
-        <div class="fi-name">${m.name}</div>
-        <div class="fi-tags">
-          <span class="ft ftcal">${Math.round(m.calories)} kcal</span>
-          <span class="ft ftp">${Math.round(m.protein)}g P</span>
-          <span class="ft ftc">${Math.round(m.carbs)}g C</span>
-          <span class="ft ftf">${Math.round(m.fat)}g F</span>
-        </div>
-      </div>
-      <button class="fi-del" data-idx="${i}">✕</button>`;
-    div.querySelector('.fi-del').addEventListener('click', () => deleteMeal(i));
-    frags.push(div);
-  }
-  el.innerHTML = '';
-  frags.forEach(f => el.appendChild(f));
-}
-
-function deleteMeal(i){
-  meals.splice(i,1);
+  const item=quickItems.find(i=>i.id===id); if(!item) return;
+  meals.push({name:item.name,emoji:item.emoji,calories:item.calories,protein:item.protein,carbs:item.carbs,fat:item.fat,thumb:null});
   save(`${KEY}_meals_${todayKey()}`,meals);
   renderAll();
 }
+function openQAModal(){
+  ['qa-name-in','qa-emoji-in','qa-cal-in','qa-p-in','qa-c-in','qa-f-in'].forEach(id=>gv(id).value='');
+  gv('qa-loading').classList.remove('show');
+  gv('qa-modal').classList.add('open');
+}
+function closeQAModal(){gv('qa-modal').classList.remove('open');}
+async function aiLookupQA(){
+  const name=gv('qa-name-in').value.trim();
+  if(!name){alert('Enter a name first.');return;}
+  gv('qa-loading').classList.add('show');
+  try{
+    const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:300,
+        system:'Return ONLY valid JSON, no markdown: {"emoji":"single emoji","calories":number,"protein":number,"carbs":number,"fat":number}',
+        messages:[{role:'user',content:`Nutrition facts for: ${name}. Use official label if branded.`}]})});
+    const data=await res.json();
+    const p=JSON.parse(data.content.map(b=>b.text||'').join('').replace(/```json|```/g,'').trim());
+    if(p.emoji) gv('qa-emoji-in').value=p.emoji;
+    if(p.calories) gv('qa-cal-in').value=p.calories;
+    if(p.protein)  gv('qa-p-in').value=p.protein;
+    if(p.carbs)    gv('qa-c-in').value=p.carbs;
+    if(p.fat)      gv('qa-f-in').value=p.fat;
+  }catch(e){alert('Lookup failed. Fill in manually.');console.error(e);}
+  finally{gv('qa-loading').classList.remove('show');}
+}
+function saveQAItem(){
+  const name=gv('qa-name-in').value.trim(); if(!name){alert('Enter a name.');return;}
+  const item={id:'custom_'+Date.now(),name,emoji:gv('qa-emoji-in').value||'🍽️',
+    calories:parseFloat(gv('qa-cal-in').value)||0,protein:parseFloat(gv('qa-p-in').value)||0,
+    carbs:parseFloat(gv('qa-c-in').value)||0,fat:parseFloat(gv('qa-f-in').value)||0};
+  quickItems.push(item); save(`${KEY}_quickitems`,quickItems);
+  closeQAModal(); renderQuickAdd();
+}
 
-// ═══════════════════════════════════════════════════
+// FOOD LIST
+function renderFoodList(){
+  const el=gv('food-list');
+  if(!meals.length){el.innerHTML='<div class="empty-st"><span class="empty-icon">🍽️</span>No meals logged yet.<br>Tap Log a Meal or Quick Add.</div>';return;}
+  el.innerHTML='';
+  for(let i=0;i<meals.length;i++){
+    const m=meals[i];
+    const div=document.createElement('div');
+    div.className='fi';
+    const thumbHTML=m.thumb?`<img class="fi-thumb" src="${m.thumb}" style="width:50px;height:50px;border-radius:12px;object-fit:cover;flex-shrink:0"/>`:`<div class="fi-thumb">${m.emoji||'🍽️'}</div>`;
+    div.innerHTML=`${thumbHTML}<div class="fi-info"><div class="fi-name">${m.name}</div><div class="fi-tags"><span class="ft ftcal">${Math.round(m.calories)} kcal</span><span class="ft ftp">${Math.round(m.protein)}g P</span><span class="ft ftc">${Math.round(m.carbs)}g C</span><span class="ft ftf">${Math.round(m.fat)}g F</span></div></div><button class="fi-del" data-i="${i}">✕</button>`;
+    div.querySelector('.fi-del').addEventListener('click',()=>deleteMeal(i));
+    el.appendChild(div);
+  }
+}
+function deleteMeal(i){meals.splice(i,1);save(`${KEY}_meals_${todayKey()}`,meals);renderAll();}
+
 // LOG MODAL
-// ═══════════════════════════════════════════════════
-function openLogModal(){ gv('log-modal').classList.add('open'); resetLogModal(); }
-function closeLogModal(){ gv('log-modal').classList.remove('open'); resetLogModal(); }
-
+function openLogModal(){resetLogModal();gv('log-modal').classList.add('open');}
+function closeLogModal(){gv('log-modal').classList.remove('open');resetLogModal();}
 function resetLogModal(){
-  mealResult=null; mealB64=null;
+  mealB64=null; ingredients=[];
   gv('preview').style.display='none';
   gv('ph-ph').style.display='block';
   gv('photo-zone').classList.remove('has-img');
   gv('meal-desc').value='';
-  gv('result-card').classList.remove('show');
-  gv('btn-add').style.display='none';
+  gv('ing-results').style.display='none';
+  gv('ing-list').innerHTML='';
   gv('btn-analyze').textContent='ANALYSE MEAL';
   gv('btn-analyze').disabled=false;
   gv('meal-loading').classList.remove('show');
   gv('file-meal').value='';
 }
-
 function handleMealPhoto(e){
   const file=e.target.files[0]; if(!file) return;
   const r=new FileReader();
@@ -1039,103 +846,247 @@ function handleMealPhoto(e){
 
 async function analyzeMeal(){
   const desc=gv('meal-desc').value.trim();
-  if(!mealB64&&!desc){ alert('Add a photo or description first.'); return; }
+  if(!mealB64&&!desc){alert('Add a photo or description first.');return;}
   gv('btn-analyze').disabled=true;
   gv('meal-loading').classList.add('show');
-  gv('result-card').classList.remove('show');
-  gv('btn-add').style.display='none';
+  gv('ing-results').style.display='none';
+
   const content=[];
   if(mealB64) content.push({type:'image',source:{type:'base64',media_type:'image/jpeg',data:mealB64}});
-  const prompt = desc
-    ? (mealB64 ? `Analyse this food. Context: "${desc}"` : `Estimate exact macros for: "${desc}". For named branded products use the official nutritional label values.`)
-    : 'Analyse this food image and estimate macros.';
+  const prompt=desc
+    ?(mealB64?`Analyse this food image. Context: "${desc}". Identify every visible ingredient separately.`
+      :`Identify the ingredients and macros for: "${desc}". For branded products use official label values.`)
+    :'Identify every ingredient in this food image separately with their estimated portions and macros.';
   content.push({type:'text',text:prompt});
+
   try{
-    const res = await fetch('https://reborn-proxy.bormotyt.workers.dev',{
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:800,
-        system:`Precise nutrition expert with knowledge of official product nutrition labels.
+    const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1500,
+        system:`You are a precise nutrition expert. Identify each ingredient/component of the meal separately.
 Return ONLY valid JSON, no markdown, no backticks:
-{"name":"concise name","emoji":"single emoji","calories":number,"protein":number,"carbs":number,"fat":number,"notes":"source of data and confidence"}`,
-        messages:[{role:'user',content}]})
-    });
-    const data = await res.json();
-    const raw = data.content.map(b=>b.text||'').join('').replace(/```json|```/g,'').trim();
-    mealResult = {...JSON.parse(raw), thumb: mealB64?`data:image/jpeg;base64,${mealB64}`:null};
-    gv('rc-name').textContent  = mealResult.name;
-    gv('rc-cal').value   = Math.round(mealResult.calories);
-    gv('rc-p').value     = Math.round(mealResult.protein * 10) / 10;
-    gv('rc-c').value     = Math.round(mealResult.carbs * 10) / 10;
-    gv('rc-f').value     = Math.round(mealResult.fat * 10) / 10;
-    gv('rc-notes').textContent = mealResult.notes;
-    gv('result-card').classList.add('show');
-    gv('btn-add').style.display='block';
+{
+  "confidence": "high"|"medium"|"low",
+  "confidence_tip": "one sentence on what info would improve accuracy (or empty string if high)",
+  "ingredients": [
+    {"name":"ingredient name","emoji":"single emoji","portion":"e.g. 1 slice, 80g, 1 tbsp","calories":number,"protein":number,"carbs":number,"fat":number}
+  ]
+}
+For branded products use official label macros. Be specific with portions. Identify 2-6 ingredients.`,
+        messages:[{role:'user',content}]})});
+    const data=await res.json();
+    const raw=data.content.map(b=>b.text||'').join('').replace(/```json|```/g,'').trim();
+    const parsed=JSON.parse(raw);
+    ingredients=parsed.ingredients.map((ing,i)=>({...ing,id:i,portion_multiplier:1,selected:true}));
+
+    // Confidence badge
+    const conf=parsed.confidence||'medium';
+    const confMap={high:{cls:'conf-high',icon:'✓',label:'High Confidence'},medium:{cls:'conf-medium',icon:'~',label:'Medium Confidence'},low:{cls:'conf-low',icon:'!',label:'Low Confidence'}};
+    const c=confMap[conf];
+    gv('conf-badge-wrap').innerHTML=`<div class="conf-badge ${c.cls}">${c.icon} ${c.label}</div>`;
+    const tipEl=gv('conf-tip');
+    if(parsed.confidence_tip&&conf!=='high'){
+      tipEl.textContent='💡 '+parsed.confidence_tip;
+      tipEl.classList.add('show');
+    } else { tipEl.classList.remove('show'); }
+
+    renderIngredients();
+    gv('ing-results').style.display='block';
     gv('btn-analyze').textContent='RE-ANALYSE';
-  }catch(err){ alert('Analysis failed. Please try again.'); console.error(err); }
-  finally{ gv('btn-analyze').disabled=false; gv('meal-loading').classList.remove('show'); }
+  }catch(err){alert('Analysis failed. Please try again.');console.error(err);}
+  finally{gv('btn-analyze').disabled=false;gv('meal-loading').classList.remove('show');}
+}
+
+function renderIngredients(){
+  const el=gv('ing-list'); el.innerHTML='';
+  for(const ing of ingredients){
+    const div=document.createElement('div');
+    div.className='ing-item'+(ing.selected?' selected':'');
+    div.dataset.id=ing.id;
+    const pm=ing.portion_multiplier;
+    const cal=Math.round(ing.calories*pm);
+    const p=Math.round(ing.protein*pm*10)/10;
+    const c=Math.round(ing.carbs*pm*10)/10;
+    const f=Math.round(ing.fat*pm*10)/10;
+    const portions=[.5,.75,1,1.5,2];
+    const portionBtns=portions.map(v=>`<button class="pbtn${pm===v?' active':''}" onclick="setMultiplier(${ing.id},${v})">${v===1?'Full':v+'×'}</button>`).join('');
+    div.innerHTML=`
+      <div class="ing-top">
+        <div class="ing-check" onclick="toggleIng(${ing.id})"><span class="ing-check-icon">✓</span></div>
+        <div class="ing-emoji">${ing.emoji}</div>
+        <div class="ing-name">${ing.name}</div>
+      </div>
+      <div class="ing-macros">
+        <span class="ing-m" style="color:var(--muted)">${ing.portion}</span>
+        <span class="ing-m" style="color:var(--lime)">${cal} kcal</span>
+        <span class="ing-m" style="color:var(--pc)">${p}g P</span>
+        <span class="ing-m" style="color:var(--cc)">${c}g C</span>
+        <span class="ing-m" style="color:var(--fc)">${f}g F</span>
+      </div>
+      <div class="portion-row">
+        <span class="portion-lbl">Portion:</span>
+        <div class="portion-btns">${portionBtns}</div>
+      </div>`;
+    el.appendChild(div);
+  }
+  updateSelectionTotals();
+}
+
+function toggleIng(id){
+  const ing=ingredients.find(i=>i.id===id); if(!ing) return;
+  ing.selected=!ing.selected;
+  renderIngredients();
+}
+
+function setMultiplier(id,val){
+  const ing=ingredients.find(i=>i.id===id); if(!ing) return;
+  ing.portion_multiplier=val;
+  renderIngredients();
+}
+
+function updateSelectionTotals(){
+  const sel=ingredients.filter(i=>i.selected);
+  const totals=sel.reduce((a,i)=>({
+    cal:a.cal+i.calories*i.portion_multiplier,
+    p:a.p+i.protein*i.portion_multiplier,
+    c:a.c+i.carbs*i.portion_multiplier,
+    f:a.f+i.fat*i.portion_multiplier
+  }),{cal:0,p:0,c:0,f:0});
+  gv('sel-cal').textContent=Math.round(totals.cal)+' kcal';
+  gv('sel-p').textContent=Math.round(totals.p)+'g P';
+  gv('sel-c').textContent=Math.round(totals.c)+'g C';
+  gv('sel-f').textContent=Math.round(totals.f)+'g F';
 }
 
 function confirmMeal(){
-  if(!mealResult) return;
-  // Read potentially-edited values from the input fields
-  const finalMeal = {
-    ...mealResult,
-    calories: parseFloat(gv('rc-cal').value) || mealResult.calories,
-    protein:  parseFloat(gv('rc-p').value)   || mealResult.protein,
-    carbs:    parseFloat(gv('rc-c').value)   || mealResult.carbs,
-    fat:      parseFloat(gv('rc-f').value)   || mealResult.fat,
+  const selected=ingredients.filter(i=>i.selected);
+  if(!selected.length){alert('Select at least one ingredient.');return;}
+  // Combine all selected ingredients into one meal entry
+  const totals=selected.reduce((a,i)=>({
+    cal:a.cal+i.calories*i.portion_multiplier,
+    p:a.p+i.protein*i.portion_multiplier,
+    c:a.c+i.carbs*i.portion_multiplier,
+    f:a.f+i.fat*i.portion_multiplier
+  }),{cal:0,p:0,c:0,f:0});
+  const names=selected.map(i=>i.emoji+' '+i.name).join(', ');
+  const meal={
+    name: selected.length===1?selected[0].name:selected.map(i=>i.name).join(' + '),
+    emoji: selected[0].emoji,
+    calories: Math.round(totals.cal),
+    protein: Math.round(totals.p*10)/10,
+    carbs: Math.round(totals.c*10)/10,
+    fat: Math.round(totals.f*10)/10,
+    thumb: mealB64?`data:image/jpeg;base64,${mealB64}`:null
   };
-  meals.push(finalMeal);
+  meals.push(meal);
   save(`${KEY}_meals_${todayKey()}`,meals);
-  closeLogModal();
-  showPage('today', document.querySelectorAll('.nb')[0]);
-  renderAll();
+  // Close first, then navigate — fixes the button bug
+  gv('log-modal').classList.remove('open');
+  setTimeout(()=>{
+    resetLogModal();
+    showPage('today',document.querySelectorAll('.nb')[0]);
+    renderAll();
+  },100);
 }
 
-// ═══════════════════════════════════════════════════
+// AI COACH
+function updateCoachStats(){
+  const t=getTotals();
+  gv('cs-cal').textContent=Math.round(t.cal)||'—';
+  gv('cs-protein').textContent=Math.round(t.p)||'—';
+  gv('cs-water').textContent=waterMl||'—';
+}
+
+async function generateCoachReport(){
+  const t=getTotals();
+  if(!meals.length&&!whoop){
+    alert('Log some meals or Whoop data first to get a meaningful report.');return;
+  }
+  gv('coach-loading').classList.add('show');
+  gv('coach-response').classList.remove('show');
+  gv('coach-response').innerHTML='';
+
+  const mealSummary=meals.map(m=>`${m.name}: ${Math.round(m.calories)} kcal, ${Math.round(m.protein)}g P, ${Math.round(m.carbs)}g C, ${Math.round(m.fat)}g F`).join('\n');
+  const whoopSummary=whoop?`Strain: ${whoop.strain??'—'}, Recovery: ${whoop.recovery??'—'}%, Burned: ${whoop.burned??'—'} kcal, Sleep: ${whoop.sleep??'—'}h, Steps: ${whoop.steps??'—'}`:'No Whoop data logged';
+  const tgt=whoop?.target||TARGETS.cal;
+
+  const prompt=`Here is my nutrition and fitness data for today:
+
+MEALS LOGGED:
+${mealSummary||'None logged'}
+
+TOTALS: ${Math.round(t.cal)} kcal eaten, ${Math.round(t.p)}g protein, ${Math.round(t.c)}g carbs, ${Math.round(t.f)}g fat
+TARGET: ${tgt} kcal/day (cut phase, fat loss goal)
+MACRO TARGETS: 128g protein, 200g carbs, 65g fat
+
+WHOOP DATA: ${whoopSummary}
+HYDRATION: ${waterMl}ml of 2500ml target
+
+MY PROFILE: Male, 26, 89.1kg, 25.1% body fat, goal to reach 20.1% BF by Apr 27 2026, lean mass 64kg.
+
+Give me a direct, honest daily debrief like a no-nonsense performance coach. Structure it as:
+1. OVERALL SCORE (rate the day 1-10 with one punchy sentence)
+2. NUTRITION (what went well, what didn't, specific callouts)
+3. RECOVERY & ACTIVITY (based on Whoop data if available)
+4. TOP 3 ACTIONS FOR TOMORROW (specific and actionable)
+
+Be direct. No fluff. If I'm falling short, say so. If I'm on track, acknowledge it briefly and push me further.`;
+
+  try{
+    const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,
+        system:'You are a direct, no-nonsense performance and nutrition coach. Give honest, specific, actionable feedback. No filler words. Speak directly to the athlete.',
+        messages:[{role:'user',content:prompt}]})});
+    const data=await res.json();
+    const text=data.content.map(b=>b.text||'').join('').trim();
+
+    const responseEl=gv('coach-response');
+    responseEl.innerHTML=`
+      <div class="cr-header">
+        <div class="cr-icon">🧠</div>
+        <div><div class="cr-title">Daily Debrief</div><div class="cr-time">${new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'})}</div></div>
+      </div>
+      <div class="cr-body">${text.replace(/\n/g,'<br>')}</div>`;
+    responseEl.classList.add('show');
+  }catch(err){alert('Coach report failed. Try again.');console.error(err);}
+  finally{gv('coach-loading').classList.remove('show');}
+}
+
 // CALENDAR
-// ═══════════════════════════════════════════════════
 function buildCalendar(){
-  const calEl = gv('cal-grid');
-  if(!calEl) return;
-  const y=calViewDate.getFullYear(), m=calViewDate.getMonth();
-  gv('cal-month-lbl').textContent = MONTHS[m]+' '+y;
-  gv('cal-dow').innerHTML = DOWS.map(d=>`<div class="cal-dow">${d}</div>`).join('');
-  const firstDay=new Date(y,m,1).getDay();
-  const days=new Date(y,m+1,0).getDate();
-  const todayStr=todayKey();
+  const calEl=gv('cal-grid'); if(!calEl) return;
+  const y=calViewDate.getFullYear(),m=calViewDate.getMonth();
+  gv('cal-month-lbl').textContent=MONTHS[m]+' '+y;
+  gv('cal-dow').innerHTML=DOWS.map(d=>`<div class="cal-dow">${d}</div>`).join('');
+  const firstDay=new Date(y,m,1).getDay(), days=new Date(y,m+1,0).getDate(), todayStr=todayKey();
   let html='';
   for(let i=0;i<firstDay;i++) html+=`<div class="cc empty"></div>`;
   for(let d=1;d<=days;d++){
     const ds=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     const hasMeals=load(`${KEY}_meals_${ds}`,[]).length>0;
     const hasWhoop=load(`${KEY}_whoop_${ds}`,null)!==null;
-    const isToday=ds===todayStr, isSel=ds===calSelKey;
+    const isToday=ds===todayStr,isSel=ds===calSelKey;
     html+=`<div class="cc${isToday?' today':''}${isSel?' sel':''}${(hasMeals||hasWhoop)?' has-data':''}" onclick="selectDay('${ds}')"><div class="cc-num">${d}</div></div>`;
   }
   calEl.innerHTML=html;
   renderDayDetail(calSelKey);
 }
-function changeMonth(dir){ calViewDate.setMonth(calViewDate.getMonth()+dir); buildCalendar(); }
-function selectDay(ds){ calSelKey=ds; buildCalendar(); }
+function changeMonth(dir){calViewDate.setMonth(calViewDate.getMonth()+dir);buildCalendar();}
+function selectDay(ds){calSelKey=ds;buildCalendar();}
 
 function renderDayDetail(ds){
   const el=gv('day-detail'); if(!el) return;
-  const dm=load(`${KEY}_meals_${ds}`,[]);
-  const dw=load(`${KEY}_whoop_${ds}`,null);
+  const dm=load(`${KEY}_meals_${ds}`,[]),dw=load(`${KEY}_whoop_${ds}`,null);
   const dwat=parseInt(localStorage.getItem(`${KEY}_water_${ds}`)||'0');
   const t=getTotals(dm);
   const d=new Date(ds+'T12:00:00');
   const label=d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
-  let html=`<div class="ddc">
-    <div class="ddc-title">${label}</div>
-    <div class="ddc-row">
-      <div class="ddc-s"><div class="ddc-v" style="color:var(--lime)">${t.cal>0?Math.round(t.cal):'—'}</div><div class="ddc-l">kcal</div></div>
-      <div class="ddc-s"><div class="ddc-v" style="color:var(--pc)">${t.p>0?Math.round(t.p)+'g':'—'}</div><div class="ddc-l">Protein</div></div>
-      <div class="ddc-s"><div class="ddc-v" style="color:var(--cc)">${t.c>0?Math.round(t.c)+'g':'—'}</div><div class="ddc-l">Carbs</div></div>
-      <div class="ddc-s"><div class="ddc-v" style="color:var(--fc)">${t.f>0?Math.round(t.f)+'g':'—'}</div><div class="ddc-l">Fat</div></div>
-      <div class="ddc-s"><div class="ddc-v" style="color:var(--blue)">${dwat>0?dwat+'ml':'—'}</div><div class="ddc-l">Water</div></div>
-    </div></div>`;
+  let html=`<div class="ddc"><div class="ddc-title">${label}</div><div class="ddc-row">
+    <div class="ddc-s"><div class="ddc-v" style="color:var(--lime)">${t.cal>0?Math.round(t.cal):'—'}</div><div class="ddc-l">kcal</div></div>
+    <div class="ddc-s"><div class="ddc-v" style="color:var(--pc)">${t.p>0?Math.round(t.p)+'g':'—'}</div><div class="ddc-l">Protein</div></div>
+    <div class="ddc-s"><div class="ddc-v" style="color:var(--cc)">${t.c>0?Math.round(t.c)+'g':'—'}</div><div class="ddc-l">Carbs</div></div>
+    <div class="ddc-s"><div class="ddc-v" style="color:var(--fc)">${t.f>0?Math.round(t.f)+'g':'—'}</div><div class="ddc-l">Fat</div></div>
+    <div class="ddc-s"><div class="ddc-v" style="color:var(--blue)">${dwat>0?dwat+'ml':'—'}</div><div class="ddc-l">Water</div></div>
+  </div></div>`;
   if(dw){
     const ws=[
       dw.strain!=null?`<div class="ddc-s"><div class="ddc-v" style="color:var(--whoop-green)">${dw.strain}</div><div class="ddc-l">Strain</div></div>`:'',
@@ -1150,73 +1101,61 @@ function renderDayDetail(ds){
     html+=`<div class="ddc"><div class="ddc-title">Meals</div>`;
     for(const m of dm) html+=`<div class="dm-item"><div class="dm-name">${m.emoji||'🍽️'} ${m.name}</div><div class="dm-cal">${Math.round(m.calories)} kcal</div></div>`;
     html+=`</div>`;
-  } else {
-    html+=`<div class="no-data">No meals logged on this day.</div>`;
-  }
+  } else { html+=`<div class="no-data">No meals logged on this day.</div>`; }
   el.innerHTML=html;
 }
 
-// ═══════════════════════════════════════════════════
 // PROGRESS
-// ═══════════════════════════════════════════════════
-function openEntryModal(){ gv('entry-modal').classList.add('open'); }
-function closeEntryModal(){ gv('entry-modal').classList.remove('open'); }
-
+function openEntryModal(){gv('entry-modal').classList.add('open');}
+function closeEntryModal(){gv('entry-modal').classList.remove('open');}
 function saveEntry(){
   const w=gv('e-w').value!==''?parseFloat(gv('e-w').value):null;
   const bf=gv('e-bf').value!==''?parseFloat(gv('e-bf').value):null;
-  if(!w&&!bf){ alert('Enter weight or body fat %.'); return; }
+  if(!w&&!bf){alert('Enter weight or body fat %.');return;}
   entries.push({date:new Date().toISOString(),weight:w,bf,notes:gv('e-notes').value.trim()});
   save(`${KEY}_entries`,entries);
-  gv('e-w').value=''; gv('e-bf').value=''; gv('e-notes').value='';
-  closeEntryModal(); renderProgress();
+  gv('e-w').value='';gv('e-bf').value='';gv('e-notes').value='';
+  closeEntryModal();renderProgress();
 }
-function deleteEntry(i){ entries.splice(i,1); save(`${KEY}_entries`,entries); renderProgress(); }
-
+function deleteEntry(i){entries.splice(i,1);save(`${KEY}_entries`,entries);renderProgress();}
 function renderProgress(){
-  const wEs=entries.filter(e=>e.weight!=null), bEs=entries.filter(e=>e.bf!=null);
-  const lw=wEs.length?wEs[wEs.length-1].weight:null, lb=bEs.length?bEs[bEs.length-1].bf:null;
-  const pw=wEs.length>1?wEs[wEs.length-2].weight:BASELINE.weight, pb=bEs.length>1?bEs[bEs.length-2].bf:BASELINE.bf;
+  const wEs=entries.filter(e=>e.weight!=null),bEs=entries.filter(e=>e.bf!=null);
+  const lw=wEs.length?wEs[wEs.length-1].weight:null,lb=bEs.length?bEs[bEs.length-1].bf:null;
+  const pw=wEs.length>1?wEs[wEs.length-2].weight:BASELINE.weight,pb=bEs.length>1?bEs[bEs.length-2].bf:BASELINE.bf;
   gv('p-weight').textContent=lw!=null?lw.toFixed(1):BASELINE.weight.toFixed(1);
   gv('p-bf').textContent=lb!=null?lb.toFixed(1):BASELINE.bf.toFixed(1);
-  const wd=lw!=null?(lw-pw).toFixed(1):null, bd=lb!=null?(lb-pb).toFixed(1):null;
+  const wd=lw!=null?(lw-pw).toFixed(1):null,bd=lb!=null?(lb-pb).toFixed(1):null;
   if(wd) gv('p-w-delta').innerHTML=`<span class="${parseFloat(wd)<0?'dg':'db'}">${parseFloat(wd)>0?'+':''}${wd} kg</span> vs prev`;
   if(bd) gv('p-bf-delta').innerHTML=`<span class="${parseFloat(bd)<0?'dg':'db'}">${parseFloat(bd)>0?'+':''}${bd}%</span> vs prev`;
-  const curBF=lb||BASELINE.bf, curW=lw||BASELINE.weight;
-  const curFat=(curBF/100)*curW, tgtFat=(GOAL_BF/100)*BASELINE.weight;
-  const fatLost=BASELINE.fatMass-curFat, totalLose=BASELINE.fatMass-tgtFat;
+  const curBF=lb||BASELINE.bf,curW=lw||BASELINE.weight;
+  const curFat=(curBF/100)*curW,tgtFat=(GOAL_BF/100)*BASELINE.weight;
+  const fatLost=BASELINE.fatMass-curFat,totalLose=BASELINE.fatMass-tgtFat;
   const pct=Math.max(0,Math.min(100,Math.round((fatLost/totalLose)*100)));
-  gv('goal-pct').textContent=pct+'%'; gv('gbar-f').style.width=pct+'%';
+  gv('goal-pct').textContent=pct+'%';gv('gbar-f').style.width=pct+'%';
   gv('goal-detail').textContent=`Baseline: 22.4kg fat → Target: ${tgtFat.toFixed(1)}kg fat · ${Math.max(0,totalLose-fatLost).toFixed(1)}kg to go`;
-  renderChart('chart-w', wEs.slice(-8),'weight','kg','#c8f135',84,92);
-  renderChart('chart-bf',bEs.slice(-8),'bf',    '%', '#30d5c8',18,28);
+  renderChart('chart-w',wEs.slice(-8),'weight','kg','#c8f135',84,92);
+  renderChart('chart-bf',bEs.slice(-8),'bf','%','#30d5c8',18,28);
   const listEl=gv('entries-list');
-  if(!entries.length){ listEl.innerHTML='<div style="text-align:center;padding:24px;color:var(--muted);font-size:12px">No entries yet.</div>'; return; }
+  if(!entries.length){listEl.innerHTML='<div style="text-align:center;padding:24px;color:var(--muted);font-size:12px">No entries yet.</div>';return;}
   let html='';
   [...entries].reverse().forEach((e,ri)=>{
     const i=entries.length-1-ri;
     const ds=new Date(e.date).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'});
-    html+=`<div class="ei">
-      <div><div class="ei-date">${ds}</div>${e.notes?`<div class="ei-note">${e.notes}</div>`:''}</div>
-      <div class="ei-vals">
-        ${e.weight!=null?`<div class="ei-v"><div class="ei-vn" style="color:var(--lime)">${e.weight}</div><div class="ei-vl">kg</div></div>`:''}
-        ${e.bf!=null?`<div class="ei-v"><div class="ei-vn" style="color:var(--cyan)">${e.bf}%</div><div class="ei-vl">BF</div></div>`:''}
-        <button class="ei-del" onclick="deleteEntry(${i})">✕</button>
-      </div>
-    </div>`;
+    html+=`<div class="ei"><div><div class="ei-date">${ds}</div>${e.notes?`<div class="ei-note">${e.notes}</div>`:''}</div>
+      <div class="ei-vals">${e.weight!=null?`<div class="ei-v"><div class="ei-vn" style="color:var(--lime)">${e.weight}</div><div class="ei-vl">kg</div></div>`:''}
+      ${e.bf!=null?`<div class="ei-v"><div class="ei-vn" style="color:var(--cyan)">${e.bf}%</div><div class="ei-vl">BF</div></div>`:''}
+      <button class="ei-del" onclick="deleteEntry(${i})">✕</button></div></div>`;
   });
   listEl.innerHTML=html;
 }
-
 function renderChart(id,data,field,unit,color,minV,maxV){
   const el=gv(id);
-  if(!data.length){ el.innerHTML=`<div style="color:var(--muted);font-size:11px;padding:8px">No data yet.</div>`; return; }
-  const range=maxV-minV||1;
-  let html='';
+  if(!data.length){el.innerHTML=`<div style="color:var(--muted);font-size:11px;padding:8px">No data yet.</div>`;return;}
+  const range=maxV-minV||1; let html='';
   for(const e of data){
-    const v=e[field], h=Math.max(6,Math.min(95,((v-minV)/range)*90));
+    const v=e[field],h=Math.max(6,Math.min(95,((v-minV)/range)*90));
     const dl=new Date(e.date).toLocaleDateString('en-US',{month:'short',day:'numeric'});
-    html+=`<div class="cb-wrap"><div class="cb" style="height:${h}px;background:${color};opacity:0.75"><div class="cb-val" style="color:${color}">${v}${unit}</div></div><div class="cb-lbl">${dl}</div></div>`;
+    html+=`<div class="cb-wrap"><div class="cb" style="height:${h}px;background:${color};opacity:.75"><div class="cb-val" style="color:${color}">${v}${unit}</div></div><div class="cb-lbl">${dl}</div></div>`;
   }
   el.innerHTML=html;
 }
