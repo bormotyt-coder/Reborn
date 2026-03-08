@@ -1,3 +1,4 @@
+document.addEventListener("DOMContentLoaded", () => {
 
 loadState();
 updateUI();
@@ -7,19 +8,19 @@ document.getElementById("calories").innerText = state.calories;
 document.getElementById("water").innerText = state.water + " cups";
 }
 
-function addCalories(){
+window.addCalories = function(){
 state.calories += 100;
 saveState();
 updateUI();
 }
 
-function addWater(){
+window.addWater = function(){
 state.water += 1;
 saveState();
 updateUI();
 }
 
-function sendChat(){
+window.sendChat = function(){
 
 const input = document.getElementById("chatInput");
 const msg = input.value.trim();
@@ -47,5 +48,7 @@ addWater();
 if(e.key==="c"){
 addCalories();
 }
+
+});
 
 });
