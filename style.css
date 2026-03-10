@@ -868,3 +868,42 @@ input:focus, textarea:focus, select:focus { border-color: var(--blue); }
 .fi:nth-child(8)  { animation-delay: .30s; }
 .fi:nth-child(9)  { animation-delay: .32s; }
 .fi:nth-child(n+10) { animation-delay: .34s; }
+
+/* ══════════════════════════════════════
+   MEAL TIMING BUCKETS
+══════════════════════════════════════ */
+.meal-bucket-hdr { display: flex; align-items: center; gap: 8px; padding: 10px 2px 6px; margin-top: 4px; }
+.meal-bucket-hdr:first-child { margin-top: 0; }
+.mb-icon { font-size: 14px; }
+.mb-name { font-family: var(--font); font-size: 11px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: .08em; flex: 1; }
+.mb-cal { font-family: var(--font); font-size: 11px; font-weight: 600; color: var(--muted); }
+
+/* ══════════════════════════════════════
+   WATER UNIT TOGGLE
+══════════════════════════════════════ */
+.water-ct-row { display: flex; align-items: center; gap: 8px; }
+.water-unit-btn { background: rgba(56,139,253,0.10); border: 1px solid rgba(56,139,253,0.25); border-radius: 7px; padding: 3px 9px; font-family: var(--font); font-size: 11px; font-weight: 700; color: var(--blue2); cursor: pointer; transition: all .15s; letter-spacing: .04em; }
+.water-unit-btn:active { background: rgba(56,139,253,0.25); }
+
+/* ══════════════════════════════════════
+   HEADER STREAK BADGE
+══════════════════════════════════════ */
+.hdr-streak { display: flex; align-items: center; gap: 4px; background: rgba(248,81,73,0.12); border: 1px solid rgba(248,81,73,0.25); border-radius: 20px; padding: 4px 10px; margin-right: 8px; }
+.hdr-streak-fire { font-size: 14px; line-height: 1; }
+.hdr-streak-num { font-family: var(--font); font-size: 15px; font-weight: 800; color: #ff6b6b; line-height: 1; }
+.hdr-streak-lbl { font-family: var(--font); font-size: 9px; font-weight: 600; color: rgba(255,107,107,0.7); text-transform: uppercase; letter-spacing: .06em; }
+
+/* ══════════════════════════════════════
+   WEEKLY NUTRITION TRENDS
+══════════════════════════════════════ */
+.wk-chart-card { background: var(--glass); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 16px 14px 12px; margin-bottom: 12px; }
+.wk-chart-title { font-family: var(--font); font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 12px; }
+.wk-chart-sub { font-size: 11px; font-weight: 500; color: var(--muted); margin-left: 6px; }
+.wk-macro-legend { display: flex; gap: 12px; margin-bottom: 10px; }
+.wk-macro-legend span { font-family: var(--font); font-size: 11px; font-weight: 600; color: var(--text2); }
+.wk-macro-grid { display: flex; gap: 6px; align-items: flex-end; }
+.wk-macro-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.wk-macro-col.today .wk-bar-lbl { color: var(--blue2); font-weight: 800; }
+.wk-macro-bars { display: flex; align-items: flex-end; gap: 2px; height: 64px; }
+.wk-mb { width: 8px; border-radius: 3px 3px 1px 1px; transition: height .4s ease; min-height: 0; opacity: 0.85; }
+.wk-macro-col.today .wk-mb { opacity: 1; }

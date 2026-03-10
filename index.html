@@ -23,6 +23,11 @@
       <div class="logo-icon"><span style="font-family:var(--font);font-size:15px;font-weight:800;color:#fff;letter-spacing:-1px">rB</span></div>
       <div><div class="logo-main">reBorn</div><div class="logo-sub">Fat Loss · Active</div></div>
     </div>
+    <div class="hdr-streak" id="hdr-streak" style="display:none">
+      <span class="hdr-streak-fire">🔥</span>
+      <span class="hdr-streak-num" id="hdr-streak-num">0</span>
+      <span class="hdr-streak-lbl">streak</span>
+    </div>
     <div class="hdr-date" id="hdr-date"></div>
   </div>
   <div class="scan-banner">
@@ -120,7 +125,10 @@
     <div class="gc-in">
       <div class="water-top">
         <div class="water-lbl">💧 Hydration</div>
-        <div class="water-ct"><span id="water-cups">0</span><span style="font-size:12px;color:var(--muted)">&thinsp;/ 8 cups · <span id="water-ml-display">0</span> mL</span></div>
+        <div class="water-ct-row">
+          <span id="water-amount-display" style="font-family:var(--font);font-size:14px;font-weight:700;color:var(--text)">0 / 8 cups</span>
+          <button class="water-unit-btn" id="water-unit-btn" onclick="cycleWaterUnit()">mL</button>
+        </div>
       </div>
       <div class="water-bar-bg"><div class="water-bar-fill" id="water-bar" style="width:0%"></div></div>
       <div class="cups-grid" id="cups-grid"></div>

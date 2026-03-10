@@ -45,6 +45,7 @@ const DEFAULT_QA=[
 let meals      =load(`${KEY}_meals_${todayKey()}`,[]);
 let whoopSnaps =load(`${KEY}_whoopsnaps_${todayKey()}`,[null,null,null]);
 let cups       =parseInt(localStorage.getItem(`${KEY}_cups_${todayKey()}`)||'0');
+let waterUnit  =localStorage.getItem(`${KEY}_water_unit`)||'cups'; // 'cups' | 'ml' | 'L'
 let entries    =load(`${KEY}_entries`,[]);
 let quickItems =load(`${KEY}_quickitems`,DEFAULT_QA);
 let calViewDate=new Date();
@@ -296,6 +297,23 @@ function setRing(id,vid,pid,cur,tgt,unit,delay){
 }
 
 // CUPS
+function fmtWater(c){
+  const ml=c*ML_PER_CUP;
+  if(waterUnit==='ml') return ml.toLocaleString()+' mL';
+  if(waterUnit==='L')  return (ml/1000).toFixed(1)+' L';
+  return c+' / '+CUPS+' cups';
+}
+function fmtWaterTarget(){
+  const ml=CUPS*ML_PER_CUP;
+  if(waterUnit==='ml') return 'of '+ml.toLocaleString()+' mL';
+  if(waterUnit==='L')  return 'of '+(ml/1000).toFixed(1)+' L';
+  return '';
+}
+function cycleWaterUnit(){
+  waterUnit=waterUnit==='cups'?'ml':waterUnit==='ml'?'L':'cups';
+  localStorage.setItem(`${KEY}_water_unit`,waterUnit);
+  renderCups();
+}
 function renderCups(){
   const grid=gv('cups-grid');grid.innerHTML='';
   for(let i=0;i<CUPS;i++){
@@ -305,9 +323,15 @@ function renderCups(){
     btn.addEventListener('click',()=>{cups=i<cups?i:i+1;localStorage.setItem(`${KEY}_cups_${todayKey()}`,cups);renderCups();});
     grid.appendChild(btn);
   }
-  gv('water-cups').textContent=cups;
-  gv('water-ml-display').textContent=(cups*ML_PER_CUP).toLocaleString();
+  // Update display label
+  const dispEl=gv('water-amount-display');
+  if(dispEl) dispEl.textContent=fmtWater(cups);
+  const tgtEl=gv('water-target-display');
+  if(tgtEl) tgtEl.textContent=fmtWaterTarget();
   gv('water-bar').style.width=Math.min((cups/CUPS)*100,100)+'%';
+  // Update unit toggle button label
+  const ub=gv('water-unit-btn');
+  if(ub) ub.textContent=waterUnit==='cups'?'mL':waterUnit==='ml'?'L':'cups';
 }
 function resetWater(){cups=0;localStorage.setItem(`${KEY}_cups_${todayKey()}`,0);renderCups();}
 
@@ -374,21 +398,48 @@ function saveQAItem(){
 }
 
 // FOOD LIST
+function getMealType(h){
+  if(h>=5&&h<11) return 'Breakfast';
+  if(h>=11&&h<15) return 'Lunch';
+  if(h>=15&&h<18) return 'Snacks';
+  if(h>=18&&h<23) return 'Dinner';
+  return 'Snacks';
+}
+
 function renderFoodList(){
   const el=gv('food-list');
   if(!meals.length){el.innerHTML='<div class="empty-st"><span class="empty-icon">🍽️</span>No meals logged yet.<br>Tap Log a Meal or Quick Add.</div>';return;}
   el.innerHTML='';
-  for(let i=0;i<meals.length;i++){
-    const m=meals[i];const div=document.createElement('div');div.className='fi';
-    const th=m.thumb?`<img class="fi-thumb" src="${m.thumb}" style="width:46px;height:46px;border-radius:11px;object-fit:cover;flex-shrink:0"/>`:`<div class="fi-thumb">${m.emoji||'🍽️'}</div>`;
-    const pPct=Math.min(Math.round(m.protein/TARGETS.p*100),100);
-    const cPct=Math.min(Math.round(m.carbs/TARGETS.c*100),100);
-    const fPct=Math.min(Math.round(m.fat/TARGETS.f*100),100);
-    div.innerHTML=`<div class="fi-top">${th}<div class="fi-info"><div class="fi-name">${m.name}</div><div class="fi-tags"><span class="ft ftcal">${Math.round(m.calories)} kcal</span><span class="ft ftp">${Math.round(m.protein)}g P</span><span class="ft ftc">${Math.round(m.carbs)}g C</span><span class="ft ftf">${Math.round(m.fat)}g F</span></div></div><button class="fi-del">✕</button></div><div class="fi-bars"><div class="fi-bar-row"><span class="fi-bar-lbl">P</span><div class="fi-bar-track"><div class="fi-bar-fill" style="width:${pPct}%;background:var(--pc)"></div></div><span class="fi-bar-val" style="color:var(--pc)">${Math.round(m.protein)}g</span></div><div class="fi-bar-row"><span class="fi-bar-lbl">C</span><div class="fi-bar-track"><div class="fi-bar-fill" style="width:${cPct}%;background:var(--cc)"></div></div><span class="fi-bar-val" style="color:var(--cc)">${Math.round(m.carbs)}g</span></div><div class="fi-bar-row"><span class="fi-bar-lbl">F</span><div class="fi-bar-track"><div class="fi-bar-fill" style="width:${fPct}%;background:var(--fc)"></div></div><span class="fi-bar-val" style="color:var(--fc)">${Math.round(m.fat)}g</span></div></div>`;
-    div.querySelector('.fi-del').addEventListener('click',(e)=>{e.stopPropagation();deleteMeal(i);});
-    div.addEventListener('click',()=>openMealDetail(i));
-    el.appendChild(div);
-  }
+  const BUCKETS=['Breakfast','Lunch','Snacks','Dinner'];
+  const BUCKET_ICONS={Breakfast:'🌅',Lunch:'☀️',Snacks:'🍎',Dinner:'🌙'};
+  // Group meals by bucket
+  const buckets={};
+  BUCKETS.forEach(b=>{buckets[b]=[];});
+  meals.forEach((m,i)=>{
+    const type=m.mealType||getMealType(m.loggedAt?new Date(m.loggedAt).getHours():12);
+    (buckets[type]=buckets[type]||[]).push({m,i});
+  });
+  BUCKETS.forEach(bucket=>{
+    const items=buckets[bucket];
+    if(!items.length)return;
+    // Bucket header
+    const bucketCal=items.reduce((a,{m})=>a+m.calories,0);
+    const header=document.createElement('div');
+    header.className='meal-bucket-hdr';
+    header.innerHTML=`<span class="mb-icon">${BUCKET_ICONS[bucket]}</span><span class="mb-name">${bucket}</span><span class="mb-cal">${Math.round(bucketCal)} kcal</span>`;
+    el.appendChild(header);
+    items.forEach(({m,i})=>{
+      const div=document.createElement('div');div.className='fi';
+      const th=m.thumb?`<img class="fi-thumb" src="${m.thumb}" style="width:46px;height:46px;border-radius:11px;object-fit:cover;flex-shrink:0"/>`:`<div class="fi-thumb">${m.emoji||'🍽️'}</div>`;
+      const pPct=Math.min(Math.round(m.protein/TARGETS.p*100),100);
+      const cPct=Math.min(Math.round(m.carbs/TARGETS.c*100),100);
+      const fPct=Math.min(Math.round(m.fat/TARGETS.f*100),100);
+      div.innerHTML=`<div class="fi-top">${th}<div class="fi-info"><div class="fi-name">${m.name}</div><div class="fi-tags"><span class="ft ftcal">${Math.round(m.calories)} kcal</span><span class="ft ftp">${Math.round(m.protein)}g P</span><span class="ft ftc">${Math.round(m.carbs)}g C</span><span class="ft ftf">${Math.round(m.fat)}g F</span></div></div><button class="fi-del">✕</button></div><div class="fi-bars"><div class="fi-bar-row"><span class="fi-bar-lbl">P</span><div class="fi-bar-track"><div class="fi-bar-fill" style="width:${pPct}%;background:var(--pc)"></div></div><span class="fi-bar-val" style="color:var(--pc)">${Math.round(m.protein)}g</span></div><div class="fi-bar-row"><span class="fi-bar-lbl">C</span><div class="fi-bar-track"><div class="fi-bar-fill" style="width:${cPct}%;background:var(--cc)"></div></div><span class="fi-bar-val" style="color:var(--cc)">${Math.round(m.carbs)}g</span></div><div class="fi-bar-row"><span class="fi-bar-lbl">F</span><div class="fi-bar-track"><div class="fi-bar-fill" style="width:${fPct}%;background:var(--fc)"></div></div><span class="fi-bar-val" style="color:var(--fc)">${Math.round(m.fat)}g</span></div></div>`;
+      div.querySelector('.fi-del').addEventListener('click',(e)=>{e.stopPropagation();deleteMeal(i);});
+      div.addEventListener('click',()=>openMealDetail(i));
+      el.appendChild(div);
+    });
+  });
 }
 function deleteMeal(i){meals.splice(i,1);save(`${KEY}_meals_${todayKey()}`,meals);renderAll();}
 
@@ -844,6 +895,7 @@ function confirmMeal(){
       fat:Math.round(i.fat*i.portion_multiplier*10)/10
     })),
     loggedAt:Date.now(),
+    mealType:getMealType(new Date().getHours()),
     thumb:null
   };
   meals.push(entry);
@@ -1850,59 +1902,89 @@ function renderWeekly(){
   const days=getWeekData();
   const streak=calcStreak();
   const tgt=getCalTarget();
-
-  // Averages over days with data
   const logged=days.filter(d=>d.hasData);
   const avgCal=logged.length?Math.round(logged.reduce((a,d)=>a+d.t.cal,0)/logged.length):0;
   const avgP=logged.length?Math.round(logged.reduce((a,d)=>a+d.t.p,0)/logged.length):0;
+  const avgC=logged.length?Math.round(logged.reduce((a,d)=>a+d.t.c,0)/logged.length):0;
+  const avgF=logged.length?Math.round(logged.reduce((a,d)=>a+d.t.f,0)/logged.length):0;
   const daysOnTarget=logged.filter(d=>d.t.cal>=tgt*0.8&&d.t.cal<=tgt*1.15).length;
 
-  let html=`
-  <div class="week-streak">
-    <div class="streak-fire">🔥</div>
-    <div class="streak-num">${streak}</div>
-    <div class="streak-lbl">day streak</div>
-  </div>
-  <div class="week-stats-row">
-    <div class="wk-s"><div class="wk-v" style="color:var(--blue2)">${avgCal||'—'}</div><div class="wk-l">avg kcal/day</div></div>
+  // ── Summary stats ──
+  let html=`<div class="week-stats-row">
+    <div class="wk-s"><div class="wk-v" style="color:var(--blue2)">${avgCal||'—'}</div><div class="wk-l">avg kcal</div></div>
     <div class="wk-s"><div class="wk-v" style="color:var(--pc)">${avgP||'—'}g</div><div class="wk-l">avg protein</div></div>
-    <div class="wk-s"><div class="wk-v" style="color:var(--cyan)">${daysOnTarget}/7</div><div class="wk-l">days on target</div></div>
-  </div>
-  <div class="week-bars">`;
+    <div class="wk-s"><div class="wk-v" style="color:var(--cc)">${avgC||'—'}g</div><div class="wk-l">avg carbs</div></div>
+    <div class="wk-s"><div class="wk-v" style="color:var(--fc)">${avgF||'—'}g</div><div class="wk-l">avg fat</div></div>
+  </div>`;
 
+  // ── Calorie bar chart ──
+  html+=`<div class="wk-chart-card">
+    <div class="wk-chart-title">Calories <span class="wk-chart-sub">vs ${tgt} kcal target</span></div>
+    <div class="week-bars">`;
   const maxCal=Math.max(...days.map(d=>d.t.cal),tgt,1);
   days.forEach(d=>{
     const h=Math.max(4,Math.round((d.t.cal/maxCal)*80));
-    const col=d.t.cal===0?'var(--glass2)':d.t.cal>tgt*1.1?'var(--red)':d.t.cal>=tgt*0.85?'var(--blue2)':'var(--amber)';
-    const borderStyle=d.isToday?'border:2px solid var(--blue2);border-bottom:none;':'';
+    const col=d.t.cal===0?'var(--border)':d.t.cal>tgt*1.1?'var(--red)':d.t.cal>=tgt*0.85?'var(--blue2)':'var(--amber)';
+    const tgtH=Math.round((tgt/maxCal)*80);
     html+=`<div class="wk-bar-wrap${d.isToday?' today':''}">
-      <div class="wk-bar-val" style="color:${col}">${d.t.cal?Math.round(d.t.cal):''}</div>
-      <div class="wk-bar" style="height:${h}px;background:${col};opacity:${d.isToday?1:0.7};${borderStyle}"></div>
+      <div class="wk-bar-val" style="color:${col}">${d.t.cal?Math.round(d.t.cal/100)/10+'k':''}</div>
+      <div style="position:relative;width:100%;display:flex;flex-direction:column;align-items:center">
+        <div class="wk-bar" style="height:${h}px;background:${col};opacity:${d.isToday?1:0.75};width:100%;border-radius:4px 4px 2px 2px"></div>
+        <div style="position:absolute;bottom:${tgtH}px;left:0;right:0;height:1px;background:rgba(56,139,253,0.3);pointer-events:none"></div>
+      </div>
       <div class="wk-bar-lbl">${d.label}</div>
-      <div class="wk-bar-dot" style="background:${d.hasData?'var(--blue2)':'var(--glass2)'}"></div>
     </div>`;
   });
-  html+=`</div>`;
+  html+=`</div></div>`;
 
-  // Per-day detail list
+  // ── Macro trend bars (stacked-style per day) ──
+  html+=`<div class="wk-chart-card">
+    <div class="wk-chart-title">Macro Trends <span class="wk-chart-sub">grams per day</span></div>
+    <div class="wk-macro-legend">
+      <span style="color:var(--pc)">● P</span>
+      <span style="color:var(--cc)">● C</span>
+      <span style="color:var(--fc)">● F</span>
+    </div>
+    <div class="wk-macro-grid">`;
+  const maxP=Math.max(...days.map(d=>d.t.p),TARGETS.p,1);
+  const maxC=Math.max(...days.map(d=>d.t.c),TARGETS.c,1);
+  const maxF=Math.max(...days.map(d=>d.t.f),TARGETS.f,1);
+  days.forEach(d=>{
+    const pH=d.hasData?Math.max(3,Math.round((d.t.p/maxP)*60)):0;
+    const cH=d.hasData?Math.max(3,Math.round((d.t.c/maxC)*60)):0;
+    const fH=d.hasData?Math.max(3,Math.round((d.t.f/maxF)*60)):0;
+    html+=`<div class="wk-macro-col${d.isToday?' today':''}">
+      <div class="wk-macro-bars">
+        <div class="wk-mb" style="height:${pH}px;background:var(--pc)" title="${Math.round(d.t.p)}g P"></div>
+        <div class="wk-mb" style="height:${cH}px;background:var(--cc)" title="${Math.round(d.t.c)}g C"></div>
+        <div class="wk-mb" style="height:${fH}px;background:var(--fc)" title="${Math.round(d.t.f)}g F"></div>
+      </div>
+      <div class="wk-bar-lbl">${d.label}</div>
+    </div>`;
+  });
+  html+=`</div></div>`;
+
+  // ── Per-day breakdown ──
   html+=`<div class="week-days">`;
   [...days].reverse().forEach(d=>{
     if(!d.hasData&&!d.isToday)return;
     const lbl=d.isToday?'Today':d.d.toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});
     const recovery=d.dayWhoop[0]?.recovery;
     const recBadge=recovery!=null?`<span class="wk-badge" style="background:${recovery>=67?'rgba(0,229,190,0.15)':recovery>=34?'rgba(245,166,35,0.15)':'rgba(255,69,69,0.15)'};color:${recovery>=67?'var(--whoop-green)':recovery>=34?'var(--amber)':'var(--red)'}">${recovery}% rec</span>`:'';
+    const calCol=d.t.cal>tgt*1.1?'var(--red)':d.t.cal>=tgt*0.85?'var(--blue2)':'var(--amber)';
     html+=`<div class="week-day-row">
       <div class="wkd-lbl">${lbl}</div>
       <div class="wkd-stats">
-        <span style="color:var(--blue2)">${Math.round(d.t.cal)||'—'} kcal</span>
+        <span style="color:${calCol}">${Math.round(d.t.cal)||'—'} kcal</span>
         <span style="color:var(--pc)">${Math.round(d.t.p)||'—'}g P</span>
-        <span style="color:var(--cyan)">${d.dayWater} 💧</span>
+        <span style="color:var(--cc)">${Math.round(d.t.c)||'—'}g C</span>
+        <span style="color:var(--fc)">${Math.round(d.t.f)||'—'}g F</span>
+        <span style="color:var(--blue2)">${d.dayWater}💧</span>
         ${recBadge}
       </div>
     </div>`;
   });
   html+=`</div>`;
-
   el.innerHTML=html;
 }
 
@@ -1970,13 +2052,24 @@ Time of day: ${new Date().getHours()}:00. Goal: fat loss cut phase.`;
   }
 }
 
+function renderStreak(){
+  const s=calcStreak();
+  const el=gv('hdr-streak');
+  const num=gv('hdr-streak-num');
+  if(!el||!num)return;
+  num.textContent=s;
+  el.style.display=s>0?'flex':'none';
+}
+
 // Hook renderAll to also call new renderers
 const _origRenderAll=renderAll;
 window.renderAll=function(){
   _origRenderAll();
   renderNutrients();
   renderWeekly();
+  renderStreak();
 };
 // Call it once now to init
 renderNutrients();
 renderWeekly();
+renderStreak();
