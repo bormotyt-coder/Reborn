@@ -1023,7 +1023,9 @@ function _drawCloud(ctx,cx,cy,scale,alpha){
 
 function _wcFrame(canvas,bg,scene){
   const {tod,w,h,t}=scene;
+  const dpr=scene.dpr||1;
   const ctx=canvas.getContext('2d');
+  ctx.setTransform(dpr,0,0,dpr,0,0);
   ctx.clearRect(0,0,w,h);
 
   if(tod==='morning'){
@@ -1192,14 +1194,12 @@ function setBgForTime(h,weatherCode){
   if(!canvas||!bg)return;
   // Size canvas to physical pixels for crisp rendering
   const dpr=Math.min(window.devicePixelRatio||1,2);
-  const pw=canvas.parentElement.offsetWidth||400;
-  const ph=canvas.parentElement.offsetHeight||120;
+  const pw=canvas.parentElement.offsetWidth||canvas.parentElement.clientWidth||360;
+  const ph=(canvas.parentElement.offsetHeight||canvas.parentElement.clientHeight)||140;
   canvas.width=pw*dpr;
   canvas.height=ph*dpr;
   canvas.style.width=pw+'px';
   canvas.style.height=ph+'px';
-  const ctx=canvas.getContext('2d');
-  ctx.scale(dpr,dpr);
   const tod=getTimeOfDay(h);
   const bgs={
     morning:  'linear-gradient(135deg,#0c2240,#1a3520)',
@@ -1209,6 +1209,7 @@ function setBgForTime(h,weatherCode){
   };
   bg.style.background=bgs[tod];
   _wcScene=_wcInitScene(tod,pw,ph);
+  _wcScene.dpr=dpr;
   // Pause loop when tab hidden (battery saving)
   document.removeEventListener('visibilitychange',_wcVisChange);
   document.addEventListener('visibilitychange',_wcVisChange);
@@ -1227,7 +1228,8 @@ async function initWelcomeCard(){
   const h=new Date().getHours();
   gv('wc-greeting').textContent=getGreeting(h);
   gv('wc-sub').textContent=getSmartSub();
-  setBgForTime(h,0);
+  // Defer until browser has painted and card has real dimensions
+  setTimeout(()=>setBgForTime(h,0), 60);
   // Fetch Dubai weather from Open-Meteo (no API key needed)
   try{
     const r=await fetch('https://api.open-meteo.com/v1/forecast?latitude=25.2048&longitude=55.2708&current=temperature_2m,weathercode,windspeed_10m&timezone=Asia/Dubai');
