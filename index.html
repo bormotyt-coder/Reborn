@@ -147,6 +147,97 @@
 </div>
 
 <!-- ═══ WEEKLY ═══ -->
+<!-- ═══ WORKOUT ═══ -->
+<div id="pg-workout" class="page">
+  <div class="hdr">
+    <div class="logo-wrap">
+      <div class="logo-icon"><span style="font-family:var(--font);font-size:15px;font-weight:800;color:#fff;letter-spacing:-1px">rB</span></div>
+      <div><div class="logo-main">Workout</div><div class="logo-sub" id="wo-hdr-sub">Train Smart</div></div>
+    </div>
+    <button class="wo-history-btn" onclick="showWorkoutHistory()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+    </button>
+  </div>
+
+  <!-- READINESS CARD -->
+  <div class="wo-readiness-card">
+    <div class="wo-ready-left">
+      <div class="wo-ready-ring">
+        <svg viewBox="0 0 60 60" width="60" height="60">
+          <circle cx="30" cy="30" r="25" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="5"/>
+          <circle id="wo-ready-arc" cx="30" cy="30" r="25" fill="none" stroke="#3dd68c" stroke-width="5"
+            stroke-dasharray="157" stroke-dashoffset="157" stroke-linecap="round"
+            transform="rotate(-90 30 30)"/>
+        </svg>
+        <div class="wo-ready-pct" id="wo-ready-pct">—</div>
+      </div>
+      <div class="wo-ready-label">Recovery</div>
+    </div>
+    <div class="wo-ready-right">
+      <div class="wo-ready-stats">
+        <div class="wo-rs"><span class="wo-rs-v" id="wr-sleep">—</span><span class="wo-rs-l">sleep hrs</span></div>
+        <div class="wo-rs"><span class="wo-rs-v" id="wr-protein">—</span><span class="wo-rs-l">yday protein</span></div>
+        <div class="wo-rs"><span class="wo-rs-v" id="wr-last">—</span><span class="wo-rs-l">last session</span></div>
+      </div>
+      <div class="wo-ready-verdict" id="wo-ready-verdict">Enter recovery % to begin</div>
+    </div>
+  </div>
+
+  <!-- RECOVERY INPUT -->
+  <div class="wo-recovery-input-card">
+    <div class="wo-ri-label">⚡ WHOOP Recovery % this morning</div>
+    <div class="wo-ri-row">
+      <input type="number" id="wo-rec-val" class="wo-rec-input" placeholder="74" min="0" max="100" oninput="updateReadiness()">
+      <div class="wo-rec-btns">
+        <button class="wo-rec-preset" onclick="setRecovery(25)" style="color:var(--red)">🔴 &lt;34</button>
+        <button class="wo-rec-preset" onclick="setRecovery(55)" style="color:var(--amber)">🟡 34–66</button>
+        <button class="wo-rec-preset" onclick="setRecovery(80)" style="color:var(--green)">🟢 67+</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- GENERATE VIEW -->
+  <div id="wo-generate-view">
+    <div id="wo-last-session"></div>
+    <button class="wo-gen-btn" id="wo-gen-btn" onclick="generateWorkout()">
+      <div class="wo-gen-icon">⚡</div>
+      <div class="wo-gen-title">Generate Today's Split</div>
+      <div class="wo-gen-sub">AI analyses your recovery, yesterday's nutrition &amp; training history</div>
+    </button>
+    <div id="wo-plan-preview" style="display:none">
+      <div class="wo-plan-header">
+        <div style="flex:1">
+          <div class="wo-split-name" id="wpp-name"></div>
+          <div class="wo-split-note" id="wpp-note"></div>
+        </div>
+        <button class="wo-start-btn" onclick="startWorkout()">Start →</button>
+      </div>
+      <div id="wpp-exercises"></div>
+      <div id="wpp-cardio"></div>
+    </div>
+  </div>
+
+  <!-- ACTIVE WORKOUT VIEW -->
+  <div id="wo-active-view" style="display:none">
+    <div class="wo-active-header">
+      <div style="flex:1">
+        <div class="wo-split-name" id="wo-split-name">—</div>
+        <div class="wo-split-note" id="wo-split-note"></div>
+      </div>
+      <div class="wo-timer-wrap">
+        <div class="wo-elapsed" id="wo-elapsed">0:00</div>
+        <div style="font-size:9px;color:var(--muted);text-align:center">elapsed</div>
+      </div>
+    </div>
+    <div id="wo-exercises"></div>
+    <div id="wo-cardio-section"></div>
+    <div style="padding:16px 14px 8px">
+      <button class="wo-finish-btn" onclick="finishWorkout()">✓ Finish Workout</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ WEEKLY + CALENDAR (merged) ═══ -->
 <div id="pg-weekly" class="page">
   <div class="hdr">
     <div class="logo-wrap">
@@ -154,8 +245,25 @@
       <div><div class="logo-main">Weekly</div><div class="logo-sub">Last 7 days</div></div>
     </div>
   </div>
-  <div class="week-pg">
+  <!-- Tab toggle -->
+  <div class="wk-tab-bar">
+    <button class="wk-tab active" id="wk-tab-weekly" onclick="switchWeeklyTab('weekly')">Weekly</button>
+    <button class="wk-tab" id="wk-tab-calendar" onclick="switchWeeklyTab('calendar')">Calendar</button>
+  </div>
+  <div id="wk-tab-content-weekly" class="week-pg">
     <div id="weekly-content"></div>
+  </div>
+  <div id="wk-tab-content-calendar" style="display:none">
+    <div class="cal-pg">
+      <div class="cal-nav">
+        <button class="cal-navbtn" onclick="changeMonth(-1)">‹</button>
+        <div class="cal-month" id="cal-month-lbl"></div>
+        <button class="cal-navbtn" onclick="changeMonth(1)">›</button>
+      </div>
+      <div class="cal-dow-row" id="cal-dow"></div>
+      <div class="cal-grid" id="cal-grid"></div>
+      <div class="day-detail" id="day-detail"></div>
+    </div>
   </div>
 </div>
 
@@ -199,26 +307,6 @@
   </div>
 </div>
 
-<!-- ═══ CALENDAR ═══ -->
-<div id="pg-calendar" class="page">
-  <div class="hdr">
-    <div class="logo-wrap">
-      <div class="logo-icon"><span style="font-family:var(--font);font-size:15px;font-weight:800;color:#fff;letter-spacing:-1px">rB</span></div>
-      <div><div class="logo-main">Calendar</div></div>
-    </div>
-  </div>
-  <div class="cal-pg">
-    <div class="cal-nav">
-      <button class="cal-navbtn" onclick="changeMonth(-1)">‹</button>
-      <div class="cal-month" id="cal-month-lbl"></div>
-      <button class="cal-navbtn" onclick="changeMonth(1)">›</button>
-    </div>
-    <div class="cal-dow-row" id="cal-dow"></div>
-    <div class="cal-grid" id="cal-grid"></div>
-    <div class="day-detail" id="day-detail"></div>
-  </div>
-</div>
-
 <!-- ═══ PROGRESS ═══ -->
 <div id="pg-progress" class="page">
   <div class="hdr">
@@ -255,17 +343,17 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
       <span>Today</span>
     </button>
+    <button class="nb" onclick="showPage('workout',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6.5 6.5h11M6.5 17.5h11M4 12h16M2 9l2 3-2 3M22 9l-2 3 2 3"/></svg>
+      <span>Workout</span>
+    </button>
     <button class="nb" onclick="showPage('coach',this)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2a10 10 0 110 20A10 10 0 0112 2z"/><path d="M12 16v-4M12 8h.01"/></svg>
       <span>Coach</span>
     </button>
     <button class="nb" onclick="showPage('weekly',this)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-      <span>Weekly</span>
-    </button>
-    <button class="nb" onclick="showPage('calendar',this)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-      <span>Calendar</span>
+      <span>Weekly</span>
     </button>
     <button class="nb" onclick="showPage('progress',this)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>

@@ -69,7 +69,7 @@ function renderAll(){
 }
 
 // NAV
-const PAGE_ORDER=['today','coach','weekly','calendar','progress'];
+const PAGE_ORDER=['today','workout','coach','weekly','progress'];
 let _currentPage='today';
 function showPage(id,btn){
   const pages=document.querySelectorAll('.page');
@@ -93,8 +93,10 @@ function showPage(id,btn){
   btn.classList.add('active');
   incoming.scrollTop=0;
   _currentPage=id;
-  if(id==='calendar')buildCalendar();
+  if(id==='weekly')renderWeekly();
+  if(id==='weekly')buildCalendar();
   if(id==='coach')updateCoachStats();
+  if(id==='workout')renderWorkoutPage();
 }
 
 // ── WHOOP 3-SNAPSHOT ──
@@ -2161,3 +2163,747 @@ document.addEventListener('click',function(e){
 });
 
 initStykuScroll();
+
+// ══════════════════════════════════════════════════════════════════════════
+// WORKOUT TRACKER
+// ══════════════════════════════════════════════════════════════════════════
+
+// ── Storage keys ──
+const WO_KEY      = `${KEY}_workout`;       // active/in-progress session
+const WO_HIST_KEY = `${KEY}_wo_history`;    // array of completed sessions
+const WO_PBS_KEY  = `${KEY}_wo_pbs`;        // personal bests per exercise
+
+// ── State ──
+let _woRecovery  = null;           // WHOOP recovery % entered this session
+let _woPlan      = null;           // AI-generated plan object
+let _woSession   = null;           // active workout session
+let _woTimerInt  = null;           // elapsed timer interval
+let _woRestInt   = null;           // rest timer interval
+let _woHistMode  = false;          // viewing history?
+let _woHistPage  = 'list';         // 'list' | 'detail' | 'exercise'
+let _woHistDetail= null;           // selected session for detail view
+let _woHistExName= null;           // selected exercise for progression
+
+// ── Utilities ──
+function woLoad(key,def){try{const v=localStorage.getItem(key);return v?JSON.parse(v):def;}catch{return def;}}
+function woSave(key,val){localStorage.setItem(key,JSON.stringify(val));}
+function woHistory(){return woLoad(WO_HIST_KEY,[]);}
+function woPBs(){return woLoad(WO_PBS_KEY,{});}
+function epley(w,r){return r===1?w:Math.round(w*(1+r/30));}  // Epley 1RM formula
+
+// ── Exercise icon map ──
+const EX_ICONS={
+  // compounds
+  'squat':'🏋️','deadlift':'🏋️','bench':'💪','row':'🔄','press':'💪','pull':'🔄',
+  'lunge':'🦵','hip thrust':'🍑','rdl':'🔄','sumo':'🏋️',
+  // isolation
+  'curl':'💪','extension':'🦵','fly':'💪','raise':'💪','shrug':'💪',
+  'kickback':'💪','pushdown':'💪',
+  // cable/machine
+  'cable':'🔁','machine':'⚙️','lat pulldown':'🔁','leg press':'⚙️',
+  'leg curl':'⚙️','leg extension':'⚙️','chest press':'⚙️',
+  // cardio
+  'treadmill':'🏃','stair':'🪜','bike':'🚴','row machine':'🚣','elliptical':'🏃',
+  'walk':'🚶',
+};
+function getExIcon(name){
+  const n=name.toLowerCase();
+  for(const[k,v]of Object.entries(EX_ICONS)){if(n.includes(k))return v;}
+  return '💪';
+}
+
+// ── Yesterday's nutrition helper ──
+function getYesterdayNutrition(){
+  const y=new Date();y.setDate(y.getDate()-1);
+  const key=y.toISOString().slice(0,10);
+  const yMeals=woLoad(`${KEY}_meals_${key}`,[]);
+  return getTotals(yMeals);
+}
+
+// ── Last N sessions helper ──
+function getRecentSessions(n=7){
+  return woHistory().slice(-n).reverse();
+}
+
+// ── Last time muscle group was trained ──
+function getDaysSinceMuscle(){
+  const hist=woHistory();
+  const map={};
+  const today=new Date();
+  for(let i=hist.length-1;i>=0;i--){
+    const s=hist[i];
+    const daysAgo=Math.round((today-new Date(s.date))/(1000*60*60*24));
+    (s.muscleGroups||[]).forEach(m=>{
+      if(!(m in map))map[m]=daysAgo;
+    });
+  }
+  return map;
+}
+
+// ── Render workout page (readiness) ──
+function renderWorkoutPage(){
+  // Restore recovery from WHOOP morning snapshot if available
+  const morning=whoopSnaps[0];
+  if(morning&&morning.recovery&&!_woRecovery){
+    _woRecovery=morning.recovery;
+    const inp=gv('wo-rec-val');
+    if(inp)inp.value=_woRecovery;
+  }
+  updateReadiness();
+  // Restore active session if app was closed mid-workout
+  const saved=woLoad(WO_KEY,null);
+  if(saved&&saved.inProgress){
+    _woSession=saved;
+    _woPlan=saved.plan;
+    showActiveWorkout();
+  }
+  renderLastSession();
+}
+
+function setRecovery(val){
+  _woRecovery=val;
+  const inp=gv('wo-rec-val');
+  if(inp)inp.value=val;
+  updateReadiness();
+}
+
+function updateReadiness(){
+  const inp=gv('wo-rec-val');
+  if(inp&&inp.value)_woRecovery=parseInt(inp.value);
+  const rec=_woRecovery;
+  const pctEl=gv('wo-ready-pct');
+  const arcEl=gv('wo-ready-arc');
+  const verdictEl=gv('wo-ready-verdict');
+
+  // Recovery ring
+  if(rec!=null&&pctEl&&arcEl){
+    const circ=157;
+    const offset=circ-(circ*rec/100);
+    arcEl.style.strokeDashoffset=offset;
+    const col=rec>=67?'var(--green)':rec>=34?'var(--amber)':'var(--red)';
+    arcEl.style.stroke=col;
+    pctEl.textContent=rec+'%';
+    pctEl.style.color=col;
+  }
+
+  // Side stats
+  const yest=getYesterdayNutrition();
+  const sleepSnap=whoopSnaps[0];
+  const sleepHrs=sleepSnap?.sleep_duration||'—';
+  const lastSessions=getRecentSessions(1);
+  const lastLabel=lastSessions.length?lastSessions[0].splitName+'  ·  '+new Date(lastSessions[0].date).toLocaleDateString('en-US',{weekday:'short'}):'None yet';
+
+  const sleepEl=gv('wr-sleep');const protEl=gv('wr-protein');const lastEl=gv('wr-last');
+  if(sleepEl)sleepEl.textContent=sleepHrs!='—'?sleepHrs+'h':sleepHrs;
+  if(protEl)protEl.textContent=yest.p?Math.round(yest.p)+'g':'—';
+  if(lastEl){lastEl.textContent=lastLabel;lastEl.style.fontSize='10px';}
+
+  // Verdict
+  if(verdictEl){
+    if(rec==null){verdictEl.textContent='Enter your WHOOP recovery to begin';return;}
+    if(rec>=67)verdictEl.textContent='💪 Great recovery — go heavy today';
+    else if(rec>=50)verdictEl.textContent='👍 Decent recovery — moderate volume';
+    else if(rec>=34)verdictEl.textContent='⚠️ Low recovery — keep intensity down';
+    else verdictEl.textContent='😴 Poor recovery — consider light work only';
+  }
+}
+
+function renderLastSession(){
+  const el=gv('wo-last-session');if(!el)return;
+  const hist=getRecentSessions(1);
+  if(!hist.length){el.style.display='none';return;}
+  const s=hist[0];
+  const date=new Date(s.date).toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});
+  el.style.display='block';
+  el.innerHTML=`<div class="wo-last-card">
+    <div class="wo-last-label">Last Session</div>
+    <div class="wo-last-name">${s.splitName}</div>
+    <div class="wo-last-meta">${date} &nbsp;·&nbsp; ${s.duration||'—'} min &nbsp;·&nbsp; ${s.totalVolume||'—'} kg volume</div>
+    <div class="wo-last-muscles">${(s.muscleGroups||[]).map(m=>`<span class="wo-muscle-chip">${m}</span>`).join('')}</div>
+  </div>`;
+}
+
+// ── AI Workout Generation ──
+async function generateWorkout(){
+  const btn=gv('wo-gen-btn');
+  if(btn){btn.disabled=true;btn.querySelector('.wo-gen-title').textContent='Generating…';btn.querySelector('.wo-gen-icon').textContent='⏳';}
+
+  const yest=getYesterdayNutrition();
+  const rec=_woRecovery||'unknown';
+  const sleepSnap=whoopSnaps[0]||{};
+  const recentSessions=getRecentSessions(7);
+  const pbs=woPBs();
+  const daysAgo=getDaysSinceMuscle();
+
+  // Build context string
+  const histSummary=recentSessions.map(s=>`${new Date(s.date).toLocaleDateString('en-US',{weekday:'short'})}: ${s.splitName} (${(s.muscleGroups||[]).join(', ')})`).join('\n');
+  const pbSummary=Object.entries(pbs).slice(0,20).map(([ex,pb])=>`${ex}: ${pb.weight}kg x${pb.reps} (1RM ~${pb.oneRM}kg)`).join('\n');
+
+  const prompt=`You are a strength & conditioning coach for a 26-year-old male, 89.1kg, 173cm, 25.1% body fat, goal is fat loss while preserving lean mass (target 64kg lean mass). He trains FASTED in the morning before his first meal.
+
+TODAY'S CONTEXT:
+- WHOOP Recovery: ${rec}%
+- Sleep duration: ${sleepSnap.sleep_duration||'unknown'} hours
+- HRV: ${sleepSnap.hrv||'unknown'}
+- Yesterday's nutrition: ${Math.round(yest.p||0)}g protein, ${Math.round(yest.cal||0)} kcal, ${Math.round(yest.c||0)}g carbs
+
+RECENT TRAINING HISTORY (last 7 sessions):
+${histSummary||'No recent sessions logged'}
+
+DAYS SINCE MUSCLE GROUP TRAINED:
+${Object.entries(daysAgo).map(([m,d])=>`${m}: ${d} days ago`).join(', ')||'No history'}
+
+PERSONAL BESTS:
+${pbSummary||'No PBs yet — first session'}
+
+Generate a workout split for today. Return ONLY valid JSON, no markdown, no explanation.
+
+JSON format:
+{
+  "splitName": "Push — Chest & Shoulders",
+  "muscleGroups": ["Chest","Shoulders","Triceps"],
+  "coachNote": "2-line rationale based on recovery and yesterday's nutrition",
+  "exercises": [
+    {
+      "name": "Barbell Bench Press",
+      "icon": "💪",
+      "cue": "retract scapula, drive feet into floor",
+      "sets": 4,
+      "reps": "6-8",
+      "rest": 120,
+      "lastWeight": null,
+      "suggestedWeight": null,
+      "alternatives": ["Dumbbell Bench Press","Machine Chest Press","Cable Chest Fly"]
+    }
+  ],
+  "cardio": {
+    "machine": "Treadmill",
+    "icon": "🏃",
+    "duration": 15,
+    "speed": 6.5,
+    "incline": 8,
+    "unit": "km/h",
+    "rationale": "Fasted incline walk targets fat oxidation. Closes ~120 kcal of today's deficit."
+  }
+}
+
+Rules:
+- 6-8 exercises (fewer if recovery < 40)
+- If recovery >= 67: heavy compound focus, 4-5 sets, 5-8 reps
+- If recovery 34-66: moderate volume, 3-4 sets, 8-12 reps  
+- If recovery < 34: light/technique focus, 3 sets, 12-15 reps
+- Fasted training: avoid maximal CNS-heavy lifts if recovery < 50
+- Do NOT repeat muscle groups trained in last 48 hours unless recovery > 80
+- Cardio: fasted morning = prefer steady state (incline walk, moderate bike). Only recommend HIIT if recovery > 80
+- suggestedWeight: fill in if PB exists for that exercise (suggest same or slight increase), else null
+- Return valid JSON only`;
+
+  try{
+    const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:2000,messages:[{role:'user',content:prompt}]})});
+    const data=await res.json();
+    const text=data.content[0].text.trim().replace(/```json|```/g,'').trim();
+    _woPlan=JSON.parse(text);
+    renderWorkoutPreview();
+  }catch(e){
+    console.error('Workout gen error',e);
+    alert('Could not generate workout. Check your connection.');
+  }finally{
+    if(btn){btn.disabled=false;btn.querySelector('.wo-gen-title').textContent='Generate Today\'s Split';btn.querySelector('.wo-gen-icon').textContent='⚡';}
+  }
+}
+
+function renderWorkoutPreview(){
+  if(!_woPlan)return;
+  const nameEl=gv('wpp-name');const noteEl=gv('wpp-note');
+  const exEl=gv('wpp-exercises');const cardioEl=gv('wpp-cardio');
+  const preview=gv('wo-plan-preview');
+  if(nameEl)nameEl.textContent=_woPlan.splitName||'';
+  if(noteEl)noteEl.textContent=_woPlan.coachNote||'';
+  if(exEl){
+    exEl.innerHTML=(_woPlan.exercises||[]).map((ex,i)=>`
+      <div class="wo-ex-preview">
+        <div class="wo-ex-icon">${ex.icon||getExIcon(ex.name)}</div>
+        <div class="wo-ex-info">
+          <div class="wo-ex-name">${ex.name}</div>
+          <div class="wo-ex-meta">${ex.sets} sets · ${ex.reps} reps · ${ex.rest}s rest</div>
+          <div class="wo-ex-cue">${ex.cue||''}</div>
+        </div>
+        ${ex.lastWeight?`<div class="wo-ex-last">${ex.lastWeight}kg</div>`:''}
+      </div>`).join('');
+  }
+  if(cardioEl&&_woPlan.cardio){
+    const c=_woPlan.cardio;
+    cardioEl.innerHTML=`<div class="wo-cardio-preview">
+      <div class="wo-cardio-icon">${c.icon||'🏃'}</div>
+      <div class="wo-cardio-info">
+        <div class="wo-cardio-title">${c.machine} · ${c.duration} min</div>
+        <div class="wo-cardio-meta">${c.speed} ${c.unit} · ${c.incline}% incline</div>
+        <div class="wo-cardio-rat">${c.rationale||''}</div>
+      </div>
+    </div>`;
+  }
+  if(preview)preview.style.display='block';
+}
+
+// ── Start / Active Workout ──
+function startWorkout(){
+  if(!_woPlan)return;
+  // Build session object
+  _woSession={
+    id: Date.now(),
+    date: new Date().toISOString(),
+    plan: _woPlan,
+    splitName: _woPlan.splitName,
+    muscleGroups: _woPlan.muscleGroups||[],
+    inProgress: true,
+    startTime: Date.now(),
+    exercises: (_woPlan.exercises||[]).map(ex=>({
+      ...ex,
+      sets: Array.from({length:ex.sets},()=>({weight:'',reps:'',rpe:'',done:false})),
+      collapsed: false,
+      swappedTo: null,
+    })),
+    cardio: _woPlan.cardio?{..._woPlan.cardio,done:false,actualDuration:null}:null,
+  };
+  woSave(WO_KEY,_woSession);
+  showActiveWorkout();
+}
+
+function showActiveWorkout(){
+  gv('wo-generate-view').style.display='none';
+  gv('wo-active-view').style.display='block';
+  const nameEl=gv('wo-split-name');const noteEl=gv('wo-split-note');
+  if(nameEl)nameEl.textContent=_woSession.splitName||'';
+  if(noteEl)noteEl.textContent=_woSession.plan?.coachNote||'';
+  renderExercises();
+  renderCardioSection();
+  startElapsedTimer();
+}
+
+function startElapsedTimer(){
+  if(_woTimerInt)clearInterval(_woTimerInt);
+  _woTimerInt=setInterval(()=>{
+    const el=gv('wo-elapsed');if(!el)return;
+    const secs=Math.floor((Date.now()-_woSession.startTime)/1000);
+    const m=Math.floor(secs/60),s=secs%60;
+    el.textContent=`${m}:${s.toString().padStart(2,'0')}`;
+  },1000);
+}
+
+function renderExercises(){
+  const el=gv('wo-exercises');if(!el||!_woSession)return;
+  el.innerHTML=_woSession.exercises.map((ex,ei)=>renderExerciseCard(ex,ei)).join('');
+}
+
+function renderExerciseCard(ex,ei){
+  const pbs=woPBs();
+  const pb=pbs[ex.name];
+  const pbLine=pb?`<div class="wo-pb-badge">PB: ${pb.weight}kg × ${pb.reps} → 1RM ${pb.oneRM}kg</div>`:'';
+
+  const setsHtml=ex.sets.map((s,si)=>{
+    const oneRM=s.weight&&s.reps?epley(parseFloat(s.weight),parseInt(s.reps)):null;
+    return `<div class="wo-set-row ${s.done?'done':''}">
+      <div class="wo-set-num">${si+1}</div>
+      <div class="wo-set-ghost">${ex.suggestedWeight||ex.lastWeight||'—'}</div>
+      <input class="wo-set-inp" type="number" placeholder="kg" value="${s.weight}"
+        oninput="setExerciseSet(${ei},${si},'weight',this.value)" min="0" step="0.5">
+      <span class="wo-set-x">×</span>
+      <input class="wo-set-inp wo-set-reps" type="number" placeholder="reps" value="${s.reps}"
+        oninput="setExerciseSet(${ei},${si},'reps',this.value)" min="0">
+      <div class="wo-set-1rm" style="${oneRM?'color:var(--blue2)':'color:var(--muted)'}">
+        ${oneRM?oneRM+'kg':'—'}
+      </div>
+      <button class="wo-set-done-btn ${s.done?'active':''}" onclick="toggleSetDone(${ei},${si})">✓</button>
+    </div>`;
+  }).join('');
+
+  const altHtml=(ex.alternatives||[]).map(a=>`<button class="wo-alt-btn" onclick="swapExercise(${ei},'${a.replace(/'/g,"\\'")}')">↻ ${a}</button>`).join('');
+
+  return `<div class="wo-ex-card ${ex.collapsed?'collapsed':''}" id="wo-ex-${ei}">
+    <div class="wo-ex-card-hdr" onclick="toggleExCollapse(${ei})">
+      <div class="wo-ex-card-icon">${ex.icon||getExIcon(ex.name)}</div>
+      <div class="wo-ex-card-title">
+        <div class="wo-ex-card-name">${ex.swappedTo||ex.name}</div>
+        <div class="wo-ex-card-meta">${ex.sets.length} sets · ${ex.reps||ex.sets[0]?.reps||'—'} reps · ${ex.rest}s rest</div>
+      </div>
+      <div class="wo-ex-card-check" id="wo-ex-check-${ei}">${ex.sets.every(s=>s.done)?'✅':'○'}</div>
+    </div>
+    <div class="wo-ex-card-body">
+      <div class="wo-ex-cue-line">💡 ${ex.cue||''}</div>
+      ${pbLine}
+      <div class="wo-sets-header">
+        <span>Set</span><span>Last</span><span>Weight</span><span></span><span>Reps</span><span>1RM</span><span></span>
+      </div>
+      ${setsHtml}
+      <button class="wo-add-set-btn" onclick="addSet(${ei})">+ Add Set</button>
+      ${altHtml?`<div class="wo-alts-row">${altHtml}</div>`:''}
+      <div id="wo-rest-timer-${ei}" class="wo-rest-timer" style="display:none"></div>
+    </div>
+  </div>`;
+}
+
+function renderCardioSection(){
+  const el=gv('wo-cardio-section');if(!el||!_woSession?.cardio)return;
+  const c=_woSession.cardio;
+  el.innerHTML=`<div class="wo-cardio-card ${c.done?'done':''}">
+    <div class="wo-cardio-hdr">
+      <div class="wo-cardio-icon-big">${c.icon||'🏃'}</div>
+      <div>
+        <div class="wo-cardio-card-title">Cardio Finisher</div>
+        <div class="wo-cardio-card-sub">${c.machine}</div>
+      </div>
+      <button class="wo-cardio-done-btn ${c.done?'active':''}" onclick="toggleCardioDone()">✓</button>
+    </div>
+    <div class="wo-cardio-specs">
+      <div class="wo-cs"><div class="wo-cs-v">${c.duration}</div><div class="wo-cs-l">min</div></div>
+      <div class="wo-cs"><div class="wo-cs-v">${c.speed}</div><div class="wo-cs-l">${c.unit}</div></div>
+      <div class="wo-cs"><div class="wo-cs-v">${c.incline}%</div><div class="wo-cs-l">incline</div></div>
+    </div>
+    <div class="wo-cardio-rat">${c.rationale||''}</div>
+  </div>`;
+}
+
+// ── Set logging ──
+function setExerciseSet(ei,si,field,val){
+  if(!_woSession)return;
+  _woSession.exercises[ei].sets[si][field]=val;
+  // Update 1RM display live
+  const s=_woSession.exercises[ei].sets[si];
+  const row=document.querySelector(`#wo-ex-${ei} .wo-set-row:nth-child(${si+1})`);
+  if(row){
+    const oneRM=s.weight&&s.reps?epley(parseFloat(s.weight),parseInt(s.reps)):null;
+    const rm=row.querySelector('.wo-set-1rm');
+    if(rm){rm.textContent=oneRM?oneRM+'kg':'—';rm.style.color=oneRM?'var(--blue2)':'var(--muted)';}
+  }
+  woSave(WO_KEY,_woSession);
+}
+
+function toggleSetDone(ei,si){
+  if(!_woSession)return;
+  const set=_woSession.exercises[ei].sets[si];
+  set.done=!set.done;
+  // Start rest timer if just completed
+  if(set.done){
+    const rest=_woSession.exercises[ei].rest||90;
+    startRestTimer(ei,rest);
+    // Update PB
+    if(set.weight&&set.reps){
+      const ex=_woSession.exercises[ei];
+      const name=ex.swappedTo||ex.name;
+      const pbs=woPBs();
+      const oneRM=epley(parseFloat(set.weight),parseInt(set.reps));
+      if(!pbs[name]||oneRM>pbs[name].oneRM){
+        pbs[name]={weight:parseFloat(set.weight),reps:parseInt(set.reps),oneRM,date:new Date().toISOString()};
+        woSave(WO_PBS_KEY,pbs);
+      }
+    }
+  }
+  woSave(WO_KEY,_woSession);
+  // Re-render just the check icon
+  const check=gv(`wo-ex-check-${ei}`);
+  if(check)check.textContent=_woSession.exercises[ei].sets.every(s=>s.done)?'✅':'○';
+  // Re-render the specific set row
+  renderExercises();
+}
+
+function toggleExCollapse(ei){
+  if(!_woSession)return;
+  _woSession.exercises[ei].collapsed=!_woSession.exercises[ei].collapsed;
+  renderExercises();
+}
+
+function addSet(ei){
+  if(!_woSession)return;
+  _woSession.exercises[ei].sets.push({weight:'',reps:'',rpe:'',done:false});
+  woSave(WO_KEY,_woSession);
+  renderExercises();
+}
+
+function swapExercise(ei,newName){
+  if(!_woSession)return;
+  _woSession.exercises[ei].swappedTo=newName;
+  _woSession.exercises[ei].icon=getExIcon(newName);
+  woSave(WO_KEY,_woSession);
+  renderExercises();
+}
+
+function toggleCardioDone(){
+  if(!_woSession?.cardio)return;
+  _woSession.cardio.done=!_woSession.cardio.done;
+  woSave(WO_KEY,_woSession);
+  renderCardioSection();
+}
+
+// ── Rest timer ──
+function startRestTimer(ei,secs){
+  if(_woRestInt)clearInterval(_woRestInt);
+  let remaining=secs;
+  const el=gv(`wo-rest-timer-${ei}`);
+  if(!el)return;
+  el.style.display='flex';
+  const update=()=>{
+    el.textContent=`Rest: ${remaining}s`;
+    el.style.background=remaining<=10?'rgba(248,81,73,0.15)':'rgba(56,139,253,0.10)';
+    el.style.color=remaining<=10?'var(--red)':'var(--blue2)';
+    if(remaining<=0){el.textContent='Go! 💪';clearInterval(_woRestInt);setTimeout(()=>{el.style.display='none';},1500);return;}
+    remaining--;
+  };
+  update();
+  _woRestInt=setInterval(update,1000);
+}
+
+// ── Finish workout ──
+async function finishWorkout(){
+  if(!_woSession)return;
+  if(_woTimerInt)clearInterval(_woTimerInt);
+  _woSession.inProgress=false;
+  _woSession.endTime=Date.now();
+  const durMins=Math.round((_woSession.endTime-_woSession.startTime)/60000);
+  _woSession.duration=durMins;
+
+  // Calculate total volume
+  let vol=0;
+  _woSession.exercises.forEach(ex=>{
+    ex.sets.forEach(s=>{
+      if(s.weight&&s.reps&&s.done)vol+=parseFloat(s.weight)*parseInt(s.reps);
+    });
+  });
+  _woSession.totalVolume=Math.round(vol);
+
+  // Save to history
+  const hist=woHistory();
+  hist.push(_woSession);
+  woSave(WO_HIST_KEY,hist);
+  localStorage.removeItem(WO_KEY);
+
+  // Show summary
+  showWorkoutSummary(_woSession);
+  _woSession=null;
+  _woPlan=null;
+}
+
+function showWorkoutSummary(session){
+  // Build PB highlights
+  const pbs=woPBs();
+  const pbHtml=session.exercises.map(ex=>{
+    const name=ex.swappedTo||ex.name;
+    const pb=pbs[name];
+    if(!pb)return '';
+    return `<div class="wo-sum-pb">🏆 ${name}: ${pb.weight}kg × ${pb.reps} → 1RM <strong>${pb.oneRM}kg</strong></div>`;
+  }).filter(Boolean).join('');
+
+  const html=`<div class="wo-summary-modal" id="wo-sum-modal">
+    <div class="wo-sum-inner">
+      <div class="wo-sum-title">Workout Complete 💪</div>
+      <div class="wo-sum-split">${session.splitName}</div>
+      <div class="wo-sum-stats">
+        <div class="wo-ss"><div class="wo-ss-v">${session.duration}</div><div class="wo-ss-l">minutes</div></div>
+        <div class="wo-ss"><div class="wo-ss-v">${session.totalVolume?.toLocaleString()}</div><div class="wo-ss-l">kg volume</div></div>
+        <div class="wo-ss"><div class="wo-ss-v">${session.exercises.length}</div><div class="wo-ss-l">exercises</div></div>
+      </div>
+      <div class="wo-sum-muscles">${(session.muscleGroups||[]).map(m=>`<span class="wo-muscle-chip">${m}</span>`).join('')}</div>
+      ${pbHtml?`<div class="wo-sum-pbs">${pbHtml}</div>`:''}
+      <button class="wo-sum-close" onclick="closeWorkoutSummary()">Done</button>
+    </div>
+  </div>`;
+
+  const wrap=document.createElement('div');
+  wrap.innerHTML=html;
+  document.body.appendChild(wrap.firstElementChild);
+}
+
+function closeWorkoutSummary(){
+  const el=gv('wo-sum-modal');
+  if(el)el.remove();
+  gv('wo-active-view').style.display='none';
+  gv('wo-generate-view').style.display='block';
+  renderLastSession();
+  renderWorkoutPage();
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// WORKOUT HISTORY + PROGRESSION
+// ══════════════════════════════════════════════════════════════════════════
+function showWorkoutHistory(){
+  _woHistMode=true;
+  _woHistPage='list';
+  const modal=document.createElement('div');
+  modal.id='wo-hist-modal';
+  modal.className='wo-hist-modal';
+  modal.innerHTML=`
+    <div class="wo-hist-inner">
+      <div class="wo-hist-topbar">
+        <button class="wo-hist-back" id="wo-hist-back-btn" onclick="woHistBack()" style="display:none">‹</button>
+        <div class="wo-hist-title" id="wo-hist-title">History</div>
+        <button class="wo-hist-close" onclick="closeWorkoutHistory()">✕</button>
+      </div>
+      <div id="wo-hist-content"></div>
+    </div>`;
+  document.body.appendChild(modal);
+  renderHistoryList();
+}
+
+function closeWorkoutHistory(){
+  const el=gv('wo-hist-modal');if(el)el.remove();
+  _woHistMode=false;
+}
+
+function woHistBack(){
+  if(_woHistPage==='detail'){_woHistPage='list';renderHistoryList();}
+  else if(_woHistPage==='exercise'){_woHistPage='detail';renderHistoryDetail(_woHistDetail);}
+  gv('wo-hist-back-btn').style.display=_woHistPage==='list'?'none':'block';
+}
+
+function renderHistoryList(){
+  const el=gv('wo-hist-content');if(!el)return;
+  const hist=woHistory().reverse();
+  const titleEl=gv('wo-hist-title');if(titleEl)titleEl.textContent='History';
+  const backBtn=gv('wo-hist-back-btn');if(backBtn)backBtn.style.display='none';
+
+  if(!hist.length){
+    el.innerHTML=`<div class="wo-hist-empty">No workouts yet.<br>Complete your first session!</div>`;
+    return;
+  }
+
+  el.innerHTML=hist.map((s,i)=>{
+    const date=new Date(s.date).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+    return `<div class="wo-hist-row" onclick="renderHistoryDetail(${JSON.stringify(s).replace(/"/g,'&quot;')})">
+      <div class="wo-hr-left">
+        <div class="wo-hr-split">${s.splitName||'Workout'}</div>
+        <div class="wo-hr-date">${date}</div>
+        <div class="wo-hr-muscles">${(s.muscleGroups||[]).map(m=>`<span class="wo-muscle-chip">${m}</span>`).join('')}</div>
+      </div>
+      <div class="wo-hr-right">
+        <div class="wo-hr-vol">${s.totalVolume?.toLocaleString()||'—'}<span class="wo-hr-unit">kg</span></div>
+        <div class="wo-hr-dur">${s.duration||'—'} min</div>
+        <div class="wo-hr-arrow">›</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderHistoryDetail(session){
+  if(typeof session==='string'){try{session=JSON.parse(session);}catch{return;}}
+  _woHistDetail=session;
+  _woHistPage='detail';
+  const el=gv('wo-hist-content');if(!el)return;
+  const backBtn=gv('wo-hist-back-btn');if(backBtn)backBtn.style.display='block';
+  const titleEl=gv('wo-hist-title');if(titleEl)titleEl.textContent=session.splitName||'Session';
+  const date=new Date(session.date).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+
+  const exHtml=(session.exercises||[]).map(ex=>{
+    const name=ex.swappedTo||ex.name;
+    const doneSets=ex.sets.filter(s=>s.done&&s.weight&&s.reps);
+    const bestSet=doneSets.reduce((b,s)=>epley(parseFloat(s.weight),parseInt(s.reps))>epley(parseFloat(b.weight||0),parseInt(b.reps||1))?s:b,doneSets[0]);
+    return `<div class="wo-det-ex" onclick="renderExerciseProgression('${name.replace(/'/g,"\\'")}')">
+      <div class="wo-det-ex-top">
+        <div class="wo-det-ex-name">${ex.icon||getExIcon(name)} ${name}</div>
+        <div class="wo-det-ex-arrow">›</div>
+      </div>
+      <div class="wo-det-sets">
+        ${doneSets.map(s=>`<span class="wo-det-set">${s.weight}kg×${s.reps}</span>`).join('')}
+      </div>
+      ${bestSet?`<div class="wo-det-1rm">Best 1RM: <strong>${epley(parseFloat(bestSet.weight),parseInt(bestSet.reps))}kg</strong></div>`:''}
+    </div>`;
+  }).join('');
+
+  el.innerHTML=`<div class="wo-det-header">
+    <div class="wo-det-date">${date}</div>
+    <div class="wo-det-stats">
+      <span>${session.duration||'—'} min</span>
+      <span>${session.totalVolume?.toLocaleString()||'—'} kg</span>
+    </div>
+    <div class="wo-det-muscles">${(session.muscleGroups||[]).map(m=>`<span class="wo-muscle-chip">${m}</span>`).join('')}</div>
+  </div>
+  <div class="wo-det-ex-list">
+    <div class="wo-det-section-lbl">Exercises — tap for progression</div>
+    ${exHtml}
+  </div>`;
+}
+
+function renderExerciseProgression(exName){
+  _woHistPage='exercise';
+  _woHistExName=exName;
+  const el=gv('wo-hist-content');if(!el)return;
+  const backBtn=gv('wo-hist-back-btn');if(backBtn)backBtn.style.display='block';
+  const titleEl=gv('wo-hist-title');if(titleEl)titleEl.textContent=exName;
+
+  // Gather all historical data for this exercise
+  const hist=woHistory();
+  const dataPoints=[];
+  hist.forEach(session=>{
+    (session.exercises||[]).forEach(ex=>{
+      const name=ex.swappedTo||ex.name;
+      if(name===exName){
+        const doneSets=ex.sets.filter(s=>s.done&&s.weight&&s.reps);
+        if(doneSets.length){
+          const best=doneSets.reduce((b,s)=>epley(parseFloat(s.weight),parseInt(s.reps))>epley(parseFloat(b.weight||0),parseInt(b.reps||1))?s:b,doneSets[0]);
+          dataPoints.push({
+            date:session.date,
+            oneRM:epley(parseFloat(best.weight),parseInt(best.reps)),
+            weight:parseFloat(best.weight),
+            reps:parseInt(best.reps),
+            sets:doneSets,
+          });
+        }
+      }
+    });
+  });
+
+  const pb=woPBs()[exName];
+
+  // Draw mini chart as inline SVG
+  let chartSvg='<div class="wo-prog-empty">Not enough data yet</div>';
+  if(dataPoints.length>=2){
+    const W=320,H=100,pad=20;
+    const vals=dataPoints.map(d=>d.oneRM);
+    const min=Math.min(...vals)-5,max=Math.max(...vals)+5;
+    const pts=dataPoints.map((d,i)=>{
+      const x=pad+(i/(dataPoints.length-1))*(W-pad*2);
+      const y=H-pad-((d.oneRM-min)/(max-min||1))*(H-pad*2);
+      return `${x},${y}`;
+    }).join(' ');
+    const dotHtml=dataPoints.map((d,i)=>{
+      const x=pad+(i/(dataPoints.length-1))*(W-pad*2);
+      const y=H-pad-((d.oneRM-min)/(max-min||1))*(H-pad*2);
+      return `<circle cx="${x}" cy="${y}" r="4" fill="var(--blue2)"/><title>${d.oneRM}kg</title>`;
+    }).join('');
+    chartSvg=`<svg viewBox="0 0 ${W} ${H}" class="wo-prog-chart">
+      <polyline points="${pts}" fill="none" stroke="var(--blue2)" stroke-width="2" stroke-linejoin="round"/>
+      ${dotHtml}
+    </svg>`;
+  }
+
+  const histRows=dataPoints.slice().reverse().map(d=>{
+    const date=new Date(d.date).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+    return `<div class="wo-prog-row">
+      <span class="wo-prog-date">${date}</span>
+      <span class="wo-prog-sets">${d.sets.map(s=>`${s.weight}×${s.reps}`).join('  ')}</span>
+      <span class="wo-prog-1rm">${d.oneRM}kg</span>
+    </div>`;
+  }).join('');
+
+  el.innerHTML=`
+    <div class="wo-prog-header">
+      ${pb?`<div class="wo-prog-pb">🏆 Personal Best: ${pb.weight}kg × ${pb.reps} reps → <strong>${pb.oneRM}kg</strong> 1RM</div>`:''}
+      <div class="wo-prog-sessions">${dataPoints.length} sessions logged</div>
+    </div>
+    ${chartSvg}
+    <div class="wo-prog-history">
+      <div class="wo-det-section-lbl">Session History</div>
+      ${histRows||'<div class="wo-hist-empty">No data yet</div>'}
+    </div>`;
+}
+
+// ── Weekly/Calendar merge: toggle inside weekly page ──
+let _weeklyTab='weekly';
+function switchWeeklyTab(tab){
+  _weeklyTab=tab;
+  gv('wk-tab-weekly').classList.toggle('active',tab==='weekly');
+  gv('wk-tab-calendar').classList.toggle('active',tab==='calendar');
+  gv('wk-tab-content-weekly').style.display=tab==='weekly'?'block':'none';
+  gv('wk-tab-content-calendar').style.display=tab==='calendar'?'block':'none';
+  if(tab==='calendar')buildCalendar();
+  if(tab==='weekly')renderWeekly();
+}
