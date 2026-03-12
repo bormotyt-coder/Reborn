@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -9,16 +10,7 @@
 <meta name="apple-mobile-web-app-title" content="reBorn">
 <meta name="theme-color" content="#090b10">
 <title>Project reBorn</title>
-<!-- PWA Manifest -->
-<link rel="manifest" href="manifest.json">
-<!-- Apple touch icons (iOS home screen) -->
-<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
-<link rel="apple-touch-icon" sizes="167x167" href="icon-167.png">
-<link rel="apple-touch-icon" sizes="152x152" href="icon-152.png">
-<link rel="apple-touch-icon" sizes="120x120" href="icon-120.png">
-<!-- Favicon / Android -->
-<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
-<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+<link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxODAgMTgwIj48cmVjdCB3aWR0aD0iMTgwIiBoZWlnaHQ9IjE4MCIgcng9IjQwIiBmaWxsPSIjMDkwYjEwIi8+PHRleHQgeD0iNTAlIiB5PSI1NCUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJHZW9yZ2lhLHNlcmlmIiBmb250LXNpemU9IjkwIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0iI2Q0ZjUzYyI+ckI8L3RleHQ+PC9zdmc+">
 <!-- fonts loaded via style.css @import -->
 <link rel="stylesheet" href="style.css">
 </head>
@@ -26,6 +18,7 @@
 <div id="app">
 
 <!-- ═══ TODAY ═══ -->
+
 <div id="pg-today" class="page active">
   <div class="hdr">
     <div class="logo-wrap">
@@ -44,7 +37,18 @@
       <div class="sb-s"><div class="sb-v">−5.6kg</div><div class="sb-l">Fat Goal</div></div>
     </div>
   </div>
+  <!-- STREAK MINI-CARD -->
+  <div class="streak-mini-card" id="streak-mini-card" onclick="openStreakModal()">
+    <div class="smc-fire">🔥</div>
+    <div class="smc-body">
+      <div class="smc-num" id="smc-num">0</div>
+      <div class="smc-lbl">day streak</div>
+    </div>
+    <div class="smc-arrow">›</div>
+  </div>
+
   <!-- WELCOME CARD -->
+
   <div class="welcome-card" id="welcome-card">
     <div class="wc-bg" id="wc-bg"><canvas id="wc-canvas"></canvas></div>
     <div class="wc-overlay"></div>
@@ -147,7 +151,10 @@
         SCAN BARCODE
       </button>
 
-    </div>
+```
+</div>
+```
+
   </div>
   <!-- AUTO-SUGGEST -->
   <div class="gc">
@@ -166,6 +173,7 @@
 </div>
 
 <!-- ═══ WEEKLY ═══ -->
+
 <div id="pg-weekly" class="page">
   <div class="hdr">
     <div class="logo-wrap">
@@ -179,6 +187,7 @@
 </div>
 
 <!-- ═══ AI COACH ═══ -->
+
 <div id="pg-coach" class="page">
   <div class="hdr">
     <div class="logo-wrap">
@@ -219,6 +228,7 @@
 </div>
 
 <!-- ═══ CALENDAR ═══ -->
+
 <div id="pg-calendar" class="page">
   <div class="hdr">
     <div class="logo-wrap">
@@ -239,6 +249,7 @@
 </div>
 
 <!-- ═══ PROGRESS ═══ -->
+
 <div id="pg-progress" class="page">
   <div class="hdr">
     <div class="logo-wrap">
@@ -268,6 +279,7 @@
 </div><!-- #app -->
 
 <!-- BOTTOM NAV -->
+
 <nav class="bnav">
   <div class="bnav-inner">
     <button class="nb active" onclick="showPage('today',this)">
@@ -294,6 +306,7 @@
 </nav>
 
 <!-- MODAL: LOG MEAL -->
+
 <div class="overlay" id="log-modal">
   <div class="modal">
     <div class="m-handle"></div>
@@ -308,77 +321,81 @@
     <textarea id="meal-desc" rows="2" placeholder="e.g. avocado toast with egg, Big Mac, GHOST whey 1 scoop…"></textarea>
     <div class="loading" id="meal-loading"><div class="spin"></div><br>Identifying ingredients…</div>
 
-    <!-- INGREDIENT RESULTS -->
-    <div id="ing-results" style="display:none">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;margin-top:4px">
-        <div id="conf-badge-wrap"></div>
-        <div style="font-size:11px;color:var(--muted)">Select what's on your plate</div>
-      </div>
-      <div id="conf-tip" class="conf-tip"></div>
-      <div class="ing-list" id="ing-list"></div>
+```
+<!-- INGREDIENT RESULTS -->
+<div id="ing-results" style="display:none">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;margin-top:4px">
+    <div id="conf-badge-wrap"></div>
+    <div style="font-size:11px;color:var(--muted)">Select what's on your plate</div>
+  </div>
+  <div id="conf-tip" class="conf-tip"></div>
+  <div class="ing-list" id="ing-list"></div>
 
-      <!-- Add missing ingredient -->
-      <div style="margin:4px 0 8px">
-        <button onclick="toggleAddIngForm()" style="width:100%;background:rgba(245,166,35,0.06);border:1.5px dashed rgba(245,166,35,0.25);border-radius:12px;padding:11px;font-family:var(--font);font-size:15px;font-weight:700;color:var(--amber);cursor:pointer;letter-spacing:.05em">+ Add Missing Ingredient</button>
-        <div id="add-ing-form" style="display:none;background:rgba(245,166,35,0.05);border:1px solid rgba(245,166,35,0.18);border-radius:14px;padding:14px;margin-top:8px">
-          <div style="font-family:var(--font);font-size:15px;font-weight:700;color:var(--amber);margin-bottom:4px">Add Ingredient</div>
-          <input type="text" id="add-ing-name" placeholder="e.g. Olive oil 1 tbsp, Feta 30g" style="margin-bottom:8px"/>
-          <button onclick="aiLookupIngredient()" style="width:100%;background:rgba(245,166,35,0.1);border:1px solid rgba(245,166,35,0.3);border-radius:10px;padding:9px;font-family:var(--font);font-size:14px;font-weight:700;color:var(--amber);cursor:pointer;margin-bottom:4px">🔍 AI Lookup</button>
-          <div class="loading" id="ing-lookup-loading" style="color:var(--amber)"><div class="spin" style="border-top-color:var(--amber)"></div><br>Looking up…</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px">
-            <div><label class="flbl" style="margin-top:0">Emoji</label><input type="text" id="add-ing-emoji" placeholder="🫒" maxlength="2"/></div>
-            <div><label class="flbl" style="margin-top:0">Calories</label><input type="number" id="add-ing-cal" placeholder="kcal"/></div>
-            <div><label class="flbl" style="margin-top:0">Protein (g)</label><input type="number" id="add-ing-p" placeholder="g"/></div>
-            <div><label class="flbl" style="margin-top:0">Carbs (g)</label><input type="number" id="add-ing-c" placeholder="g"/></div>
-            <div><label class="flbl" style="margin-top:0">Fat (g)</label><input type="number" id="add-ing-f" placeholder="g"/></div>
-            <div><label class="flbl" style="margin-top:0">Portion</label><input type="text" id="add-ing-portion" placeholder="e.g. 1 tbsp"/></div>
-          </div>
-          <button onclick="addManualIngredient()" style="width:100%;background:linear-gradient(135deg,var(--amber),rgba(245,166,35,0.7));color:#080a0a;border:none;border-radius:12px;padding:13px;font-family:var(--font);font-size:18px;font-weight:800;cursor:pointer;margin-top:10px">ADD INGREDIENT</button>
-        </div>
+  <!-- Add missing ingredient -->
+  <div style="margin:4px 0 8px">
+    <button onclick="toggleAddIngForm()" style="width:100%;background:rgba(245,166,35,0.06);border:1.5px dashed rgba(245,166,35,0.25);border-radius:12px;padding:11px;font-family:var(--font);font-size:15px;font-weight:700;color:var(--amber);cursor:pointer;letter-spacing:.05em">+ Add Missing Ingredient</button>
+    <div id="add-ing-form" style="display:none;background:rgba(245,166,35,0.05);border:1px solid rgba(245,166,35,0.18);border-radius:14px;padding:14px;margin-top:8px">
+      <div style="font-family:var(--font);font-size:15px;font-weight:700;color:var(--amber);margin-bottom:4px">Add Ingredient</div>
+      <input type="text" id="add-ing-name" placeholder="e.g. Olive oil 1 tbsp, Feta 30g" style="margin-bottom:8px"/>
+      <button onclick="aiLookupIngredient()" style="width:100%;background:rgba(245,166,35,0.1);border:1px solid rgba(245,166,35,0.3);border-radius:10px;padding:9px;font-family:var(--font);font-size:14px;font-weight:700;color:var(--amber);cursor:pointer;margin-bottom:4px">🔍 AI Lookup</button>
+      <div class="loading" id="ing-lookup-loading" style="color:var(--amber)"><div class="spin" style="border-top-color:var(--amber)"></div><br>Looking up…</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px">
+        <div><label class="flbl" style="margin-top:0">Emoji</label><input type="text" id="add-ing-emoji" placeholder="🫒" maxlength="2"/></div>
+        <div><label class="flbl" style="margin-top:0">Calories</label><input type="number" id="add-ing-cal" placeholder="kcal"/></div>
+        <div><label class="flbl" style="margin-top:0">Protein (g)</label><input type="number" id="add-ing-p" placeholder="g"/></div>
+        <div><label class="flbl" style="margin-top:0">Carbs (g)</label><input type="number" id="add-ing-c" placeholder="g"/></div>
+        <div><label class="flbl" style="margin-top:0">Fat (g)</label><input type="number" id="add-ing-f" placeholder="g"/></div>
+        <div><label class="flbl" style="margin-top:0">Portion</label><input type="text" id="add-ing-portion" placeholder="e.g. 1 tbsp"/></div>
       </div>
-
-      <!-- Total row — tap pencil to edit totals and redistribute to ingredients -->
-      <div id="sel-totals-view" style="background:rgba(255,255,255,0.04);border-radius:12px;padding:11px 14px;margin-bottom:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-        <span style="font-family:var(--font);font-size:14px;font-weight:700;color:var(--text2)">Total:</span>
-        <span id="sel-cal" style="color:var(--blue2);font-family:var(--font);font-weight:700;font-size:14px">0 kcal</span>
-        <span id="sel-p" style="color:var(--pc);font-family:var(--font);font-weight:700;font-size:14px">0g P</span>
-        <span id="sel-c" style="color:var(--cc);font-family:var(--font);font-weight:700;font-size:14px">0g C</span>
-        <span id="sel-f" style="color:var(--fc);font-family:var(--font);font-weight:700;font-size:14px">0g F</span>
-        <button class="tot-edit-btn" onclick="openTotalEdit()" title="Override totals">✏️</button>
-      </div>
-      <!-- Total edit panel -->
-      <div id="sel-totals-edit" style="display:none;background:rgba(56,139,253,0.06);border:1px solid rgba(56,139,253,0.25);border-radius:12px;padding:12px 14px;margin-bottom:8px">
-        <div style="font-family:var(--font);font-size:11px;font-weight:700;color:var(--blue2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Override totals — ingredients will be rescaled to match</div>
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:10px">
-          <div class="ing-edit-col"><label class="ing-edit-lbl">kcal</label><input class="ing-edit-in" id="tot-cal" type="number" min="0" step="1" inputmode="decimal"/></div>
-          <div class="ing-edit-col"><label class="ing-edit-lbl">Protein g</label><input class="ing-edit-in" id="tot-p" type="number" min="0" step="0.1" inputmode="decimal"/></div>
-          <div class="ing-edit-col"><label class="ing-edit-lbl">Carbs g</label><input class="ing-edit-in" id="tot-c" type="number" min="0" step="0.1" inputmode="decimal"/></div>
-          <div class="ing-edit-col"><label class="ing-edit-lbl">Fat g</label><input class="ing-edit-in" id="tot-f" type="number" min="0" step="0.1" inputmode="decimal"/></div>
-        </div>
-        <div style="display:flex;gap:7px">
-          <button class="ing-save-btn" onclick="saveTotalEdit()">✓ Apply &amp; Rescale</button>
-          <button class="ing-cancel-btn" onclick="closeTotalEdit()">Cancel</button>
-        </div>
-      </div>
-      <!-- Inline macro impact panel — auto-renders after analysis -->
-      <div id="log-impact" style="display:none;margin-bottom:10px">
-        <div class="li-header">
-          <span class="li-title">📊 Macro Impact</span>
-          <span id="li-score" class="impact-score"></span>
-        </div>
-        <div id="li-needs" style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px"></div>
-        <div id="li-bars" style="display:flex;flex-direction:column;gap:7px;margin-bottom:10px"></div>
-        <div id="li-verdict" style="font-size:12px;color:var(--text2);line-height:1.7;padding:9px 12px;background:rgba(255,255,255,0.04);border-radius:10px"></div>
-      </div>
-      <button class="btn-confirm" onclick="confirmMeal()">+ ADD TO TODAY'S LOG</button>
+      <button onclick="addManualIngredient()" style="width:100%;background:linear-gradient(135deg,var(--amber),rgba(245,166,35,0.7));color:#080a0a;border:none;border-radius:12px;padding:13px;font-family:var(--font);font-size:18px;font-weight:800;cursor:pointer;margin-top:10px">ADD INGREDIENT</button>
     </div>
+  </div>
 
-    <button class="btn-p" id="btn-analyze" onclick="analyzeMeal()">ANALYSE MEAL</button>
-    <button class="btn-s" onclick="closeLogModal()">Cancel</button>
+  <!-- Total row — tap pencil to edit totals and redistribute to ingredients -->
+  <div id="sel-totals-view" style="background:rgba(255,255,255,0.04);border-radius:12px;padding:11px 14px;margin-bottom:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+    <span style="font-family:var(--font);font-size:14px;font-weight:700;color:var(--text2)">Total:</span>
+    <span id="sel-cal" style="color:var(--blue2);font-family:var(--font);font-weight:700;font-size:14px">0 kcal</span>
+    <span id="sel-p" style="color:var(--pc);font-family:var(--font);font-weight:700;font-size:14px">0g P</span>
+    <span id="sel-c" style="color:var(--cc);font-family:var(--font);font-weight:700;font-size:14px">0g C</span>
+    <span id="sel-f" style="color:var(--fc);font-family:var(--font);font-weight:700;font-size:14px">0g F</span>
+    <button class="tot-edit-btn" onclick="openTotalEdit()" title="Override totals">✏️</button>
+  </div>
+  <!-- Total edit panel -->
+  <div id="sel-totals-edit" style="display:none;background:rgba(56,139,253,0.06);border:1px solid rgba(56,139,253,0.25);border-radius:12px;padding:12px 14px;margin-bottom:8px">
+    <div style="font-family:var(--font);font-size:11px;font-weight:700;color:var(--blue2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Override totals — ingredients will be rescaled to match</div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:10px">
+      <div class="ing-edit-col"><label class="ing-edit-lbl">kcal</label><input class="ing-edit-in" id="tot-cal" type="number" min="0" step="1" inputmode="decimal"/></div>
+      <div class="ing-edit-col"><label class="ing-edit-lbl">Protein g</label><input class="ing-edit-in" id="tot-p" type="number" min="0" step="0.1" inputmode="decimal"/></div>
+      <div class="ing-edit-col"><label class="ing-edit-lbl">Carbs g</label><input class="ing-edit-in" id="tot-c" type="number" min="0" step="0.1" inputmode="decimal"/></div>
+      <div class="ing-edit-col"><label class="ing-edit-lbl">Fat g</label><input class="ing-edit-in" id="tot-f" type="number" min="0" step="0.1" inputmode="decimal"/></div>
+    </div>
+    <div style="display:flex;gap:7px">
+      <button class="ing-save-btn" onclick="saveTotalEdit()">✓ Apply &amp; Rescale</button>
+      <button class="ing-cancel-btn" onclick="closeTotalEdit()">Cancel</button>
+    </div>
+  </div>
+  <!-- Inline macro impact panel — auto-renders after analysis -->
+  <div id="log-impact" style="display:none;margin-bottom:10px">
+    <div class="li-header">
+      <span class="li-title">📊 Macro Impact</span>
+      <span id="li-score" class="impact-score"></span>
+    </div>
+    <div id="li-needs" style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px"></div>
+    <div id="li-bars" style="display:flex;flex-direction:column;gap:7px;margin-bottom:10px"></div>
+    <div id="li-verdict" style="font-size:12px;color:var(--text2);line-height:1.7;padding:9px 12px;background:rgba(255,255,255,0.04);border-radius:10px"></div>
+  </div>
+  <button class="btn-confirm" onclick="confirmMeal()">+ ADD TO TODAY'S LOG</button>
+</div>
+
+<button class="btn-p" id="btn-analyze" onclick="analyzeMeal()">ANALYSE MEAL</button>
+<button class="btn-s" onclick="closeLogModal()">Cancel</button>
+```
+
   </div>
 </div>
 
 <!-- MODAL: WHOOP -->
+
 <div class="overlay" id="whoop-modal">
   <div class="modal">
     <div class="m-handle"></div>
@@ -391,6 +408,7 @@
 </div>
 
 <!-- MODAL: PROGRESS ENTRY -->
+
 <div class="overlay" id="entry-modal">
   <div class="modal">
     <div class="m-handle"></div>
@@ -407,6 +425,7 @@
 </div>
 
 <!-- MODAL: ADD QUICK ITEM -->
+
 <div class="overlay" id="qa-modal">
   <div class="modal">
     <div class="m-handle"></div>
@@ -429,8 +448,8 @@
   </div>
 </div>
 
-
 <!-- MODAL: BARCODE SCANNER -->
+
 <div class="overlay" id="barcode-modal">
   <div class="modal">
     <div class="m-handle"></div>
@@ -479,8 +498,8 @@
   </div>
 </div>
 
-
 <!-- MODAL: MACRO IMPACT SCANNER -->
+
 <div class="overlay" id="impact-modal">
   <div class="modal">
     <div class="m-handle"></div>
@@ -508,6 +527,7 @@
 </div>
 
 <!-- MODAL: MEAL DETAIL -->
+
 <div class="overlay" id="meal-detail-modal">
   <div class="modal">
     <div class="m-handle"></div>
@@ -586,6 +606,7 @@
 </div>
 
 <!-- MODAL: MACRO BREAKDOWN -->
+
 <div class="overlay" id="macro-breakdown-modal" onclick="closeMacroBreakdown()">
   <div class="modal" onclick="event.stopPropagation()">
     <div class="m-handle"></div>
@@ -601,7 +622,37 @@
   </div>
 </div>
 
+<!-- STREAK MODAL -->
+
+<div class="overlay" id="streak-modal" onclick="closeStreakModal()">
+  <div class="modal streak-modal-inner" onclick="event.stopPropagation()">
+    <div class="m-handle"></div>
+    <button class="mdd-close" onclick="closeStreakModal()" style="position:absolute;top:16px;right:16px">✕</button>
+    <canvas id="streak-flame-canvas" width="260" height="220" style="display:block;margin:0 auto 4px;border-radius:16px"></canvas>
+    <div class="sm-hero">
+      <div class="sm-num" id="sm-num">0</div>
+      <div class="sm-unit">day streak 🔥</div>
+    </div>
+    <div class="sm-stats-row">
+      <div class="sm-stat"><div class="sm-sv" id="sm-started">—</div><div class="sm-sl">Started</div></div>
+      <div class="sm-stat"><div class="sm-sv" id="sm-rank">—</div><div class="sm-sl">Consistency</div></div>
+      <div class="sm-stat"><div class="sm-sv" id="sm-max">—</div><div class="sm-sl">Best streak</div></div>
+    </div>
+    <div class="sm-week-dots" id="sm-dots"></div>
+    <div class="sm-milestone-wrap">
+      <div class="sm-milestone-bar-bg"><div class="sm-milestone-bar-fill" id="sm-mbar"></div></div>
+      <div class="sm-milestone-label" id="sm-mlabel"></div>
+    </div>
+    <div class="sm-callout" id="sm-callout">
+      <div class="sm-callout-title" id="sm-callout-title"></div>
+      <div class="sm-callout-body" id="sm-callout-body"></div>
+    </div>
+  </div>
+</div>
+
 <script src="data.js"></script>
+
 <script src="app.js"></script>
+
 </body>
 </html>
