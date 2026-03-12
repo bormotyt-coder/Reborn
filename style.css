@@ -193,7 +193,7 @@ body {
 }
 .sb-row { display: flex; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
 .sb-row::-webkit-scrollbar { display: none; }
-.sb-s { flex: 0 0 auto; text-align: center; padding: 0 14px; border-right: 1px solid var(--border2); }
+.sb-s { flex: 0 0 auto; min-width: 90px; text-align: center; padding: 0 14px; border-right: 1px solid var(--border2); }
 .sb-s:last-child { border-right: none; }
 .sb-v { font-family: var(--font); font-size: 20px; font-weight: 700; line-height: 1; color: var(--text); }
 .sb-l { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: .07em; margin-top: 3px; }
@@ -346,33 +346,56 @@ body {
    ACTION BUTTONS — Log / Barcode / Impact
    New layout: LOG big, other two side-by-side smaller
 ══════════════════════════════════════ */
-.log-btn-wrap { padding: 12px 14px 0; display: flex; flex-direction: column; gap: 8px; }
-.log-btn {
-  width: 100%;
-  background: linear-gradient(135deg, var(--blue), rgba(56,139,253,0.75));
-  color: #fff; border: none; border-radius: var(--r-md);
-  padding: 17px; font-family: var(--font); font-size: 20px; font-weight: 800;
-  letter-spacing: 1.5px; cursor: pointer;
-  display: flex; align-items: center; justify-content: center; gap: 10px;
-  transition: transform .1s, opacity .1s;
-  box-shadow: 0 6px 28px rgba(56,139,253,0.28), 0 0 0 1px rgba(56,139,253,0.20) inset;
+/* ── FAB (floating action button) ── */
+.fab-wrap {
+  position: fixed; bottom: calc(80px + env(safe-area-inset-bottom)); right: 18px;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 12px; z-index: 49;
 }
-.log-btn:active { transform: scale(.97); opacity: .92; }
-.log-btn svg { width: 20px; height: 20px; stroke: #fff; stroke-width: 2.5; fill: none; }
-
-.log-btn-row { display: flex; gap: 8px; }
-.log-btn-sec {
-  flex: 1; background: var(--glass2);
-  border: 1px solid var(--border);
-  border-radius: var(--r-sm); padding: 12px 8px;
-  font-family: var(--font); font-size: 12px; font-weight: 700;
+.fab-main {
+  width: 58px; height: 58px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--blue), rgba(56,139,253,0.8));
+  border: none; color: #fff; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 6px 24px rgba(56,139,253,0.40), 0 2px 8px rgba(0,0,0,0.4);
+  transition: transform .2s cubic-bezier(.34,1.56,.64,1), box-shadow .2s;
+  -webkit-tap-highlight-color: transparent;
+}
+.fab-main:active { transform: scale(.92); }
+.fab-main.open { transform: rotate(45deg); }
+#fab-icon { width: 24px; height: 24px; transition: transform .25s; }
+.fab-sub-btns {
+  display: flex; flex-direction: column; align-items: flex-end; gap: 10px;
+  opacity: 0; pointer-events: none;
+  transform: translateY(12px) scale(0.9);
+  transition: opacity .2s ease, transform .2s cubic-bezier(.34,1.56,.64,1);
+}
+.fab-sub-btns.open { opacity: 1; pointer-events: auto; transform: translateY(0) scale(1); }
+.fab-sub-item { display: flex; align-items: center; gap: 10px; }
+.fab-sub-label {
+  background: rgba(10,13,22,0.92); border: 1px solid var(--border);
+  border-radius: 10px; padding: 5px 12px;
+  font-family: var(--font); font-size: 12px; font-weight: 600; color: var(--text2);
+  white-space: nowrap; backdrop-filter: blur(20px);
+}
+.fab-sub-btn {
+  width: 46px; height: 46px; border-radius: 50%;
+  background: rgba(10,13,22,0.92); border: 1px solid var(--border);
   color: var(--text2); cursor: pointer;
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 5px; letter-spacing: .3px; transition: all .15s;
+  display: flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(20px);
+  transition: background .15s, transform .1s;
+  -webkit-tap-highlight-color: transparent;
 }
-.log-btn-sec:active { background: var(--glass); }
-.log-btn-sec svg { width: 18px; height: 18px; flex-shrink: 0; }
-.log-btn-sec.impact { color: var(--blue2); border-color: var(--border-blue); background: var(--glass-blue); }
+.fab-sub-btn:active { transform: scale(.9); }
+.fab-sub-btn svg { width: 18px; height: 18px; }
+.fab-sub-primary {
+  background: linear-gradient(135deg, var(--blue), rgba(56,139,253,0.75));
+  border-color: transparent; color: #fff;
+}
+.fab-overlay-dismiss {
+  position: fixed; inset: 0; z-index: 48; display: none;
+}
+.fab-overlay-dismiss.show { display: block; }
 
 /* ══════════════════════════════════════
    QUICK ADD
@@ -870,14 +893,14 @@ input:focus, textarea:focus, select:focus { border-color: var(--blue); }
 .fi:nth-child(n+10) { animation-delay: .34s; }
 
 /* ── STREAK MINI-CARD (today page) ── */
-/* hdr-right: wraps date + streak pill */
-.hdr-right { display:flex; flex-direction:column; align-items:flex-end; gap:5px; }
+/* hdr-right: just the streak pill */
+.hdr-right { display:flex; align-items:center; }
 /* Compact streak pill in header */
 .hdr-streak-btn {
   display:inline-flex; align-items:center; gap:4px;
   background:rgba(56,139,253,0.12); border:1px solid rgba(56,139,253,0.25);
-  border-radius:20px; padding:3px 10px 3px 7px;
-  font-family:var(--font); font-size:13px; font-weight:700; color:var(--blue2);
+  border-radius:20px; padding:5px 12px 5px 9px;
+  font-family:var(--font); font-size:14px; font-weight:700; color:var(--blue2);
   cursor:pointer; transition:background .15s; white-space:nowrap;
   -webkit-tap-highlight-color:transparent;
 }

@@ -55,7 +55,7 @@ let activeTab  =0;
 
 // BOOT
 const _n=new Date();
-gv('hdr-date').innerHTML=_n.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})+'<br>'+_n.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+const _hdrDate=gv('hdr-date');if(_hdrDate)_hdrDate.innerHTML=_n.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})+'<br>'+_n.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
 gv('coach-date').textContent=_n.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
 renderAll();
 initWelcomeCard();
@@ -2136,5 +2136,28 @@ function initStykuScroll(){
   row.addEventListener('touchend',()=>{setTimeout(()=>{_sbPause=60;_sbRaf=requestAnimationFrame(_sbFrame);},600);},{passive:true});
   setTimeout(()=>{_sbRaf=requestAnimationFrame(_sbFrame);},2000);
 }
+
+// ══════════════════════════════════════════════════════════════════════════
+// FEATURE: FAB (floating action button)
+// ══════════════════════════════════════════════════════════════════════════
+let _fabOpen=false;
+function fabToggle(){
+  _fabOpen=!_fabOpen;
+  const main=gv('fab-main');
+  const subs=gv('fab-sub-btns');
+  if(main)main.classList.toggle('open',_fabOpen);
+  if(subs)subs.classList.toggle('open',_fabOpen);
+}
+function fabClose(){
+  _fabOpen=false;
+  const main=gv('fab-main');
+  const subs=gv('fab-sub-btns');
+  if(main)main.classList.remove('open');
+  if(subs)subs.classList.remove('open');
+}
+// Close FAB when tapping elsewhere on the page
+document.addEventListener('click',function(e){
+  if(_fabOpen&&!gv('fab-wrap')?.contains(e.target))fabClose();
+});
 
 initStykuScroll();

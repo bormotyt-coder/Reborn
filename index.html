@@ -23,10 +23,7 @@
       <div class="logo-icon"><span style="font-family:var(--font);font-size:15px;font-weight:800;color:#fff;letter-spacing:-1px">rB</span></div>
       <div><div class="logo-main">reBorn</div><div class="logo-sub">Fat Loss · Active</div></div>
     </div>
-    <div class="hdr-right">
-      <div class="hdr-date" id="hdr-date"></div>
-      <button class="hdr-streak-btn" id="hdr-streak-btn" onclick="openStreakModal()">🔥 <span id="smc-num">0</span></button>
-    </div>
+    <button class="hdr-streak-btn" id="hdr-streak-btn" onclick="openStreakModal()">🔥 <span id="smc-num">0</span></button>
   </div>
   <div class="scan-banner">
     <div class="sb-label">🔬 Styku · Mar 4, 2026</div>
@@ -54,26 +51,6 @@
     </div>
   </div>
 
-  <div class="whoop-card">
-    <div class="wh-top">
-      <div class="wh-brand"><div class="wh-dot"></div><div class="wh-logo">WHOOP</div></div>
-    </div>
-    <div style="display:flex;gap:6px;margin-bottom:12px;position:relative;z-index:1">
-      <div class="wh-tab active" id="wh-tab-0" onclick="selectWhoopTab(0)">
-        <div class="wh-tab-label">Wake Up</div><div class="wh-tab-time">Sleep &amp; Recovery</div><div class="wh-tab-dot"></div>
-      </div>
-      <div class="wh-tab" id="wh-tab-1" onclick="selectWhoopTab(1)">
-        <div class="wh-tab-label">1 PM</div><div class="wh-tab-time">Mid-day</div><div class="wh-tab-dot"></div>
-      </div>
-      <div class="wh-tab" id="wh-tab-2" onclick="selectWhoopTab(2)">
-        <div class="wh-tab-label">10 PM</div><div class="wh-tab-time">End of day</div><div class="wh-tab-dot"></div>
-      </div>
-    </div>
-    <div id="wh-snap-display" style="position:relative;z-index:1;min-height:52px"></div>
-    <div style="display:flex;justify-content:flex-end;margin-top:10px;position:relative;z-index:1">
-      <button class="wh-btn" onclick="openWhoopModal()">+ Log Snapshot</button>
-    </div>
-  </div>
   <!-- HERO: Calories + Rings unified -->
   <div class="hero-card" style="margin:8px 14px 0">
     <div class="gc-in">
@@ -120,6 +97,28 @@
       <div id="nutrient-breakdown"></div>
     </div>
   </div>
+
+  <div class="whoop-card">
+    <div class="wh-top">
+      <div class="wh-brand"><div class="wh-dot"></div><div class="wh-logo">WHOOP</div></div>
+    </div>
+    <div style="display:flex;gap:6px;margin-bottom:12px;position:relative;z-index:1">
+      <div class="wh-tab active" id="wh-tab-0" onclick="selectWhoopTab(0)">
+        <div class="wh-tab-label">Wake Up</div><div class="wh-tab-time">Sleep &amp; Recovery</div><div class="wh-tab-dot"></div>
+      </div>
+      <div class="wh-tab" id="wh-tab-1" onclick="selectWhoopTab(1)">
+        <div class="wh-tab-label">1 PM</div><div class="wh-tab-time">Mid-day</div><div class="wh-tab-dot"></div>
+      </div>
+      <div class="wh-tab" id="wh-tab-2" onclick="selectWhoopTab(2)">
+        <div class="wh-tab-label">10 PM</div><div class="wh-tab-time">End of day</div><div class="wh-tab-dot"></div>
+      </div>
+    </div>
+    <div id="wh-snap-display" style="position:relative;z-index:1;min-height:52px"></div>
+    <div style="display:flex;justify-content:flex-end;margin-top:10px;position:relative;z-index:1">
+      <button class="wh-btn" onclick="openWhoopModal()">+ Log Snapshot</button>
+    </div>
+  </div>
+
   <div class="gc">
     <div class="gc-in">
       <div class="water-top">
@@ -129,19 +128,6 @@
       <div class="water-bar-bg"><div class="water-bar-fill" id="water-bar" style="width:0%"></div></div>
       <div class="cups-grid" id="cups-grid"></div>
       <button class="water-reset" onclick="resetWater()">Reset</button>
-    </div>
-  </div>
-  <div class="log-btn-wrap">
-    <button class="log-btn" onclick="openLogModal()">
-      <svg viewBox="0 0 24 24"><path d="M14.5 2h-5L7 4H4a2 2 0 00-2 2v12a2 2 0 002 2h16a2 2 0 002-2V6a2 2 0 00-2-2h-3l-2.5-2z"/><circle cx="12" cy="13" r="3"/></svg>
-      LOG A MEAL
-    </button>
-    <div class="log-btn-row">
-      <button class="log-btn-sec" onclick="openBarcodeModal()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="3" height="16"/><rect x="6" y="4" width="1" height="16"/><rect x="9" y="4" width="2" height="16"/><rect x="13" y="4" width="1" height="16"/><rect x="16" y="4" width="3" height="16"/><rect x="21" y="4" width="2" height="16"/></svg>
-        SCAN BARCODE
-      </button>
-
     </div>
   </div>
   <!-- AUTO-SUGGEST -->
@@ -597,6 +583,27 @@
 </div>
 
 <!-- STREAK MODAL -->
+<!-- FAB: floating action button -->
+<div id="fab-wrap" class="fab-wrap">
+  <div id="fab-sub-btns" class="fab-sub-btns">
+    <div class="fab-sub-item">
+      <span class="fab-sub-label">Scan Barcode</span>
+      <button class="fab-sub-btn" onclick="fabClose();openBarcodeModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="1" y="4" width="3" height="16"/><rect x="6" y="4" width="1" height="16"/><rect x="9" y="4" width="2" height="16"/><rect x="13" y="4" width="1" height="16"/><rect x="16" y="4" width="3" height="16"/><rect x="21" y="4" width="2" height="16"/></svg>
+      </button>
+    </div>
+    <div class="fab-sub-item">
+      <span class="fab-sub-label">Log a Meal</span>
+      <button class="fab-sub-btn fab-sub-primary" onclick="fabClose();openLogModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14.5 2h-5L7 4H4a2 2 0 00-2 2v12a2 2 0 002 2h16a2 2 0 002-2V6a2 2 0 00-2-2h-3l-2.5-2z"/><circle cx="12" cy="13" r="3"/></svg>
+      </button>
+    </div>
+  </div>
+  <button id="fab-main" class="fab-main" onclick="fabToggle()">
+    <svg id="fab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+  </button>
+</div>
+
 <div class="overlay" id="streak-modal" onclick="closeStreakModal()">
   <div class="modal streak-modal-inner" onclick="event.stopPropagation()">
     <div class="m-handle"></div>
