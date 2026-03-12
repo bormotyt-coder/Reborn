@@ -353,10 +353,10 @@ body {
 }
 .fab-main {
   width: 58px; height: 58px; border-radius: 50%;
-  background: linear-gradient(135deg, var(--blue), rgba(56,139,253,0.8));
+  background: linear-gradient(135deg, #a259ff, #7c3aed);
   border: none; color: #fff; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 6px 24px rgba(56,139,253,0.40), 0 2px 8px rgba(0,0,0,0.4);
+  box-shadow: 0 6px 24px rgba(162,89,255,0.40), 0 2px 8px rgba(0,0,0,0.4);
   transition: transform .2s cubic-bezier(.34,1.56,.64,1), box-shadow .2s;
   -webkit-tap-highlight-color: transparent;
 }
