@@ -23,7 +23,10 @@
       <div class="logo-icon"><span style="font-family:var(--font);font-size:15px;font-weight:800;color:#fff;letter-spacing:-1px">rB</span></div>
       <div><div class="logo-main">reBorn</div><div class="logo-sub">Fat Loss · Active</div></div>
     </div>
-    <div class="hdr-date" id="hdr-date"></div>
+    <div class="hdr-right">
+      <div class="hdr-date" id="hdr-date"></div>
+      <button class="hdr-streak-btn" id="hdr-streak-btn" onclick="openStreakModal()">🔥 <span id="smc-num">0</span></button>
+    </div>
   </div>
   <div class="scan-banner">
     <div class="sb-label">🔬 Styku · Mar 4, 2026</div>
@@ -34,15 +37,6 @@
       <div class="sb-s"><div class="sb-v" style="color:var(--cyan)">2,340</div><div class="sb-l">Target kcal</div></div>
       <div class="sb-s"><div class="sb-v">−5.6kg</div><div class="sb-l">Fat Goal</div></div>
     </div>
-  </div>
-  <!-- STREAK MINI-CARD -->
-  <div class="streak-mini-card" id="streak-mini-card" onclick="openStreakModal()">
-    <div class="smc-fire">🔥</div>
-    <div class="smc-body">
-      <div class="smc-num" id="smc-num">0</div>
-      <div class="smc-lbl">day streak</div>
-    </div>
-    <div class="smc-arrow">›</div>
   </div>
 
   <!-- WELCOME CARD -->
