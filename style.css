@@ -181,20 +181,21 @@ body {
    STYKU SCAN BANNER
 ══════════════════════════════════════ */
 .scan-banner {
-  margin: 8px 12px 0;
+  margin: 8px 10px 0;
   background: var(--glass-blue);
   border: 1px solid var(--border-blue);
   border-radius: var(--r-md);
-  padding: 10px 12px;
+  padding: 8px 10px;
 }
 .sb-label {
   font-family: var(--font); font-size: 10px; font-weight: 600;
-  color: var(--blue2); letter-spacing: .18em; text-transform: uppercase; margin-bottom: 6px;
+  color: var(--blue2); letter-spacing: .18em; text-transform: uppercase; margin-bottom: 5px;
 }
-.sb-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 6px; }
-.sb-s { flex: 1; text-align: center; padding: 6px 4px; border-right: none; }
-.sb-v { font-family: var(--font); font-size: 16px; font-weight: 700; line-height: 1; color: var(--text); }
-.sb-l { font-size: 8px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-top: 2px; }
+.sb-row { display: flex; gap: 0; justify-content: space-between; }
+.sb-s { flex: 1; text-align: center; padding: 0 2px; border-right: 1px solid var(--border2); }
+.sb-s:last-child { border-right: none; }
+.sb-v { font-family: var(--font); font-size: 18px; font-weight: 700; line-height: 1; color: var(--text); }
+.sb-l { font-size: 7px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-top: 1px; }
 
 /* ══════════════════════════════════════
    WELCOME CARD
