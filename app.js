@@ -1858,10 +1858,11 @@ function renderWeekly(){
   const daysOnTarget=logged.filter(d=>d.t.cal>=tgt*0.8&&d.t.cal<=tgt*1.15).length;
 
   let html=`
-  <div class="week-streak">
+  <div class="week-streak" onclick="openStreakModal()" style="cursor:pointer">
     <div class="streak-fire">🔥</div>
     <div class="streak-num">${streak}</div>
     <div class="streak-lbl">day streak</div>
+    <div style="margin-left:auto;font-size:20px;color:var(--muted);font-weight:300">›</div>
   </div>
   <div class="week-stats-row">
     <div class="wk-s"><div class="wk-v" style="color:var(--blue2)">${avgCal||'—'}</div><div class="wk-l">avg kcal/day</div></div>
@@ -1976,7 +1977,164 @@ window.renderAll=function(){
   _origRenderAll();
   renderNutrients();
   renderWeekly();
+  renderStreakMini();
 };
 // Call it once now to init
 renderNutrients();
 renderWeekly();
+renderStreakMini();
+
+// ══════════════════════════════════════════════════════════════════════════
+// FEATURE: STREAK MINI-CARD (today page)
+// ══════════════════════════════════════════════════════════════════════════
+function renderStreakMini(){
+  const el=gv('smc-num');
+  if(!el)return;
+  el.textContent=calcStreak();
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// FEATURE: STREAK MODAL
+// ══════════════════════════════════════════════════════════════════════════
+let _sfRaf=null;
+
+function openStreakModal(){
+  const modal=gv('streak-modal');
+  if(!modal)return;
+  const streak=calcStreak();
+
+  // Hero count-up
+  const numEl=gv('sm-num');
+  if(numEl){
+    let n=0;const dur=600;const start=performance.now();
+    function tick(now){
+      const p=Math.min((now-start)/dur,1);
+      numEl.textContent=Math.round((1-Math.pow(1-p,3))*streak);
+      if(p<1)requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  }
+
+  // Started date
+  const startedEl=gv('sm-started');
+  if(startedEl&&streak>0){
+    const d=new Date();d.setDate(d.getDate()-(streak-1));
+    startedEl.textContent=d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  } else if(startedEl) startedEl.textContent='—';
+
+  // Rank
+  const rankEl=gv('sm-rank');
+  if(rankEl) rankEl.textContent=streak>=30?'Elite':streak>=14?'Strong':streak>=7?'Building':streak>=3?'Starting':'New';
+
+  // All-time max
+  const maxEl=gv('sm-max');
+  if(maxEl){
+    let max=0,cur=0;
+    for(let i=0;i<180;i++){
+      const d=new Date();d.setDate(d.getDate()-i);
+      const m=load(`${KEY}_meals_${d.toISOString().slice(0,10)}`)||[];
+      if(m.length>0){cur++;if(cur>max)max=cur;}else cur=0;
+    }
+    maxEl.textContent=`${Math.max(max,streak)}d`;
+  }
+
+  // Week dots Mon-Sun
+  const dotsEl=gv('sm-dots');
+  if(dotsEl){
+    const dayLabels=['M','T','W','T','F','S','S'];
+    const today=new Date();const dow=today.getDay();
+    const mondayOffset=dow===0?-6:1-dow;
+    let html='';
+    for(let i=0;i<7;i++){
+      const d=new Date(today);d.setDate(today.getDate()+mondayOffset+i);
+      const k=d.toISOString().slice(0,10);
+      const isFuture=d>today&&k!==todayKey();
+      const m=load(`${KEY}_meals_${k}`)||[];
+      const lit=m.length>0&&!isFuture;
+      html+=`<div class="sm-dot"><div class="sm-dot-circle ${lit?'lit':'dim'}">${lit?'🔥':''}</div><div class="sm-dot-day">${dayLabels[i]}</div></div>`;
+    }
+    dotsEl.innerHTML=html;
+  }
+
+  // Milestone bar
+  const milestones=[7,14,30,60,90,180,365,730];
+  const nextM=milestones.find(m=>m>streak)||365;
+  const prevM=[...milestones].reverse().find(m=>m<=streak)||0;
+  const pct=nextM>prevM?Math.min(((streak-prevM)/(nextM-prevM))*100,100):100;
+  const mbar=gv('sm-mbar');if(mbar)setTimeout(()=>mbar.style.width=pct+'%',80);
+  const mlabel=gv('sm-mlabel');
+  if(mlabel)mlabel.textContent=streak>=nextM?`🏆 ${nextM}-day milestone reached!`:`${streak} / ${nextM} days to next milestone`;
+
+  // Callout
+  const msgs=[[0,'Just Getting Started 💪','Every legend starts at day 1. Log your meals today and build the habit.'],[3,'3 Days — Habit Forming 🌱','Research shows 3 days is when habits start to stick. Keep it going.'],[7,'One Week Strong 🔥','A full week! Your consistency is already beating 80% of people who try.'],[14,'Two Weeks — Locked In 🚀','14 days straight. This is no longer a challenge — it\'s a lifestyle.'],[30,'30-Day Warrior 🏆','One month of daily tracking. Your metabolic data is now deeply accurate.'],[60,'Two Months of Excellence ⚡','60 days straight. You\'ve built something most people only dream about.'],[90,'The 90-Day Club 🌟','Elite tier. Only a tiny fraction of people ever reach this milestone.']];
+  const ctitle=gv('sm-callout-title'),cbody=gv('sm-callout-body');
+  if(ctitle&&cbody){const msg=[...msgs].reverse().find(([d])=>streak>=d)||msgs[0];ctitle.textContent=msg[1];cbody.textContent=msg[2];}
+
+  _startStreakFlame(streak);
+  modal.classList.add('active');
+}
+
+function closeStreakModal(){
+  const modal=gv('streak-modal');
+  if(modal)modal.classList.remove('active');
+  if(_sfRaf){cancelAnimationFrame(_sfRaf);_sfRaf=null;}
+}
+
+function _newFlameParticle(W,H){
+  return{x:W/2+(Math.random()-0.5)*W*0.5,y:H*0.85+Math.random()*H*0.1,vx:(Math.random()-0.5)*1.2,vy:-(1.5+Math.random()*2.5),life:1,decay:0.012+Math.random()*0.018,r:3+Math.random()*6,phase:Math.random()*Math.PI*2};
+}
+
+function _startStreakFlame(streak){
+  const canvas=gv('streak-flame-canvas');if(!canvas)return;
+  const dpr=window.devicePixelRatio||1;
+  const W=260,H=220;
+  canvas.width=W*dpr;canvas.height=H*dpr;
+  canvas.style.width=W+'px';canvas.style.height=H+'px';
+  const ctx=canvas.getContext('2d');ctx.scale(dpr,dpr);
+  const t=Math.min(streak/90,1);
+  const r1=Math.round(255*(1-t)+181*t),g1=Math.round(120*(1-t)+40*t),b1=Math.round(0*(1-t)+255*t);
+  const r2=Math.round(255*(1-t)+90*t),g2=Math.round(60*(1-t)+0*t),b2=Math.round(0*(1-t)+200*t);
+  let particles=Array.from({length:60},()=>_newFlameParticle(W,H));
+  function frame(){
+    ctx.clearRect(0,0,W,H);
+    if(particles.length<80)particles.push(_newFlameParticle(W,H));
+    particles.forEach(p=>{
+      p.x+=p.vx+Math.sin(p.phase+Date.now()*0.002)*0.4;
+      p.y+=p.vy;p.life-=p.decay;p.phase+=0.05;
+      if(p.life<=0)return;
+      const cr=Math.round(r1+(r2-r1)*(1-p.life)),cg=Math.round(g1+(g2-g1)*(1-p.life)),cb=Math.round(b1+(b2-b1)*(1-p.life));
+      ctx.beginPath();ctx.arc(p.x,p.y,p.r*p.life,0,Math.PI*2);
+      ctx.fillStyle=`rgba(${cr},${cg},${cb},${p.life*0.85})`;ctx.fill();
+    });
+    particles=particles.filter(p=>p.life>0);
+    _sfRaf=requestAnimationFrame(frame);
+  }
+  if(_sfRaf)cancelAnimationFrame(_sfRaf);
+  frame();
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// FEATURE: STYKU STATS BAR AUTO-SCROLL (ping-pong)
+// ══════════════════════════════════════════════════════════════════════════
+let _sbRaf=null,_sbDir=1,_sbPause=0;
+
+function _sbFrame(){
+  const row=document.querySelector('.sb-row');
+  if(!row){_sbRaf=null;return;}
+  const maxScroll=row.scrollWidth-row.clientWidth;
+  if(maxScroll<=0){_sbRaf=requestAnimationFrame(_sbFrame);return;}
+  if(_sbPause>0){_sbPause--;_sbRaf=requestAnimationFrame(_sbFrame);return;}
+  row.scrollLeft+=_sbDir*0.6;
+  if(row.scrollLeft>=maxScroll-1){row.scrollLeft=maxScroll;_sbDir=-1;_sbPause=120;}
+  else if(row.scrollLeft<=1){row.scrollLeft=0;_sbDir=1;_sbPause=120;}
+  _sbRaf=requestAnimationFrame(_sbFrame);
+}
+
+function initStykuScroll(){
+  const row=document.querySelector('.sb-row');if(!row)return;
+  row.addEventListener('touchstart',()=>{if(_sbRaf){cancelAnimationFrame(_sbRaf);_sbRaf=null;}},{passive:true});
+  row.addEventListener('touchend',()=>{setTimeout(()=>{_sbPause=60;_sbRaf=requestAnimationFrame(_sbFrame);},600);},{passive:true});
+  setTimeout(()=>{_sbRaf=requestAnimationFrame(_sbFrame);},2000);
+}
+
+initStykuScroll();
