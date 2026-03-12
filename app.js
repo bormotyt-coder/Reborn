@@ -45,7 +45,6 @@ const DEFAULT_QA=[
 let meals      =load(`${KEY}_meals_${todayKey()}`,[]);
 let whoopSnaps =load(`${KEY}_whoopsnaps_${todayKey()}`,[null,null,null]);
 let cups       =parseInt(localStorage.getItem(`${KEY}_cups_${todayKey()}`)||'0');
-let waterUnit  =localStorage.getItem(`${KEY}_water_unit`)||'cups'; // 'cups' | 'ml' | 'L'
 let entries    =load(`${KEY}_entries`,[]);
 let quickItems =load(`${KEY}_quickitems`,DEFAULT_QA);
 let calViewDate=new Date();
@@ -60,6 +59,7 @@ gv('hdr-date').innerHTML=_n.toLocaleDateString('en-US',{weekday:'short',month:'s
 gv('coach-date').textContent=_n.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
 renderAll();
 initWelcomeCard();
+initStykuScroll();
 
 function renderAll(){
   renderWhoopCard();renderSummary();renderRings();
@@ -297,23 +297,6 @@ function setRing(id,vid,pid,cur,tgt,unit,delay){
 }
 
 // CUPS
-function fmtWater(c){
-  const ml=c*ML_PER_CUP;
-  if(waterUnit==='ml') return ml.toLocaleString()+' mL';
-  if(waterUnit==='L')  return (ml/1000).toFixed(1)+' L';
-  return c+' / '+CUPS+' cups';
-}
-function fmtWaterTarget(){
-  const ml=CUPS*ML_PER_CUP;
-  if(waterUnit==='ml') return 'of '+ml.toLocaleString()+' mL';
-  if(waterUnit==='L')  return 'of '+(ml/1000).toFixed(1)+' L';
-  return '';
-}
-function cycleWaterUnit(){
-  waterUnit=waterUnit==='cups'?'ml':waterUnit==='ml'?'L':'cups';
-  localStorage.setItem(`${KEY}_water_unit`,waterUnit);
-  renderCups();
-}
 function renderCups(){
   const grid=gv('cups-grid');grid.innerHTML='';
   for(let i=0;i<CUPS;i++){
@@ -323,15 +306,9 @@ function renderCups(){
     btn.addEventListener('click',()=>{cups=i<cups?i:i+1;localStorage.setItem(`${KEY}_cups_${todayKey()}`,cups);renderCups();});
     grid.appendChild(btn);
   }
-  // Update display label
-  const dispEl=gv('water-amount-display');
-  if(dispEl) dispEl.textContent=fmtWater(cups);
-  const tgtEl=gv('water-target-display');
-  if(tgtEl) tgtEl.textContent=fmtWaterTarget();
+  gv('water-cups').textContent=cups;
+  gv('water-ml-display').textContent=(cups*ML_PER_CUP).toLocaleString();
   gv('water-bar').style.width=Math.min((cups/CUPS)*100,100)+'%';
-  // Update unit toggle button label
-  const ub=gv('water-unit-btn');
-  if(ub) ub.textContent=waterUnit==='cups'?'mL':waterUnit==='ml'?'L':'cups';
 }
 function resetWater(){cups=0;localStorage.setItem(`${KEY}_cups_${todayKey()}`,0);renderCups();}
 
@@ -398,48 +375,21 @@ function saveQAItem(){
 }
 
 // FOOD LIST
-function getMealType(h){
-  if(h>=5&&h<11) return 'Breakfast';
-  if(h>=11&&h<15) return 'Lunch';
-  if(h>=15&&h<18) return 'Snacks';
-  if(h>=18&&h<23) return 'Dinner';
-  return 'Snacks';
-}
-
 function renderFoodList(){
   const el=gv('food-list');
   if(!meals.length){el.innerHTML='<div class="empty-st"><span class="empty-icon">🍽️</span>No meals logged yet.<br>Tap Log a Meal or Quick Add.</div>';return;}
   el.innerHTML='';
-  const BUCKETS=['Breakfast','Lunch','Snacks','Dinner'];
-  const BUCKET_ICONS={Breakfast:'🌅',Lunch:'☀️',Snacks:'🍎',Dinner:'🌙'};
-  // Group meals by bucket
-  const buckets={};
-  BUCKETS.forEach(b=>{buckets[b]=[];});
-  meals.forEach((m,i)=>{
-    const type=m.mealType||getMealType(m.loggedAt?new Date(m.loggedAt).getHours():12);
-    (buckets[type]=buckets[type]||[]).push({m,i});
-  });
-  BUCKETS.forEach(bucket=>{
-    const items=buckets[bucket];
-    if(!items.length)return;
-    // Bucket header
-    const bucketCal=items.reduce((a,{m})=>a+m.calories,0);
-    const header=document.createElement('div');
-    header.className='meal-bucket-hdr';
-    header.innerHTML=`<span class="mb-icon">${BUCKET_ICONS[bucket]}</span><span class="mb-name">${bucket}</span><span class="mb-cal">${Math.round(bucketCal)} kcal</span>`;
-    el.appendChild(header);
-    items.forEach(({m,i})=>{
-      const div=document.createElement('div');div.className='fi';
-      const th=m.thumb?`<img class="fi-thumb" src="${m.thumb}" style="width:46px;height:46px;border-radius:11px;object-fit:cover;flex-shrink:0"/>`:`<div class="fi-thumb">${m.emoji||'🍽️'}</div>`;
-      const pPct=Math.min(Math.round(m.protein/TARGETS.p*100),100);
-      const cPct=Math.min(Math.round(m.carbs/TARGETS.c*100),100);
-      const fPct=Math.min(Math.round(m.fat/TARGETS.f*100),100);
-      div.innerHTML=`<div class="fi-top">${th}<div class="fi-info"><div class="fi-name">${m.name}</div><div class="fi-tags"><span class="ft ftcal">${Math.round(m.calories)} kcal</span><span class="ft ftp">${Math.round(m.protein)}g P</span><span class="ft ftc">${Math.round(m.carbs)}g C</span><span class="ft ftf">${Math.round(m.fat)}g F</span></div></div><button class="fi-del">✕</button></div><div class="fi-bars"><div class="fi-bar-row"><span class="fi-bar-lbl">P</span><div class="fi-bar-track"><div class="fi-bar-fill" style="width:${pPct}%;background:var(--pc)"></div></div><span class="fi-bar-val" style="color:var(--pc)">${Math.round(m.protein)}g</span></div><div class="fi-bar-row"><span class="fi-bar-lbl">C</span><div class="fi-bar-track"><div class="fi-bar-fill" style="width:${cPct}%;background:var(--cc)"></div></div><span class="fi-bar-val" style="color:var(--cc)">${Math.round(m.carbs)}g</span></div><div class="fi-bar-row"><span class="fi-bar-lbl">F</span><div class="fi-bar-track"><div class="fi-bar-fill" style="width:${fPct}%;background:var(--fc)"></div></div><span class="fi-bar-val" style="color:var(--fc)">${Math.round(m.fat)}g</span></div></div>`;
-      div.querySelector('.fi-del').addEventListener('click',(e)=>{e.stopPropagation();deleteMeal(i);});
-      div.addEventListener('click',()=>openMealDetail(i));
-      el.appendChild(div);
-    });
-  });
+  for(let i=0;i<meals.length;i++){
+    const m=meals[i];const div=document.createElement('div');div.className='fi';
+    const th=m.thumb?`<img class="fi-thumb" src="${m.thumb}" style="width:46px;height:46px;border-radius:11px;object-fit:cover;flex-shrink:0"/>`:`<div class="fi-thumb">${m.emoji||'🍽️'}</div>`;
+    const pPct=Math.min(Math.round(m.protein/TARGETS.p*100),100);
+    const cPct=Math.min(Math.round(m.carbs/TARGETS.c*100),100);
+    const fPct=Math.min(Math.round(m.fat/TARGETS.f*100),100);
+    div.innerHTML=`<div class="fi-top">${th}<div class="fi-info"><div class="fi-name">${m.name}</div><div class="fi-tags"><span class="ft ftcal">${Math.round(m.calories)} kcal</span><span class="ft ftp">${Math.round(m.protein)}g P</span><span class="ft ftc">${Math.round(m.carbs)}g C</span><span class="ft ftf">${Math.round(m.fat)}g F</span></div></div><button class="fi-del">✕</button></div><div class="fi-bars"><div class="fi-bar-row"><span class="fi-bar-lbl">P</span><div class="fi-bar-track"><div class="fi-bar-fill" style="width:${pPct}%;background:var(--pc)"></div></div><span class="fi-bar-val" style="color:var(--pc)">${Math.round(m.protein)}g</span></div><div class="fi-bar-row"><span class="fi-bar-lbl">C</span><div class="fi-bar-track"><div class="fi-bar-fill" style="width:${cPct}%;background:var(--cc)"></div></div><span class="fi-bar-val" style="color:var(--cc)">${Math.round(m.carbs)}g</span></div><div class="fi-bar-row"><span class="fi-bar-lbl">F</span><div class="fi-bar-track"><div class="fi-bar-fill" style="width:${fPct}%;background:var(--fc)"></div></div><span class="fi-bar-val" style="color:var(--fc)">${Math.round(m.fat)}g</span></div></div>`;
+    div.querySelector('.fi-del').addEventListener('click',(e)=>{e.stopPropagation();deleteMeal(i);});
+    div.addEventListener('click',()=>openMealDetail(i));
+    el.appendChild(div);
+  }
 }
 function deleteMeal(i){meals.splice(i,1);save(`${KEY}_meals_${todayKey()}`,meals);renderAll();}
 
@@ -895,7 +845,6 @@ function confirmMeal(){
       fat:Math.round(i.fat*i.portion_multiplier*10)/10
     })),
     loggedAt:Date.now(),
-    mealType:getMealType(new Date().getHours()),
     thumb:null
   };
   meals.push(entry);
@@ -1276,6 +1225,38 @@ function _wcVisChange(){
   }
 }
 
+
+// ── Styku stats auto-scroll (ping-pong) ───────────────────────────────────
+let _sbRaf=null, _sbDir=1, _sbPause=0;
+function _sbFrame(){
+  const row=document.getElementById('sb-row');
+  if(!row){_sbRaf=null;return;}
+  const maxScroll=row.scrollWidth-row.clientWidth;
+  if(maxScroll<=0){_sbRaf=null;return;} // fits without scrolling
+
+  if(_sbPause>0){_sbPause--;_sbRaf=requestAnimationFrame(_sbFrame);return;}
+
+  row.scrollLeft+=_sbDir*0.6; // px per frame ~36px/s at 60fps
+
+  if(row.scrollLeft>=maxScroll-1){
+    _sbDir=-1;
+    _sbPause=120; // ~2s pause at right end
+  } else if(row.scrollLeft<=0){
+    _sbDir=1;
+    _sbPause=120; // ~2s pause at left end
+  }
+  _sbRaf=requestAnimationFrame(_sbFrame);
+}
+function initStykuScroll(){
+  const row=document.getElementById('sb-row');
+  if(!row)return;
+  // pause on touch
+  row.addEventListener('touchstart',()=>{if(_sbRaf){cancelAnimationFrame(_sbRaf);_sbRaf=null;}},{passive:true});
+  row.addEventListener('touchend',()=>{setTimeout(()=>{if(!_sbRaf)_sbRaf=requestAnimationFrame(_sbFrame);},1500);},{passive:true});
+  // start after short delay so layout is settled
+  setTimeout(()=>{_sbPause=60;_sbRaf=requestAnimationFrame(_sbFrame);},800);
+}
+
 async function initWelcomeCard(){
   const h=new Date().getHours();
   gv('wc-greeting').textContent=getGreeting(h);
@@ -1528,6 +1509,8 @@ let _barcodeScanning=false;
 function openBarcodeModal(){
   gv('barcode-modal').classList.add('open');
   gv('barcode-result').style.display='none';
+  const bci=gv('bc-impact');if(bci)bci.style.display='none';
+  window._barcodeEntry=null;
   gv('barcode-manual').value='';
   _barcodeScanning=false;
   setBarcodeStatus('idle');
@@ -1681,6 +1664,7 @@ async function lookupBarcode(code){
     _barcodeScanning=false;
     stopBarcodeCamera();
     setBarcodeStatus('found');
+    renderBarcodeImpact();
   }catch(e){
     _barcodeScanning=false;
     setBarcodeStatus('error','Lookup failed — product may not be in database.');
@@ -1714,6 +1698,84 @@ function addBarcodeItem(){
   if(todayBtn)showPage('today',todayBtn);
   setTimeout(()=>{_barcodeLock=false;},800);
 }
+// ── Barcode macro impact ──────────────────────────────────────────────────
+function renderBarcodeImpact(){
+  const el=gv('bc-impact');if(!el)return;
+  if(!window._barcodeEntry){el.style.display='none';return;}
+  const qty=parseFloat(gv('barcode-qty')?.value)||1;
+  const e=window._barcodeEntry;
+  const cal=Math.round(e.calories*qty);
+  const p=Math.round(e.protein*qty*10)/10;
+  const c=Math.round(e.carbs*qty*10)/10;
+  const f=Math.round(e.fat*qty*10)/10;
+
+  const t=getTotals(), tgt=getCalTarget();
+  const remCal=tgt-t.cal, remP=TARGETS.p-t.p, remC=TARGETS.c-t.c, remF=TARGETS.f-t.f;
+
+  // Score (same algorithm as renderLogImpact)
+  let score=0;
+  if(remP>5&&p>0)  score+=Math.min(p/remP,1)*35;
+  if(remC>5&&c>0)  score+=Math.min(c/remC,1)*25;
+  if(remF>5&&f>0)  score+=Math.min(f/remF,1)*20;
+  if(remCal>50&&cal>0) score+=Math.min(cal/remCal,1)*20;
+  if(p>remP+10)    score-=15;
+  if(cal>remCal+100) score-=20;
+  score=Math.max(0,Math.min(100,Math.round(score)));
+
+  let scoreLabel,scoreCls;
+  if(score>=75){scoreLabel='Great fit 🔥';scoreCls='score-great';}
+  else if(score>=50){scoreLabel='Good fit ✓';scoreCls='score-good';}
+  else if(score>=25){scoreLabel='Okay fit';scoreCls='score-ok';}
+  else{scoreLabel='Poor fit';scoreCls='score-poor';}
+  gv('bc-score').textContent=scoreLabel;
+  gv('bc-score').className=`impact-score ${scoreCls}`;
+
+  // Remaining chips
+  const chips=[
+    {v:Math.round(remCal),unit:'kcal',label:'left',cls:'cal'},
+    {v:Math.round(remP),unit:'g',label:'protein',cls:'p'},
+    {v:Math.round(remC),unit:'g',label:'carbs',cls:'c'},
+    {v:Math.round(remF),unit:'g',label:'fat',cls:'f'},
+  ];
+  gv('bc-needs').innerHTML=chips.map(chip=>{
+    const done=chip.v<=0;
+    return`<div class="need-chip ${chip.cls}${done?' done':''}">${done?`✓ ${chip.label}`:`${chip.v}${chip.unit} ${chip.label} left`}</div>`;
+  }).join('');
+
+  // Macro bars
+  const bars=[
+    {lbl:'Protein',cur:t.p,  add:p,  tgt:TARGETS.p, col:'var(--pc)'},
+    {lbl:'Carbs',  cur:t.c,  add:c,  tgt:TARGETS.c, col:'var(--cc)'},
+    {lbl:'Fat',    cur:t.f,  add:f,  tgt:TARGETS.f, col:'var(--fc)'},
+    {lbl:'Cals',   cur:t.cal,add:cal,tgt:tgt,        col:'var(--blue2)'},
+  ];
+  gv('bc-bars').innerHTML=bars.map(b=>{
+    const curPct=Math.min(b.cur/b.tgt*100,100);
+    const addPct=Math.max(0,Math.min((b.cur+b.add)/b.tgt*100,100)-curPct);
+    const after=b.lbl==='Cals'?Math.round(b.cur+b.add)+'kcal':Math.round(b.cur+b.add)+'g';
+    const afterCol=(b.cur+b.add)>b.tgt*1.05?'var(--red)':b.col;
+    return`<div class="ibar-row">
+      <div class="ibar-lbl" style="color:${b.col}">${b.lbl}</div>
+      <div class="ibar-track">
+        <div style="position:absolute;top:0;left:0;height:100%;width:${curPct}%;background:${b.col};opacity:0.45;border-radius:4px"></div>
+        <div style="position:absolute;top:0;left:${curPct}%;height:100%;width:${addPct}%;background:${b.col};border-radius:0 4px 4px 0"></div>
+      </div>
+      <div class="ibar-after" style="color:${afterCol}">${after}</div>
+    </div>`;
+  }).join('');
+
+  // Verdict
+  let verdict='';
+  if(score>=75) verdict=`Solid choice — fills ${Math.round(p/Math.max(remP,1)*100)}% of remaining protein and fits well within your targets.`;
+  else if(cal>remCal+100) verdict=`This puts you ${Math.round(cal-remCal)} kcal over your remaining budget. Consider a smaller portion.`;
+  else if(p<remP*0.15) verdict=`Low protein hit — only ${p}g. Pair with a protein source to stay on track.`;
+  else verdict=`Decent option. Covers ${Math.round(cal/Math.max(remCal,1)*100)}% of remaining calories.`;
+  gv('bc-verdict').textContent=verdict;
+
+  el.style.display='block';
+}
+
+
 
 
 
@@ -1865,8 +1927,186 @@ function addImpactMeal(){
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-// FEATURE: WEEKLY SUMMARY & STREAK
+// STREAK MODAL
 // ══════════════════════════════════════════════════════════════════════════
+let _sfRaf=null;
+
+function openStreakModal(){
+  const streak=calcStreak();
+  const modal=gv('streak-modal');
+  if(!modal)return;
+
+  // Hero number
+  const numEl=gv('sm-num');
+  numEl.textContent='0';
+  numEl._countTo=streak;
+  const start=performance.now();
+  const dur=700;
+  (function step(now){
+    if(numEl._countTo!==streak)return;
+    const p=Math.min((now-start)/dur,1);
+    const ease=1-Math.pow(1-p,3);
+    numEl.textContent=Math.round(ease*streak);
+    if(p<1)requestAnimationFrame(step);
+  })(performance.now());
+
+  // Streak start date — walk back from today to find first day of current streak
+  const now2=new Date();
+  let streakStart=new Date(now2);
+  for(let i=1;i<=streak;i++){
+    const d=new Date(now2); d.setDate(now2.getDate()-i+1);
+    streakStart=d;
+  }
+  const startStr=streakStart.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+  gv('sm-started').textContent=startStr;
+
+  // Rank (based on streak length)
+  let rank='Top 50%';
+  if(streak>=365)rank='Top 1%';
+  else if(streak>=180)rank='Top 5%';
+  else if(streak>=90)rank='Top 10%';
+  else if(streak>=30)rank='Top 25%';
+  gv('sm-rank').textContent=rank;
+  gv('sm-max').textContent=streak; // current = max since we only track forward
+
+  // Week dots — Mon→Sun
+  const days=getWeekData();
+  // getWeekData returns last 7 days Sun-indexed; rebuild Mon-first for display
+  const todayIdx=new Date().getDay(); // 0=Sun
+  const dotDays=[];
+  for(let i=0;i<7;i++){
+    const offset=((i+1)-todayIdx+7)%7; // Mon=0 offset relative to today
+    const d=new Date(); d.setDate(new Date().getDate()-(((todayIdx-1-i)+7)%7));
+    const key=d.toISOString().slice(0,10);
+    const hasMeals=load(`${KEY}_meals_${key}`,[]).length>0;
+    const isToday=key===todayKey();
+    dotDays.push({label:['MON','TUE','WED','THU','FRI','SAT','SUN'][i],hasMeals,isToday,key});
+  }
+  const dotsEl=gv('sm-dots');
+  dotsEl.innerHTML=dotDays.map(d=>`
+    <div class="streak-dot-wrap">
+      <div class="streak-dot ${d.hasMeals?'hit':'miss'}${d.isToday?' today-dot':''}">
+        ${d.hasMeals?'🔥':''}
+      </div>
+      <div class="streak-dot-lbl${d.isToday?' today-lbl':''}">${d.label}</div>
+    </div>`).join('');
+
+  // Milestones
+  const MILESTONES=[7,14,30,60,90,180,365,730];
+  const prevMs=MILESTONES.filter(m=>m<=streak).pop()||0;
+  const nextMs=MILESTONES.find(m=>m>streak)||MILESTONES[MILESTONES.length-1];
+  const msProgress=prevMs===nextMs?1:(streak-prevMs)/(nextMs-prevMs);
+  const daysLeft=nextMs-streak;
+  const MS_EMOJI={7:'🔥',14:'💪',30:'⚡',60:'🌟',90:'🏆',180:'💎',365:'👑',730:'🚀'};
+
+  gv('sm-ms-days').textContent=`${daysLeft} more day${daysLeft!==1?'s':''}`;
+  gv('sm-ms-prev-badge').textContent=MS_EMOJI[prevMs]||'🔥';
+  gv('sm-ms-next-badge').textContent=MS_EMOJI[nextMs]||'🚀';
+  gv('sm-ms-next-badge').classList.toggle('dim',true);
+
+  // Animate bar after paint
+  setTimeout(()=>{
+    const bar=gv('sm-ms-bar');
+    if(bar)bar.style.width=Math.round(msProgress*100)+'%';
+  },120);
+
+  // Callout copy
+  const callouts=[
+    {min:0,  title:'Keep the fire burning',      body:'Every day you log is a data point building toward smarter insights about your body. Show up tomorrow.'},
+    {min:7,  title:'One week strong',             body:'You\'ve built the habit foundation. The first week is always the hardest — it only compounds from here.'},
+    {min:14, title:'Two weeks in',                body:'Your consistency is creating a reliable baseline. Trends are becoming visible. Keep pushing.'},
+    {min:30, title:'30 days — a real habit',      body:'Most people quit before this. A month of daily tracking puts you ahead of the vast majority. Don\'t break it now.'},
+    {min:60, title:'Two months of commitment',    body:'Your data is rich enough for meaningful patterns. Every logged day sharpens the picture of what works for your body.'},
+    {min:90, title:'90 days — elite tier',        body:'Less than 10% of people build a streak this long. Your consistency is genuinely impressive. Protect it.'},
+    {min:180,title:'Half a year of data',         body:'Six months of tracking gives you a dataset most trainers never see. You\'re building a precise model of your body.'},
+    {min:365,title:'One full year — legendary',   body:'A full year of data. Seasonal patterns, trends, everything. You\'ve done what almost no one does. Keep going.'},
+  ];
+  const callout=[...callouts].reverse().find(c=>streak>=c.min)||callouts[0];
+  gv('sm-callout-title').textContent=callout.title;
+  gv('sm-callout-body').textContent=callout.body;
+
+  modal.classList.add('open');
+  // Start flame animation
+  setTimeout(()=>_startStreakFlame(streak),80);
+}
+
+function closeStreakModal(){
+  const modal=gv('streak-modal');
+  if(modal)modal.classList.remove('open');
+  if(_sfRaf){cancelAnimationFrame(_sfRaf);_sfRaf=null;}
+}
+
+function _startStreakFlame(streak){
+  if(_sfRaf){cancelAnimationFrame(_sfRaf);_sfRaf=null;}
+  const canvas=gv('streak-flame-canvas');
+  if(!canvas)return;
+  const dpr=Math.min(window.devicePixelRatio||1,2);
+  const W=260,H=220;
+  canvas.width=W*dpr; canvas.height=H*dpr;
+  canvas.style.width=W+'px'; canvas.style.height=H+'px';
+  const ctx=canvas.getContext('2d');
+  ctx.scale(dpr,dpr);
+
+  // Particle system for flame
+  const hue1=streak>=90?280:streak>=30?320:20; // violet for big streaks, orange for small
+  const particles=Array.from({length:48},(_,i)=>_newFlameParticle(W,H,i));
+
+  let t=0;
+  function frame(){
+    ctx.clearRect(0,0,W,H);
+    // Outer glow halo
+    const halo=ctx.createRadialGradient(W/2,H*0.58,0,W/2,H*0.58,W*0.42);
+    halo.addColorStop(0,`hsla(${hue1},90%,60%,0.07)`);
+    halo.addColorStop(0.5,`hsla(20,100%,55%,0.04)`);
+    halo.addColorStop(1,'transparent');
+    ctx.fillStyle=halo; ctx.fillRect(0,0,W,H);
+
+    // Update & draw particles
+    particles.forEach((p,i)=>{
+      p.y-=p.vy;
+      p.x+=Math.sin(t*p.wobble+p.phase)*0.6;
+      p.life-=p.decay;
+      p.r*=0.993;
+      if(p.life<=0||p.y<H*0.1){Object.assign(particles[i],_newFlameParticle(W,H,i));}
+
+      const alpha=Math.max(0,p.life)*0.85;
+      const pg=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,p.r);
+      // Colour gradient: white core → orange → violet tip
+      pg.addColorStop(0,`rgba(255,255,220,${alpha*0.9})`);
+      pg.addColorStop(0.3,`hsla(30,100%,65%,${alpha*0.7})`);
+      pg.addColorStop(0.7,`hsla(${hue1},85%,55%,${alpha*0.45})`);
+      pg.addColorStop(1,'transparent');
+      ctx.fillStyle=pg;
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill();
+    });
+
+    // Inner bright core
+    const core=ctx.createRadialGradient(W/2,H*0.65,0,W/2,H*0.65,28+Math.sin(t*2)*3);
+    core.addColorStop(0,'rgba(255,255,200,0.30)');
+    core.addColorStop(0.5,'rgba(255,140,40,0.12)');
+    core.addColorStop(1,'transparent');
+    ctx.fillStyle=core; ctx.fillRect(0,0,W,H);
+
+    t+=0.03;
+    _sfRaf=requestAnimationFrame(frame);
+  }
+  _sfRaf=requestAnimationFrame(frame);
+}
+
+function _newFlameParticle(W,H,i){
+  const rng=(s)=>{let x=Math.sin(s+i*37.7)*10000;return x-Math.floor(x);};
+  const spread=16+rng(i*3)*22;
+  return {
+    x: W/2+(rng(i*7)-0.5)*spread*2,
+    y: H*0.72+rng(i*11)*H*0.1,
+    r: 14+rng(i*5)*22,
+    vy: 0.55+rng(i*13)*0.9,
+    life: 0.6+rng(i*17)*0.4,
+    decay: 0.006+rng(i*19)*0.008,
+    wobble: 0.8+rng(i*23)*1.4,
+    phase: rng(i*29)*Math.PI*2,
+  };
+}
 function getWeekData(){
   const days=[];
   const now=new Date();
@@ -1902,89 +2142,59 @@ function renderWeekly(){
   const days=getWeekData();
   const streak=calcStreak();
   const tgt=getCalTarget();
+
+  // Averages over days with data
   const logged=days.filter(d=>d.hasData);
   const avgCal=logged.length?Math.round(logged.reduce((a,d)=>a+d.t.cal,0)/logged.length):0;
   const avgP=logged.length?Math.round(logged.reduce((a,d)=>a+d.t.p,0)/logged.length):0;
-  const avgC=logged.length?Math.round(logged.reduce((a,d)=>a+d.t.c,0)/logged.length):0;
-  const avgF=logged.length?Math.round(logged.reduce((a,d)=>a+d.t.f,0)/logged.length):0;
   const daysOnTarget=logged.filter(d=>d.t.cal>=tgt*0.8&&d.t.cal<=tgt*1.15).length;
 
-  // ── Summary stats ──
-  let html=`<div class="week-stats-row">
-    <div class="wk-s"><div class="wk-v" style="color:var(--blue2)">${avgCal||'—'}</div><div class="wk-l">avg kcal</div></div>
+  let html=`
+  <div class="week-streak" onclick="openStreakModal()">
+    <div class="streak-fire">🔥</div>
+    <div class="streak-num">${streak}</div>
+    <div class="streak-lbl">day streak<br><span style="font-size:9px;color:var(--ghost);font-weight:500;letter-spacing:.04em;text-transform:none">tap for details ›</span></div>
+  </div>
+  <div class="week-stats-row">
+    <div class="wk-s"><div class="wk-v" style="color:var(--blue2)">${avgCal||'—'}</div><div class="wk-l">avg kcal/day</div></div>
     <div class="wk-s"><div class="wk-v" style="color:var(--pc)">${avgP||'—'}g</div><div class="wk-l">avg protein</div></div>
-    <div class="wk-s"><div class="wk-v" style="color:var(--cc)">${avgC||'—'}g</div><div class="wk-l">avg carbs</div></div>
-    <div class="wk-s"><div class="wk-v" style="color:var(--fc)">${avgF||'—'}g</div><div class="wk-l">avg fat</div></div>
-  </div>`;
+    <div class="wk-s"><div class="wk-v" style="color:var(--cyan)">${daysOnTarget}/7</div><div class="wk-l">days on target</div></div>
+  </div>
+  <div class="week-bars">`;
 
-  // ── Calorie bar chart ──
-  html+=`<div class="wk-chart-card">
-    <div class="wk-chart-title">Calories <span class="wk-chart-sub">vs ${tgt} kcal target</span></div>
-    <div class="week-bars">`;
   const maxCal=Math.max(...days.map(d=>d.t.cal),tgt,1);
   days.forEach(d=>{
     const h=Math.max(4,Math.round((d.t.cal/maxCal)*80));
-    const col=d.t.cal===0?'var(--border)':d.t.cal>tgt*1.1?'var(--red)':d.t.cal>=tgt*0.85?'var(--blue2)':'var(--amber)';
-    const tgtH=Math.round((tgt/maxCal)*80);
+    const col=d.t.cal===0?'var(--glass2)':d.t.cal>tgt*1.1?'var(--red)':d.t.cal>=tgt*0.85?'var(--blue2)':'var(--amber)';
+    const borderStyle=d.isToday?'border:2px solid var(--blue2);border-bottom:none;':'';
     html+=`<div class="wk-bar-wrap${d.isToday?' today':''}">
-      <div class="wk-bar-val" style="color:${col}">${d.t.cal?Math.round(d.t.cal/100)/10+'k':''}</div>
-      <div style="position:relative;width:100%;display:flex;flex-direction:column;align-items:center">
-        <div class="wk-bar" style="height:${h}px;background:${col};opacity:${d.isToday?1:0.75};width:100%;border-radius:4px 4px 2px 2px"></div>
-        <div style="position:absolute;bottom:${tgtH}px;left:0;right:0;height:1px;background:rgba(56,139,253,0.3);pointer-events:none"></div>
-      </div>
+      <div class="wk-bar-val" style="color:${col}">${d.t.cal?Math.round(d.t.cal):''}</div>
+      <div class="wk-bar" style="height:${h}px;background:${col};opacity:${d.isToday?1:0.7};${borderStyle}"></div>
       <div class="wk-bar-lbl">${d.label}</div>
+      <div class="wk-bar-dot" style="background:${d.hasData?'var(--blue2)':'var(--glass2)'}"></div>
     </div>`;
   });
-  html+=`</div></div>`;
+  html+=`</div>`;
 
-  // ── Macro trend bars (stacked-style per day) ──
-  html+=`<div class="wk-chart-card">
-    <div class="wk-chart-title">Macro Trends <span class="wk-chart-sub">grams per day</span></div>
-    <div class="wk-macro-legend">
-      <span style="color:var(--pc)">● P</span>
-      <span style="color:var(--cc)">● C</span>
-      <span style="color:var(--fc)">● F</span>
-    </div>
-    <div class="wk-macro-grid">`;
-  const maxP=Math.max(...days.map(d=>d.t.p),TARGETS.p,1);
-  const maxC=Math.max(...days.map(d=>d.t.c),TARGETS.c,1);
-  const maxF=Math.max(...days.map(d=>d.t.f),TARGETS.f,1);
-  days.forEach(d=>{
-    const pH=d.hasData?Math.max(3,Math.round((d.t.p/maxP)*60)):0;
-    const cH=d.hasData?Math.max(3,Math.round((d.t.c/maxC)*60)):0;
-    const fH=d.hasData?Math.max(3,Math.round((d.t.f/maxF)*60)):0;
-    html+=`<div class="wk-macro-col${d.isToday?' today':''}">
-      <div class="wk-macro-bars">
-        <div class="wk-mb" style="height:${pH}px;background:var(--pc)" title="${Math.round(d.t.p)}g P"></div>
-        <div class="wk-mb" style="height:${cH}px;background:var(--cc)" title="${Math.round(d.t.c)}g C"></div>
-        <div class="wk-mb" style="height:${fH}px;background:var(--fc)" title="${Math.round(d.t.f)}g F"></div>
-      </div>
-      <div class="wk-bar-lbl">${d.label}</div>
-    </div>`;
-  });
-  html+=`</div></div>`;
-
-  // ── Per-day breakdown ──
+  // Per-day detail list
   html+=`<div class="week-days">`;
   [...days].reverse().forEach(d=>{
     if(!d.hasData&&!d.isToday)return;
     const lbl=d.isToday?'Today':d.d.toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});
     const recovery=d.dayWhoop[0]?.recovery;
     const recBadge=recovery!=null?`<span class="wk-badge" style="background:${recovery>=67?'rgba(0,229,190,0.15)':recovery>=34?'rgba(245,166,35,0.15)':'rgba(255,69,69,0.15)'};color:${recovery>=67?'var(--whoop-green)':recovery>=34?'var(--amber)':'var(--red)'}">${recovery}% rec</span>`:'';
-    const calCol=d.t.cal>tgt*1.1?'var(--red)':d.t.cal>=tgt*0.85?'var(--blue2)':'var(--amber)';
     html+=`<div class="week-day-row">
       <div class="wkd-lbl">${lbl}</div>
       <div class="wkd-stats">
-        <span style="color:${calCol}">${Math.round(d.t.cal)||'—'} kcal</span>
+        <span style="color:var(--blue2)">${Math.round(d.t.cal)||'—'} kcal</span>
         <span style="color:var(--pc)">${Math.round(d.t.p)||'—'}g P</span>
-        <span style="color:var(--cc)">${Math.round(d.t.c)||'—'}g C</span>
-        <span style="color:var(--fc)">${Math.round(d.t.f)||'—'}g F</span>
-        <span style="color:var(--blue2)">${d.dayWater}💧</span>
+        <span style="color:var(--cyan)">${d.dayWater} 💧</span>
         ${recBadge}
       </div>
     </div>`;
   });
   html+=`</div>`;
+
   el.innerHTML=html;
 }
 
@@ -2052,24 +2262,13 @@ Time of day: ${new Date().getHours()}:00. Goal: fat loss cut phase.`;
   }
 }
 
-function renderStreak(){
-  const s=calcStreak();
-  const el=gv('hdr-streak');
-  const num=gv('hdr-streak-num');
-  if(!el||!num)return;
-  num.textContent=s;
-  el.style.display=s>0?'flex':'none';
-}
-
 // Hook renderAll to also call new renderers
 const _origRenderAll=renderAll;
 window.renderAll=function(){
   _origRenderAll();
   renderNutrients();
   renderWeekly();
-  renderStreak();
 };
 // Call it once now to init
 renderNutrients();
 renderWeekly();
-renderStreak();
