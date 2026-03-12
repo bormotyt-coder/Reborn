@@ -59,7 +59,6 @@ gv('hdr-date').innerHTML=_n.toLocaleDateString('en-US',{weekday:'short',month:'s
 gv('coach-date').textContent=_n.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
 renderAll();
 initWelcomeCard();
-initStykuScroll();
 
 function renderAll(){
   renderWhoopCard();renderSummary();renderRings();
@@ -1225,38 +1224,6 @@ function _wcVisChange(){
   }
 }
 
-
-// ── Styku stats auto-scroll (ping-pong) ───────────────────────────────────
-let _sbRaf=null, _sbDir=1, _sbPause=0;
-function _sbFrame(){
-  const row=document.getElementById('sb-row');
-  if(!row){_sbRaf=null;return;}
-  const maxScroll=row.scrollWidth-row.clientWidth;
-  if(maxScroll<=0){_sbRaf=null;return;} // fits without scrolling
-
-  if(_sbPause>0){_sbPause--;_sbRaf=requestAnimationFrame(_sbFrame);return;}
-
-  row.scrollLeft+=_sbDir*0.6; // px per frame ~36px/s at 60fps
-
-  if(row.scrollLeft>=maxScroll-1){
-    _sbDir=-1;
-    _sbPause=120; // ~2s pause at right end
-  } else if(row.scrollLeft<=0){
-    _sbDir=1;
-    _sbPause=120; // ~2s pause at left end
-  }
-  _sbRaf=requestAnimationFrame(_sbFrame);
-}
-function initStykuScroll(){
-  const row=document.getElementById('sb-row');
-  if(!row)return;
-  // pause on touch
-  row.addEventListener('touchstart',()=>{if(_sbRaf){cancelAnimationFrame(_sbRaf);_sbRaf=null;}},{passive:true});
-  row.addEventListener('touchend',()=>{setTimeout(()=>{if(!_sbRaf)_sbRaf=requestAnimationFrame(_sbFrame);},1500);},{passive:true});
-  // start after short delay so layout is settled
-  setTimeout(()=>{_sbPause=60;_sbRaf=requestAnimationFrame(_sbFrame);},800);
-}
-
 async function initWelcomeCard(){
   const h=new Date().getHours();
   gv('wc-greeting').textContent=getGreeting(h);
@@ -1509,8 +1476,6 @@ let _barcodeScanning=false;
 function openBarcodeModal(){
   gv('barcode-modal').classList.add('open');
   gv('barcode-result').style.display='none';
-  const bci=gv('bc-impact');if(bci)bci.style.display='none';
-  window._barcodeEntry=null;
   gv('barcode-manual').value='';
   _barcodeScanning=false;
   setBarcodeStatus('idle');
@@ -1664,7 +1629,6 @@ async function lookupBarcode(code){
     _barcodeScanning=false;
     stopBarcodeCamera();
     setBarcodeStatus('found');
-    renderBarcodeImpact();
   }catch(e){
     _barcodeScanning=false;
     setBarcodeStatus('error','Lookup failed — product may not be in database.');
@@ -1698,84 +1662,6 @@ function addBarcodeItem(){
   if(todayBtn)showPage('today',todayBtn);
   setTimeout(()=>{_barcodeLock=false;},800);
 }
-// ── Barcode macro impact ──────────────────────────────────────────────────
-function renderBarcodeImpact(){
-  const el=gv('bc-impact');if(!el)return;
-  if(!window._barcodeEntry){el.style.display='none';return;}
-  const qty=parseFloat(gv('barcode-qty')?.value)||1;
-  const e=window._barcodeEntry;
-  const cal=Math.round(e.calories*qty);
-  const p=Math.round(e.protein*qty*10)/10;
-  const c=Math.round(e.carbs*qty*10)/10;
-  const f=Math.round(e.fat*qty*10)/10;
-
-  const t=getTotals(), tgt=getCalTarget();
-  const remCal=tgt-t.cal, remP=TARGETS.p-t.p, remC=TARGETS.c-t.c, remF=TARGETS.f-t.f;
-
-  // Score (same algorithm as renderLogImpact)
-  let score=0;
-  if(remP>5&&p>0)  score+=Math.min(p/remP,1)*35;
-  if(remC>5&&c>0)  score+=Math.min(c/remC,1)*25;
-  if(remF>5&&f>0)  score+=Math.min(f/remF,1)*20;
-  if(remCal>50&&cal>0) score+=Math.min(cal/remCal,1)*20;
-  if(p>remP+10)    score-=15;
-  if(cal>remCal+100) score-=20;
-  score=Math.max(0,Math.min(100,Math.round(score)));
-
-  let scoreLabel,scoreCls;
-  if(score>=75){scoreLabel='Great fit 🔥';scoreCls='score-great';}
-  else if(score>=50){scoreLabel='Good fit ✓';scoreCls='score-good';}
-  else if(score>=25){scoreLabel='Okay fit';scoreCls='score-ok';}
-  else{scoreLabel='Poor fit';scoreCls='score-poor';}
-  gv('bc-score').textContent=scoreLabel;
-  gv('bc-score').className=`impact-score ${scoreCls}`;
-
-  // Remaining chips
-  const chips=[
-    {v:Math.round(remCal),unit:'kcal',label:'left',cls:'cal'},
-    {v:Math.round(remP),unit:'g',label:'protein',cls:'p'},
-    {v:Math.round(remC),unit:'g',label:'carbs',cls:'c'},
-    {v:Math.round(remF),unit:'g',label:'fat',cls:'f'},
-  ];
-  gv('bc-needs').innerHTML=chips.map(chip=>{
-    const done=chip.v<=0;
-    return`<div class="need-chip ${chip.cls}${done?' done':''}">${done?`✓ ${chip.label}`:`${chip.v}${chip.unit} ${chip.label} left`}</div>`;
-  }).join('');
-
-  // Macro bars
-  const bars=[
-    {lbl:'Protein',cur:t.p,  add:p,  tgt:TARGETS.p, col:'var(--pc)'},
-    {lbl:'Carbs',  cur:t.c,  add:c,  tgt:TARGETS.c, col:'var(--cc)'},
-    {lbl:'Fat',    cur:t.f,  add:f,  tgt:TARGETS.f, col:'var(--fc)'},
-    {lbl:'Cals',   cur:t.cal,add:cal,tgt:tgt,        col:'var(--blue2)'},
-  ];
-  gv('bc-bars').innerHTML=bars.map(b=>{
-    const curPct=Math.min(b.cur/b.tgt*100,100);
-    const addPct=Math.max(0,Math.min((b.cur+b.add)/b.tgt*100,100)-curPct);
-    const after=b.lbl==='Cals'?Math.round(b.cur+b.add)+'kcal':Math.round(b.cur+b.add)+'g';
-    const afterCol=(b.cur+b.add)>b.tgt*1.05?'var(--red)':b.col;
-    return`<div class="ibar-row">
-      <div class="ibar-lbl" style="color:${b.col}">${b.lbl}</div>
-      <div class="ibar-track">
-        <div style="position:absolute;top:0;left:0;height:100%;width:${curPct}%;background:${b.col};opacity:0.45;border-radius:4px"></div>
-        <div style="position:absolute;top:0;left:${curPct}%;height:100%;width:${addPct}%;background:${b.col};border-radius:0 4px 4px 0"></div>
-      </div>
-      <div class="ibar-after" style="color:${afterCol}">${after}</div>
-    </div>`;
-  }).join('');
-
-  // Verdict
-  let verdict='';
-  if(score>=75) verdict=`Solid choice — fills ${Math.round(p/Math.max(remP,1)*100)}% of remaining protein and fits well within your targets.`;
-  else if(cal>remCal+100) verdict=`This puts you ${Math.round(cal-remCal)} kcal over your remaining budget. Consider a smaller portion.`;
-  else if(p<remP*0.15) verdict=`Low protein hit — only ${p}g. Pair with a protein source to stay on track.`;
-  else verdict=`Decent option. Covers ${Math.round(cal/Math.max(remCal,1)*100)}% of remaining calories.`;
-  gv('bc-verdict').textContent=verdict;
-
-  el.style.display='block';
-}
-
-
 
 
 
@@ -1927,186 +1813,8 @@ function addImpactMeal(){
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-// STREAK MODAL
+// FEATURE: WEEKLY SUMMARY & STREAK
 // ══════════════════════════════════════════════════════════════════════════
-let _sfRaf=null;
-
-function openStreakModal(){
-  const streak=calcStreak();
-  const modal=gv('streak-modal');
-  if(!modal)return;
-
-  // Hero number
-  const numEl=gv('sm-num');
-  numEl.textContent='0';
-  numEl._countTo=streak;
-  const start=performance.now();
-  const dur=700;
-  (function step(now){
-    if(numEl._countTo!==streak)return;
-    const p=Math.min((now-start)/dur,1);
-    const ease=1-Math.pow(1-p,3);
-    numEl.textContent=Math.round(ease*streak);
-    if(p<1)requestAnimationFrame(step);
-  })(performance.now());
-
-  // Streak start date — walk back from today to find first day of current streak
-  const now2=new Date();
-  let streakStart=new Date(now2);
-  for(let i=1;i<=streak;i++){
-    const d=new Date(now2); d.setDate(now2.getDate()-i+1);
-    streakStart=d;
-  }
-  const startStr=streakStart.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
-  gv('sm-started').textContent=startStr;
-
-  // Rank (based on streak length)
-  let rank='Top 50%';
-  if(streak>=365)rank='Top 1%';
-  else if(streak>=180)rank='Top 5%';
-  else if(streak>=90)rank='Top 10%';
-  else if(streak>=30)rank='Top 25%';
-  gv('sm-rank').textContent=rank;
-  gv('sm-max').textContent=streak; // current = max since we only track forward
-
-  // Week dots — Mon→Sun
-  const days=getWeekData();
-  // getWeekData returns last 7 days Sun-indexed; rebuild Mon-first for display
-  const todayIdx=new Date().getDay(); // 0=Sun
-  const dotDays=[];
-  for(let i=0;i<7;i++){
-    const offset=((i+1)-todayIdx+7)%7; // Mon=0 offset relative to today
-    const d=new Date(); d.setDate(new Date().getDate()-(((todayIdx-1-i)+7)%7));
-    const key=d.toISOString().slice(0,10);
-    const hasMeals=load(`${KEY}_meals_${key}`,[]).length>0;
-    const isToday=key===todayKey();
-    dotDays.push({label:['MON','TUE','WED','THU','FRI','SAT','SUN'][i],hasMeals,isToday,key});
-  }
-  const dotsEl=gv('sm-dots');
-  dotsEl.innerHTML=dotDays.map(d=>`
-    <div class="streak-dot-wrap">
-      <div class="streak-dot ${d.hasMeals?'hit':'miss'}${d.isToday?' today-dot':''}">
-        ${d.hasMeals?'🔥':''}
-      </div>
-      <div class="streak-dot-lbl${d.isToday?' today-lbl':''}">${d.label}</div>
-    </div>`).join('');
-
-  // Milestones
-  const MILESTONES=[7,14,30,60,90,180,365,730];
-  const prevMs=MILESTONES.filter(m=>m<=streak).pop()||0;
-  const nextMs=MILESTONES.find(m=>m>streak)||MILESTONES[MILESTONES.length-1];
-  const msProgress=prevMs===nextMs?1:(streak-prevMs)/(nextMs-prevMs);
-  const daysLeft=nextMs-streak;
-  const MS_EMOJI={7:'🔥',14:'💪',30:'⚡',60:'🌟',90:'🏆',180:'💎',365:'👑',730:'🚀'};
-
-  gv('sm-ms-days').textContent=`${daysLeft} more day${daysLeft!==1?'s':''}`;
-  gv('sm-ms-prev-badge').textContent=MS_EMOJI[prevMs]||'🔥';
-  gv('sm-ms-next-badge').textContent=MS_EMOJI[nextMs]||'🚀';
-  gv('sm-ms-next-badge').classList.toggle('dim',true);
-
-  // Animate bar after paint
-  setTimeout(()=>{
-    const bar=gv('sm-ms-bar');
-    if(bar)bar.style.width=Math.round(msProgress*100)+'%';
-  },120);
-
-  // Callout copy
-  const callouts=[
-    {min:0,  title:'Keep the fire burning',      body:'Every day you log is a data point building toward smarter insights about your body. Show up tomorrow.'},
-    {min:7,  title:'One week strong',             body:'You\'ve built the habit foundation. The first week is always the hardest — it only compounds from here.'},
-    {min:14, title:'Two weeks in',                body:'Your consistency is creating a reliable baseline. Trends are becoming visible. Keep pushing.'},
-    {min:30, title:'30 days — a real habit',      body:'Most people quit before this. A month of daily tracking puts you ahead of the vast majority. Don\'t break it now.'},
-    {min:60, title:'Two months of commitment',    body:'Your data is rich enough for meaningful patterns. Every logged day sharpens the picture of what works for your body.'},
-    {min:90, title:'90 days — elite tier',        body:'Less than 10% of people build a streak this long. Your consistency is genuinely impressive. Protect it.'},
-    {min:180,title:'Half a year of data',         body:'Six months of tracking gives you a dataset most trainers never see. You\'re building a precise model of your body.'},
-    {min:365,title:'One full year — legendary',   body:'A full year of data. Seasonal patterns, trends, everything. You\'ve done what almost no one does. Keep going.'},
-  ];
-  const callout=[...callouts].reverse().find(c=>streak>=c.min)||callouts[0];
-  gv('sm-callout-title').textContent=callout.title;
-  gv('sm-callout-body').textContent=callout.body;
-
-  modal.classList.add('open');
-  // Start flame animation
-  setTimeout(()=>_startStreakFlame(streak),80);
-}
-
-function closeStreakModal(){
-  const modal=gv('streak-modal');
-  if(modal)modal.classList.remove('open');
-  if(_sfRaf){cancelAnimationFrame(_sfRaf);_sfRaf=null;}
-}
-
-function _startStreakFlame(streak){
-  if(_sfRaf){cancelAnimationFrame(_sfRaf);_sfRaf=null;}
-  const canvas=gv('streak-flame-canvas');
-  if(!canvas)return;
-  const dpr=Math.min(window.devicePixelRatio||1,2);
-  const W=260,H=220;
-  canvas.width=W*dpr; canvas.height=H*dpr;
-  canvas.style.width=W+'px'; canvas.style.height=H+'px';
-  const ctx=canvas.getContext('2d');
-  ctx.scale(dpr,dpr);
-
-  // Particle system for flame
-  const hue1=streak>=90?280:streak>=30?320:20; // violet for big streaks, orange for small
-  const particles=Array.from({length:48},(_,i)=>_newFlameParticle(W,H,i));
-
-  let t=0;
-  function frame(){
-    ctx.clearRect(0,0,W,H);
-    // Outer glow halo
-    const halo=ctx.createRadialGradient(W/2,H*0.58,0,W/2,H*0.58,W*0.42);
-    halo.addColorStop(0,`hsla(${hue1},90%,60%,0.07)`);
-    halo.addColorStop(0.5,`hsla(20,100%,55%,0.04)`);
-    halo.addColorStop(1,'transparent');
-    ctx.fillStyle=halo; ctx.fillRect(0,0,W,H);
-
-    // Update & draw particles
-    particles.forEach((p,i)=>{
-      p.y-=p.vy;
-      p.x+=Math.sin(t*p.wobble+p.phase)*0.6;
-      p.life-=p.decay;
-      p.r*=0.993;
-      if(p.life<=0||p.y<H*0.1){Object.assign(particles[i],_newFlameParticle(W,H,i));}
-
-      const alpha=Math.max(0,p.life)*0.85;
-      const pg=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,p.r);
-      // Colour gradient: white core → orange → violet tip
-      pg.addColorStop(0,`rgba(255,255,220,${alpha*0.9})`);
-      pg.addColorStop(0.3,`hsla(30,100%,65%,${alpha*0.7})`);
-      pg.addColorStop(0.7,`hsla(${hue1},85%,55%,${alpha*0.45})`);
-      pg.addColorStop(1,'transparent');
-      ctx.fillStyle=pg;
-      ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill();
-    });
-
-    // Inner bright core
-    const core=ctx.createRadialGradient(W/2,H*0.65,0,W/2,H*0.65,28+Math.sin(t*2)*3);
-    core.addColorStop(0,'rgba(255,255,200,0.30)');
-    core.addColorStop(0.5,'rgba(255,140,40,0.12)');
-    core.addColorStop(1,'transparent');
-    ctx.fillStyle=core; ctx.fillRect(0,0,W,H);
-
-    t+=0.03;
-    _sfRaf=requestAnimationFrame(frame);
-  }
-  _sfRaf=requestAnimationFrame(frame);
-}
-
-function _newFlameParticle(W,H,i){
-  const rng=(s)=>{let x=Math.sin(s+i*37.7)*10000;return x-Math.floor(x);};
-  const spread=16+rng(i*3)*22;
-  return {
-    x: W/2+(rng(i*7)-0.5)*spread*2,
-    y: H*0.72+rng(i*11)*H*0.1,
-    r: 14+rng(i*5)*22,
-    vy: 0.55+rng(i*13)*0.9,
-    life: 0.6+rng(i*17)*0.4,
-    decay: 0.006+rng(i*19)*0.008,
-    wobble: 0.8+rng(i*23)*1.4,
-    phase: rng(i*29)*Math.PI*2,
-  };
-}
 function getWeekData(){
   const days=[];
   const now=new Date();
@@ -2150,10 +1858,10 @@ function renderWeekly(){
   const daysOnTarget=logged.filter(d=>d.t.cal>=tgt*0.8&&d.t.cal<=tgt*1.15).length;
 
   let html=`
-  <div class="week-streak" onclick="openStreakModal()">
+  <div class="week-streak">
     <div class="streak-fire">🔥</div>
     <div class="streak-num">${streak}</div>
-    <div class="streak-lbl">day streak<br><span style="font-size:9px;color:var(--ghost);font-weight:500;letter-spacing:.04em;text-transform:none">tap for details ›</span></div>
+    <div class="streak-lbl">day streak</div>
   </div>
   <div class="week-stats-row">
     <div class="wk-s"><div class="wk-v" style="color:var(--blue2)">${avgCal||'—'}</div><div class="wk-l">avg kcal/day</div></div>

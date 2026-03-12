@@ -9,7 +9,16 @@
 <meta name="apple-mobile-web-app-title" content="reBorn">
 <meta name="theme-color" content="#090b10">
 <title>Project reBorn</title>
-<link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxODAgMTgwIj48cmVjdCB3aWR0aD0iMTgwIiBoZWlnaHQ9IjE4MCIgcng9IjQwIiBmaWxsPSIjMDkwYjEwIi8+PHRleHQgeD0iNTAlIiB5PSI1NCUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJHZW9yZ2lhLHNlcmlmIiBmb250LXNpemU9IjkwIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0iI2Q0ZjUzYyI+ckI8L3RleHQ+PC9zdmc+">
+<!-- PWA Manifest -->
+<link rel="manifest" href="manifest.json">
+<!-- Apple touch icons (iOS home screen) -->
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<link rel="apple-touch-icon" sizes="167x167" href="icon-167.png">
+<link rel="apple-touch-icon" sizes="152x152" href="icon-152.png">
+<link rel="apple-touch-icon" sizes="120x120" href="icon-120.png">
+<!-- Favicon / Android -->
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
 <!-- fonts loaded via style.css @import -->
 <link rel="stylesheet" href="style.css">
 </head>
@@ -27,7 +36,7 @@
   </div>
   <div class="scan-banner">
     <div class="sb-label">🔬 Styku · Mar 4, 2026</div>
-    <div class="sb-row" id="sb-row">
+    <div class="sb-row">
       <div class="sb-s"><div class="sb-v" style="color:var(--blue2)">25.1%</div><div class="sb-l">Body Fat</div></div>
       <div class="sb-s"><div class="sb-v">64.0</div><div class="sb-l">Lean kg</div></div>
       <div class="sb-s"><div class="sb-v">1,965</div><div class="sb-l">BMR</div></div>
@@ -462,17 +471,7 @@
       </div>
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
         <label class="flbl" style="margin:0;flex-shrink:0">Servings:</label>
-        <input type="number" id="barcode-qty" value="1" min="0.5" step="0.5" style="width:70px" oninput="renderBarcodeImpact()"/>
-      </div>
-      <!-- Macro impact panel — renders when product found -->
-      <div id="bc-impact" style="display:none;margin-bottom:12px">
-        <div class="li-header">
-          <span class="li-title">📊 Macro Impact</span>
-          <span id="bc-score" class="impact-score"></span>
-        </div>
-        <div id="bc-needs" style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px"></div>
-        <div id="bc-bars" style="display:flex;flex-direction:column;gap:7px;margin-bottom:10px"></div>
-        <div id="bc-verdict" style="font-size:12px;color:var(--text2);line-height:1.7;padding:9px 12px;background:rgba(255,255,255,0.04);border-radius:10px"></div>
+        <input type="number" id="barcode-qty" value="1" min="0.5" step="0.5" style="width:70px"/>
       </div>
       <button onclick="addBarcodeItem()" style="width:100%;background:linear-gradient(135deg,var(--blue),rgba(56,139,253,0.75));color:#fff;border:none;border-radius:14px;padding:14px;font-family:var(--font);font-size:20px;font-weight:800;cursor:pointer">+ ADD TO LOG</button>
     </div>
@@ -599,59 +598,6 @@
     </div>
     <div id="mbd-list"></div>
     <div class="mbd-empty" id="mbd-empty" style="display:none">No meals logged yet.</div>
-  </div>
-</div>
-
-<!-- MODAL: STREAK -->
-<div class="overlay" id="streak-modal" onclick="closeStreakModal()">
-  <div class="streak-modal-inner" onclick="event.stopPropagation()">
-    <div class="m-handle"></div>
-    <!-- Close -->
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
-      <div style="font-family:var(--font);font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)">DAY STREAK</div>
-      <button class="mdd-close" onclick="closeStreakModal()">✕</button>
-    </div>
-    <!-- Flame hero -->
-    <div class="streak-flame-wrap" style="height:220px">
-      <canvas class="streak-flame-canvas" id="streak-flame-canvas" width="260" height="220"></canvas>
-      <div class="streak-hero-num" id="sm-num">0</div>
-      <div class="streak-hero-lbl">DAY STREAK</div>
-    </div>
-    <!-- Stats row -->
-    <div class="streak-stats">
-      <div class="streak-stat">
-        <div class="streak-stat-v" id="sm-started">—</div>
-        <div class="streak-stat-l">Streak started</div>
-      </div>
-      <div class="streak-stat">
-        <div class="streak-stat-v" id="sm-rank" style="color:var(--blue2)">—</div>
-        <div class="streak-stat-l">Consistency rank</div>
-      </div>
-      <div class="streak-stat">
-        <div class="streak-stat-v" id="sm-max">—</div>
-        <div class="streak-stat-l">Max streak</div>
-      </div>
-    </div>
-    <!-- This week dots -->
-    <div class="streak-week-title">THIS WEEK</div>
-    <div class="streak-dots" id="sm-dots"></div>
-    <!-- Next milestone -->
-    <div class="streak-milestone">
-      <div class="streak-ms-badge" id="sm-ms-prev-badge">🔥</div>
-      <div class="streak-ms-mid">
-        <div class="streak-ms-days" id="sm-ms-days">— more days</div>
-        <div class="streak-ms-sub">to unlock your next milestone</div>
-        <div class="streak-ms-bar-track">
-          <div class="streak-ms-bar-fill" id="sm-ms-bar" style="width:0%"></div>
-        </div>
-      </div>
-      <div class="streak-ms-badge dim" id="sm-ms-next-badge">🔥</div>
-    </div>
-    <!-- Motivational callout -->
-    <div class="streak-callout">
-      <div class="streak-callout-title" id="sm-callout-title">Keep the fire burning</div>
-      <div class="streak-callout-body" id="sm-callout-body">Every day you log is a data point building toward smarter insights about your body. Consistency is the edge.</div>
-    </div>
   </div>
 </div>
 
