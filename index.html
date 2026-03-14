@@ -140,8 +140,6 @@
       <div id="suggest-results"><div style="color:var(--muted);font-size:12px;line-height:1.6">Tap <strong style="color:var(--blue2)">Suggest</strong> to get 3 AI-picked foods that fill your remaining macros for the day.</div></div>
     </div>
   </div>
-  <div class="sec-lbl">Quick Add</div>
-  <div class="qa-scroll" id="qa-scroll"></div>
   <div class="sec-lbl">Today's Meals</div>
   <div id="food-list" class="food-list"></div>
 </div>
@@ -199,6 +197,14 @@
   <!-- GENERATE VIEW -->
   <div id="wo-generate-view">
     <div id="wo-last-session"></div>
+    <button class="wo-coach-btn" onclick="openCoachModal()">
+      <span class="wo-coach-icon">🧠</span>
+      <div class="wo-coach-text">
+        <div class="wo-coach-title">Daily Coach</div>
+        <div class="wo-coach-sub">Debrief · macros · recovery · chat</div>
+      </div>
+      <svg class="wo-coach-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+    </button>
     <button class="wo-gen-btn" id="wo-gen-btn" onclick="generateWorkout()">
       <div class="wo-gen-icon">⚡</div>
       <div class="wo-gen-title">Generate Today's Split</div>
@@ -268,40 +274,43 @@
 </div>
 
 <!-- ═══ AI COACH ═══ -->
-<div id="pg-coach" class="page">
-  <div class="hdr">
-    <div class="logo-wrap">
-      <div class="logo-icon"><span style="font-family:var(--font);font-size:15px;font-weight:800;color:#fff;letter-spacing:-1px">rB</span></div>
-      <div><div class="logo-main">AI Coach</div><div class="logo-sub">Daily Debrief</div></div>
+<!-- COACH MODAL OVERLAY (bottom sheet) -->
+<div id="coach-modal-overlay" class="coach-modal-overlay">
+  <div class="coach-modal-sheet">
+    <div class="coach-modal-topbar">
+      <div class="coach-modal-handle"></div>
+      <button class="coach-modal-close" onclick="closeCoachModal()">✕</button>
     </div>
-  </div>
-  <div class="coach-pg">
-    <div class="coach-hdr">
-      <div class="coach-title">Today's Report</div>
-      <div class="coach-date" id="coach-date"></div>
-    </div>
-    <div class="coach-stats">
-      <div class="cs-card"><div class="cs-v" id="cs-cal" style="color:var(--blue2)">—</div><div class="cs-l">kcal eaten</div></div>
-      <div class="cs-card"><div class="cs-v" id="cs-protein" style="color:var(--pc)">—</div><div class="cs-l">protein g</div></div>
-      <div class="cs-card"><div class="cs-v" id="cs-water" style="color:var(--wc)">—</div><div class="cs-l">water mL</div></div>
-    </div>
-    <button class="coach-generate" onclick="generateCoachReport()">
-      <div class="cg-icon">🧠</div>
-      <div class="cg-title">Generate Daily Debrief</div>
-      <div class="cg-sub">Claude analyses your meals, macros, Whoop data and hydration — and gives you a direct, honest breakdown.</div>
-    </button>
-    <div class="coach-loading" id="coach-loading">
-      <div class="coach-spin"></div><br>Analysing your day…
-    </div>
-    <div class="coach-response" id="coach-response"></div>
-    <div class="coach-chat" id="coach-chat">
-      <div style="font-family:var(--font);font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px">Ask Your Coach</div>
-      <div class="chat-messages" id="chat-messages"></div>
-      <div class="chat-input-row">
-        <textarea class="chat-input" id="chat-input" rows="1" placeholder="Ask anything about today…" onkeydown="handleChatKey(event)" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,100)+'px'"></textarea>
-        <button class="chat-send" onclick="sendChatMessage()">
-          <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+    <div class="coach-modal-scroll">
+      <div class="coach-pg">
+        <div class="coach-hdr">
+          <div class="coach-title">Today's Report</div>
+          <div class="coach-date" id="coach-date"></div>
+        </div>
+        <div class="coach-stats">
+          <div class="cs-card"><div class="cs-v" id="cs-cal" style="color:var(--blue2)">—</div><div class="cs-l">kcal eaten</div></div>
+          <div class="cs-card"><div class="cs-v" id="cs-protein" style="color:var(--pc)">—</div><div class="cs-l">protein g</div></div>
+          <div class="cs-card"><div class="cs-v" id="cs-water" style="color:var(--wc)">—</div><div class="cs-l">water mL</div></div>
+        </div>
+        <button class="coach-generate" onclick="generateCoachReport()">
+          <div class="cg-icon">🧠</div>
+          <div class="cg-title">Generate Daily Debrief</div>
+          <div class="cg-sub">Claude analyses your meals, macros, Whoop data and hydration — and gives you a direct, honest breakdown.</div>
         </button>
+        <div class="coach-loading" id="coach-loading">
+          <div class="coach-spin"></div><br>Analysing your day…
+        </div>
+        <div class="coach-response" id="coach-response"></div>
+        <div class="coach-chat" id="coach-chat">
+          <div style="font-family:var(--font);font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px">Ask Your Coach</div>
+          <div class="chat-messages" id="chat-messages"></div>
+          <div class="chat-input-row">
+            <textarea class="chat-input" id="chat-input" rows="1" placeholder="Ask anything about today…" onkeydown="handleChatKey(event)" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,100)+'px'"></textarea>
+            <button class="chat-send" onclick="sendChatMessage()">
+              <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -346,10 +355,6 @@
     <button class="nb" onclick="showPage('workout',this)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6.5 6.5h11M6.5 17.5h11M4 12h16M2 9l2 3-2 3M22 9l-2 3 2 3"/></svg>
       <span>Workout</span>
-    </button>
-    <button class="nb" onclick="showPage('coach',this)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2a10 10 0 110 20A10 10 0 0112 2z"/><path d="M12 16v-4M12 8h.01"/></svg>
-      <span>Coach</span>
     </button>
     <button class="nb" onclick="showPage('weekly',this)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
@@ -671,22 +676,41 @@
 </div>
 
 <!-- STREAK MODAL -->
+<!-- FAB dim backdrop -->
+<div id="fab-dim" class="fab-dim" onclick="fabClose()"></div>
+
 <!-- FAB: floating action button -->
 <div id="fab-wrap" class="fab-wrap">
-  <div id="fab-sub-btns" class="fab-sub-btns">
-    <div class="fab-sub-item">
-      <span class="fab-sub-label">Scan Barcode</span>
-      <button class="fab-sub-btn" onclick="fabClose();openBarcodeModal()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="1" y="4" width="3" height="16"/><rect x="6" y="4" width="1" height="16"/><rect x="9" y="4" width="2" height="16"/><rect x="13" y="4" width="1" height="16"/><rect x="16" y="4" width="3" height="16"/><rect x="21" y="4" width="2" height="16"/></svg>
-      </button>
+
+  <!-- Recent meals panel (slides in above pills when Recent tapped) -->
+  <div id="fab-recent-panel" class="fab-recent-panel">
+    <div class="fab-rp-header">
+      <span class="fab-rp-title">Recent Meals</span>
+      <button class="fab-rp-close" onclick="fabRecentClose()">✕</button>
     </div>
-    <div class="fab-sub-item">
-      <span class="fab-sub-label">Log a Meal</span>
-      <button class="fab-sub-btn fab-sub-primary" onclick="fabClose();openLogModal()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14.5 2h-5L7 4H4a2 2 0 00-2 2v12a2 2 0 002 2h16a2 2 0 002-2V6a2 2 0 00-2-2h-3l-2.5-2z"/><circle cx="12" cy="13" r="3"/></svg>
-      </button>
+    <div id="fab-recent-list" class="fab-rp-list"></div>
+  </div>
+
+  <!-- Four pill rows, fanning upward -->
+  <div id="fab-sub-btns" class="fab-sub-btns">
+    <div class="fab-pill" style="--i:3" onclick="fabPillRecent()">
+      <span class="fab-pill-lbl">Recent</span>
+      <span class="fab-pill-ico">🕐</span>
+    </div>
+    <div class="fab-pill" style="--i:2" onclick="fabClose();openQAModal()">
+      <span class="fab-pill-lbl">Quick Add</span>
+      <span class="fab-pill-ico">⚡</span>
+    </div>
+    <div class="fab-pill" style="--i:1" onclick="fabClose();openBarcodeModal()">
+      <span class="fab-pill-lbl">Scan Barcode</span>
+      <span class="fab-pill-ico">📊</span>
+    </div>
+    <div class="fab-pill" style="--i:0" onclick="fabClose();openLogModal()">
+      <span class="fab-pill-lbl">Log Meal</span>
+      <span class="fab-pill-ico">📷</span>
     </div>
   </div>
+
   <button id="fab-main" class="fab-main" onclick="fabToggle()">
     <svg id="fab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
   </button>
@@ -695,26 +719,78 @@
 <div class="overlay" id="streak-modal" onclick="closeStreakModal()">
   <div class="modal streak-modal-inner" onclick="event.stopPropagation()">
     <div class="m-handle"></div>
-    <button class="mdd-close" onclick="closeStreakModal()" style="position:absolute;top:16px;right:16px">✕</button>
-    <canvas id="streak-flame-canvas" width="260" height="220" style="display:block;margin:0 auto 4px;border-radius:16px"></canvas>
+    <button class="sm-close-btn" onclick="closeStreakModal()">✕</button>
+
+    <!-- Flame canvas -->
+    <canvas id="streak-flame-canvas" class="sm-flame-canvas"></canvas>
+
+    <!-- Hero number + headline -->
     <div class="sm-hero">
-      <div class="sm-num" id="sm-num">0</div>
-      <div class="sm-unit">day streak 🔥</div>
+      <div class="sm-hero-num-wrap">
+        <span class="sm-num" id="sm-num">0</span>
+        <span class="sm-num-unit">days</span>
+      </div>
+      <div class="sm-headline" id="sm-headline">Loading…</div>
     </div>
-    <div class="sm-stats-row">
-      <div class="sm-stat"><div class="sm-sv" id="sm-started">—</div><div class="sm-sl">Started</div></div>
-      <div class="sm-stat"><div class="sm-sv" id="sm-rank">—</div><div class="sm-sl">Consistency</div></div>
-      <div class="sm-stat"><div class="sm-sv" id="sm-max">—</div><div class="sm-sl">Best streak</div></div>
+
+    <!-- Grade + stats row -->
+    <div class="sm-grade-row">
+      <div class="sm-grade-card">
+        <div class="sm-grade-val" id="sm-grade">—</div>
+        <div class="sm-grade-lbl">Consistency</div>
+      </div>
+      <div class="sm-grade-divider"></div>
+      <div class="sm-kpi-grid">
+        <div class="sm-kpi"><span class="sm-kpi-v" id="sm-avg-protein">—</span><span class="sm-kpi-l">avg protein</span></div>
+        <div class="sm-kpi"><span class="sm-kpi-v" id="sm-on-target">—</span><span class="sm-kpi-l">on target</span></div>
+        <div class="sm-kpi"><span class="sm-kpi-v" id="sm-current">—</span><span class="sm-kpi-l">current</span></div>
+        <div class="sm-kpi"><span class="sm-kpi-v" id="sm-best">—</span><span class="sm-kpi-l">best ever</span></div>
+      </div>
     </div>
-    <div class="sm-week-dots" id="sm-dots"></div>
+
+    <!-- Best day highlight -->
+    <div class="sm-highlight" id="sm-highlight" style="display:none">
+      <span class="sm-highlight-icon">🏅</span>
+      <div class="sm-highlight-text">
+        <div class="sm-highlight-title" id="sm-highlight-title"></div>
+        <div class="sm-highlight-sub" id="sm-highlight-sub"></div>
+      </div>
+    </div>
+
+    <!-- 30-day heatmap -->
+    <div class="sm-heatmap-wrap">
+      <div class="sm-heatmap-header">
+        <span class="sm-section-lbl">30-Day Activity</span>
+        <div class="sm-heatmap-legend">
+          <span class="sm-leg-dot green"></span><span class="sm-leg-txt">On target</span>
+          <span class="sm-leg-dot amber"></span><span class="sm-leg-txt">Logged</span>
+          <span class="sm-leg-dot grey"></span><span class="sm-leg-txt">No data</span>
+        </div>
+      </div>
+      <div class="sm-heatmap-dow">
+        <span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span>
+      </div>
+      <div id="sm-heatmap" class="sm-heatmap-grid"></div>
+    </div>
+
+    <!-- Milestone bar -->
     <div class="sm-milestone-wrap">
-      <div class="sm-milestone-bar-bg"><div class="sm-milestone-bar-fill" id="sm-mbar"></div></div>
-      <div class="sm-milestone-label" id="sm-mlabel"></div>
+      <div class="sm-milestone-top">
+        <span class="sm-section-lbl">Next milestone</span>
+        <span class="sm-milestone-label" id="sm-mlabel"></span>
+      </div>
+      <div class="sm-milestone-bar-bg">
+        <div class="sm-milestone-bar-fill" id="sm-mbar"></div>
+        <div class="sm-milestone-bar-glow" id="sm-mbar-glow"></div>
+      </div>
     </div>
+
+    <!-- Motivational callout -->
     <div class="sm-callout" id="sm-callout">
       <div class="sm-callout-title" id="sm-callout-title"></div>
       <div class="sm-callout-body" id="sm-callout-body"></div>
     </div>
+
   </div>
 </div>
 
