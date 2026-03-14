@@ -719,78 +719,26 @@
 <div class="overlay" id="streak-modal" onclick="closeStreakModal()">
   <div class="modal streak-modal-inner" onclick="event.stopPropagation()">
     <div class="m-handle"></div>
-    <button class="sm-close-btn" onclick="closeStreakModal()">✕</button>
-
-    <!-- Flame canvas -->
-    <canvas id="streak-flame-canvas" class="sm-flame-canvas"></canvas>
-
-    <!-- Hero number + headline -->
+    <button class="mdd-close" onclick="closeStreakModal()" style="position:absolute;top:16px;right:16px">✕</button>
+    <canvas id="streak-flame-canvas" width="260" height="220" style="display:block;margin:0 auto 4px;border-radius:16px"></canvas>
     <div class="sm-hero">
-      <div class="sm-hero-num-wrap">
-        <span class="sm-num" id="sm-num">0</span>
-        <span class="sm-num-unit">days</span>
-      </div>
-      <div class="sm-headline" id="sm-headline">Loading…</div>
+      <div class="sm-num" id="sm-num">0</div>
+      <div class="sm-unit">day streak 🔥</div>
     </div>
-
-    <!-- Grade + stats row -->
-    <div class="sm-grade-row">
-      <div class="sm-grade-card">
-        <div class="sm-grade-val" id="sm-grade">—</div>
-        <div class="sm-grade-lbl">Consistency</div>
-      </div>
-      <div class="sm-grade-divider"></div>
-      <div class="sm-kpi-grid">
-        <div class="sm-kpi"><span class="sm-kpi-v" id="sm-avg-protein">—</span><span class="sm-kpi-l">avg protein</span></div>
-        <div class="sm-kpi"><span class="sm-kpi-v" id="sm-on-target">—</span><span class="sm-kpi-l">on target</span></div>
-        <div class="sm-kpi"><span class="sm-kpi-v" id="sm-current">—</span><span class="sm-kpi-l">current</span></div>
-        <div class="sm-kpi"><span class="sm-kpi-v" id="sm-best">—</span><span class="sm-kpi-l">best ever</span></div>
-      </div>
+    <div class="sm-stats-row">
+      <div class="sm-stat"><div class="sm-sv" id="sm-started">—</div><div class="sm-sl">Started</div></div>
+      <div class="sm-stat"><div class="sm-sv" id="sm-rank">—</div><div class="sm-sl">Consistency</div></div>
+      <div class="sm-stat"><div class="sm-sv" id="sm-max">—</div><div class="sm-sl">Best streak</div></div>
     </div>
-
-    <!-- Best day highlight -->
-    <div class="sm-highlight" id="sm-highlight" style="display:none">
-      <span class="sm-highlight-icon">🏅</span>
-      <div class="sm-highlight-text">
-        <div class="sm-highlight-title" id="sm-highlight-title"></div>
-        <div class="sm-highlight-sub" id="sm-highlight-sub"></div>
-      </div>
-    </div>
-
-    <!-- 30-day heatmap -->
-    <div class="sm-heatmap-wrap">
-      <div class="sm-heatmap-header">
-        <span class="sm-section-lbl">30-Day Activity</span>
-        <div class="sm-heatmap-legend">
-          <span class="sm-leg-dot green"></span><span class="sm-leg-txt">On target</span>
-          <span class="sm-leg-dot amber"></span><span class="sm-leg-txt">Logged</span>
-          <span class="sm-leg-dot grey"></span><span class="sm-leg-txt">No data</span>
-        </div>
-      </div>
-      <div class="sm-heatmap-dow">
-        <span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span>
-      </div>
-      <div id="sm-heatmap" class="sm-heatmap-grid"></div>
-    </div>
-
-    <!-- Milestone bar -->
+    <div class="sm-week-dots" id="sm-dots"></div>
     <div class="sm-milestone-wrap">
-      <div class="sm-milestone-top">
-        <span class="sm-section-lbl">Next milestone</span>
-        <span class="sm-milestone-label" id="sm-mlabel"></span>
-      </div>
-      <div class="sm-milestone-bar-bg">
-        <div class="sm-milestone-bar-fill" id="sm-mbar"></div>
-        <div class="sm-milestone-bar-glow" id="sm-mbar-glow"></div>
-      </div>
+      <div class="sm-milestone-bar-bg"><div class="sm-milestone-bar-fill" id="sm-mbar"></div></div>
+      <div class="sm-milestone-label" id="sm-mlabel"></div>
     </div>
-
-    <!-- Motivational callout -->
     <div class="sm-callout" id="sm-callout">
       <div class="sm-callout-title" id="sm-callout-title"></div>
       <div class="sm-callout-body" id="sm-callout-body"></div>
     </div>
-
   </div>
 </div>
 
