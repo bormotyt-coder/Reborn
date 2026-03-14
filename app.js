@@ -1979,7 +1979,7 @@ function renderWeekly(){
 
   // Calories burned from workouts this week
   const weekStart=days[0].key; // Monday ISO date
-  const weekWorkouts=woHistory().filter(s=>s.date&&s.date.slice(0,10)>=weekStart);
+  const weekWorkouts=(typeof woHistory==='function'?woHistory():[]).filter(s=>s.date&&s.date.slice(0,10)>=weekStart);
   const workoutBurnedKcal=weekWorkouts.reduce((a,s)=>{
     // totalVolume is kg lifted — not kcal. Use WHOOP burned if available, else skip.
     // Pull WHOOP burned from the session date's snapshot
@@ -2658,7 +2658,8 @@ Rules:
 - suggestedWeight: fill in if PB exists for that exercise (same or slight increase), else null
 - formUrl: ALWAYS set to https://www.youtube.com/results?search_query=EXERCISE_NAME_URL_ENCODED+proper+form
 - alternatives: 2-3 options, at least one must be unconventional or underrated (not the obvious swap)
-- Return valid JSON only`
+- Return valid JSON only`;
+
   try{
     const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:2000,messages:[{role:'user',content:prompt}]})});
