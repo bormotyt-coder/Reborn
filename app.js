@@ -1,4 +1,3 @@
-
 const PROXY='https://reborn-proxy.bormotyt.workers.dev';
 const TARGETS={cal:2340,p:128,c:200,f:65};
 const BASELINE={weight:89.1,bf:25.1,fatMass:22.4};
@@ -1961,6 +1960,82 @@ function renderWeekly(){
   });
   html+=`</div>`;
 
+  // ── Weight projection card ──
+  // Current weight: latest progress entry, fallback 89.1kg
+  const latestEntry=[...entries].reverse().find(e=>e.weight!=null);
+  const currentWeight=latestEntry?parseFloat(latestEntry.weight):89.1;
+
+  // Calorie deficit from logged days this week
+  let totalFoodDeficit=0;
+  let deficitDays=0;
+  days.forEach(d=>{
+    if(d.hasData){
+      // per-day target (respects WHOOP burned adjustments already baked into getCalTarget snapshot)
+      totalFoodDeficit+=(tgt-d.t.cal);
+      deficitDays++;
+    }
+  });
+
+  // Calories burned from workouts this week
+  const weekStart=days[0].key; // Monday ISO date
+  const weekWorkouts=woHistory().filter(s=>s.date&&s.date.slice(0,10)>=weekStart);
+  const workoutBurnedKcal=weekWorkouts.reduce((a,s)=>{
+    // totalVolume is kg lifted — not kcal. Use WHOOP burned if available, else skip.
+    // Pull WHOOP burned from the session date's snapshot
+    const k=s.date.slice(0,10);
+    const snaps=load(`${KEY}_whoopsnaps_${k}`,[null,null,null]);
+    const burned=Math.max(snaps[1]?.burned||0,snaps[2]?.burned||0);
+    return a+burned;
+  },0);
+
+  // Total deficit = food deficit + workout burn
+  // But workout calories are already partially reflected in the food target if user set burned in WHOOP.
+  // To avoid double-counting, only add workout burn on days with NO whoop burned data logged.
+  // Simple approach: just use food deficit (target vs actual), which already includes WHOOP-adjusted target.
+  const totalDeficit=Math.round(totalFoodDeficit);
+  const avgDailyDeficit=deficitDays>0?Math.round(totalDeficit/deficitDays):0;
+  const fatLossKg=totalDeficit/7700;
+  const projectedWeight=Math.round((currentWeight-fatLossKg)*10)/10;
+  const rangeLow=(projectedWeight-0.3).toFixed(1);
+  const rangeHigh=(projectedWeight+0.3).toFixed(1);
+
+  // Days left until Sunday
+  const todayDow=new Date().getDay(); // 0=Sun,6=Sat
+  const daysToSunday=todayDow===0?0:(7-todayDow);
+  const sundayLabel=daysToSunday===0?'today':`this Sunday`;
+
+  // Only show if we have at least one logged day
+  if(deficitDays>0){
+    const deficitColor=totalDeficit>0?'var(--green)':'var(--red)';
+    const deficitSign=totalDeficit>=0?'-':'+';
+    html+=`
+    <div class="wk-proj-card">
+      <div class="wk-proj-top">
+        <div class="wk-proj-icon">⚖️</div>
+        <div class="wk-proj-heading">Weight Projection</div>
+        <div class="wk-proj-badge">${sundayLabel}</div>
+      </div>
+      <div class="wk-proj-weight">${projectedWeight} <span class="wk-proj-unit">kg</span></div>
+      <div class="wk-proj-range">range ${rangeLow} – ${rangeHigh} kg</div>
+      <div class="wk-proj-divider"></div>
+      <div class="wk-proj-stats">
+        <div class="wk-proj-stat">
+          <div class="wk-proj-sv" style="color:${deficitColor}">${deficitSign}${Math.abs(totalDeficit).toLocaleString()} kcal</div>
+          <div class="wk-proj-sl">weekly deficit</div>
+        </div>
+        <div class="wk-proj-stat">
+          <div class="wk-proj-sv" style="color:${deficitColor}">${deficitSign}${Math.abs(avgDailyDeficit).toLocaleString()} kcal</div>
+          <div class="wk-proj-sl">daily avg deficit</div>
+        </div>
+        <div class="wk-proj-stat">
+          <div class="wk-proj-sv" style="color:var(--muted)">${fatLossKg>=0?'−':'+'}${Math.abs(fatLossKg).toFixed(2)} kg</div>
+          <div class="wk-proj-sl">est. fat loss</div>
+        </div>
+      </div>
+      <div class="wk-proj-note">Based on ${currentWeight} kg current · ${deficitDays} logged day${deficitDays!==1?'s':''} · 7,700 kcal/kg fat</div>
+    </div>`;
+  }
+
   // Per-day detail list
   html+=`<div class="week-days">`;
   [...days].reverse().forEach(d=>{
@@ -2506,7 +2581,7 @@ function renderLastSession(){
 // ── AI Workout Generation ──
 async function generateWorkout(){
   const btn=gv('wo-gen-btn');
-  if(btn){btn.disabled=true;btn.querySelector('.wo-gen-title').textContent='Generating…';btn.querySelector('.wo-gen-icon').textContent='⏳';}
+  if(btn){btn.disabled=true;btn.querySelector('.wo-gen-title').textContent='Generating\u2026';btn.querySelector('.wo-gen-icon').textContent='\u23f3';}
 
   const yest=getYesterdayNutrition();
   const rec=_woRecovery||'unknown';
@@ -2515,15 +2590,18 @@ async function generateWorkout(){
   const pbs=woPBs();
   const daysAgo=getDaysSinceMuscle();
 
-  // Build context string
   const histSummary=recentSessions.map(s=>`${new Date(s.date).toLocaleDateString('en-US',{weekday:'short'})}: ${s.splitName} (${(s.muscleGroups||[]).join(', ')})`).join('\n');
   const pbSummary=Object.entries(pbs).slice(0,20).map(([ex,pb])=>`${ex}: ${pb.weight}kg x${pb.reps} (1RM ~${pb.oneRM}kg)`).join('\n');
 
-  const prompt=`You are a strength & conditioning coach for a 26-year-old male, 89.1kg, 173cm, 25.1% body fat, goal is fat loss while preserving lean mass (target 64kg lean mass). He trains FASTED in the morning before his first meal.
+  const systemBrief=`You are coaching an intermediate lifter (5 years experience, confident with machines and barbell form). Prioritise mechanical tension and progressive overload. Include intensity techniques (rest-pause, drop sets, myo-reps, supersets) when recovery >= 67 \u2014 flag them in the cue field. Suggest underrated or unconventional exercises alongside staples \u2014 e.g. for chest: incline cable fly, landmine press, cable cross-under; for back: chest-supported row, meadows row, seal row; for legs: Bulgarian split squat, hack squat, Nordic curl, goblet squat; for shoulders: cable lateral raise, prone Y-raise, Lu raises; for arms: incline curl, cross-body hammer, overhead cable tricep. Keep cues technical but concise. Alternatives must include at least one unconventional or underrated option, not just standard swaps.`;
+
+  const prompt=`${systemBrief}
+
+ATHLETE: Male, 26, 89.1kg, 173cm, 25.1% body fat. Goal: fat loss while preserving lean mass (target 64kg lean). Trains FASTED in the morning.
 
 TODAY'S CONTEXT:
 - WHOOP Recovery: ${rec}%
-- Sleep duration: ${sleepSnap.sleep!=null?(()=>{const hh=Math.floor(sleepSnap.sleep),mm=Math.round((sleepSnap.sleep-hh)*60);return hh+'h'+(mm>0?' '+mm+'m':'');})():'unknown'}
+- Sleep: ${sleepSnap.sleep!=null?(()=>{const hh=Math.floor(sleepSnap.sleep),mm=Math.round((sleepSnap.sleep-hh)*60);return hh+'h'+(mm>0?' '+mm+'m':'');})():'unknown'}
 - HRV: ${sleepSnap.hrv||'unknown'}
 - Yesterday's nutrition: ${Math.round(yest.p||0)}g protein, ${Math.round(yest.cal||0)} kcal, ${Math.round(yest.c||0)}g carbs
 
@@ -2534,31 +2612,32 @@ DAYS SINCE MUSCLE GROUP TRAINED:
 ${Object.entries(daysAgo).map(([m,d])=>`${m}: ${d} days ago`).join(', ')||'No history'}
 
 PERSONAL BESTS:
-${pbSummary||'No PBs yet — first session'}
+${pbSummary||'No PBs yet \u2014 first session'}
 
 Generate a workout split for today. Return ONLY valid JSON, no markdown, no explanation.
 
 JSON format:
 {
-  "splitName": "Push — Chest & Shoulders",
+  "splitName": "Push \u2014 Chest & Shoulders",
   "muscleGroups": ["Chest","Shoulders","Triceps"],
-  "coachNote": "2-line rationale based on recovery and yesterday's nutrition",
+  "coachNote": "2-line rationale based on recovery, history, and yesterday's nutrition",
   "exercises": [
     {
-      "name": "Barbell Bench Press",
-      "icon": "💪",
-      "cue": "retract scapula, drive feet into floor",
+      "name": "Incline Barbell Bench Press",
+      "icon": "\ud83d\udcaa",
+      "cue": "retract scapula, drive feet into floor, 3-second eccentric",
       "sets": 4,
       "reps": "6-8",
       "rest": 120,
       "lastWeight": null,
       "suggestedWeight": null,
-      "alternatives": ["Dumbbell Bench Press","Machine Chest Press","Cable Chest Fly"]
+      "formUrl": "https://www.youtube.com/results?search_query=Incline%20Barbell%20Bench%20Press%20proper%20form",
+      "alternatives": ["Landmine Press","Low-to-High Cable Fly","Dumbbell Bench Press"]
     }
   ],
   "cardio": {
     "machine": "Treadmill",
-    "icon": "🏃",
+    "icon": "\ud83c\udfc3",
     "duration": 15,
     "speed": 6.5,
     "incline": 8,
@@ -2569,15 +2648,16 @@ JSON format:
 
 Rules:
 - 6-8 exercises (fewer if recovery < 40)
-- If recovery >= 67: heavy compound focus, 4-5 sets, 5-8 reps
-- If recovery 34-66: moderate volume, 3-4 sets, 8-12 reps  
+- If recovery >= 67: heavy compound focus, 4-5 sets, 5-8 reps \u2014 add at least one intensity technique (rest-pause / drop set / myo-reps / superset) noted in the cue
+- If recovery 34-66: moderate volume, 3-4 sets, 8-12 reps
 - If recovery < 34: light/technique focus, 3 sets, 12-15 reps
 - Fasted training: avoid maximal CNS-heavy lifts if recovery < 50
 - Do NOT repeat muscle groups trained in last 48 hours unless recovery > 80
-- Cardio: fasted morning = prefer steady state (incline walk, moderate bike). Only recommend HIIT if recovery > 80
-- suggestedWeight: fill in if PB exists for that exercise (suggest same or slight increase), else null
-- Return valid JSON only`;
-
+- Cardio: fasted morning = prefer steady state (incline walk, moderate bike). Only HIIT if recovery > 80
+- suggestedWeight: fill in if PB exists for that exercise (same or slight increase), else null
+- formUrl: ALWAYS set to https://www.youtube.com/results?search_query=EXERCISE_NAME_URL_ENCODED+proper+form
+- alternatives: 2-3 options, at least one must be unconventional or underrated (not the obvious swap)
+- Return valid JSON only`
   try{
     const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:2000,messages:[{role:'user',content:prompt}]})});
@@ -2605,7 +2685,7 @@ function renderWorkoutPreview(){
       <div class="wo-ex-preview">
         <div class="wo-ex-icon">${ex.icon||getExIcon(ex.name)}</div>
         <div class="wo-ex-info">
-          <div class="wo-ex-name">${ex.name}</div>
+          <div class="wo-ex-name">${(()=>{const url=ex.formUrl||`https://www.youtube.com/results?search_query=${encodeURIComponent(ex.name+' proper form')}`;return `<a class="wo-ex-name-link" href="${url}" target="_blank" rel="noopener">${ex.name} <span class="wo-ex-link-icon">🔗</span></a>`;})()}</div>
           <div class="wo-ex-meta">${ex.sets} sets · ${ex.reps} reps · ${ex.rest}s rest</div>
           <div class="wo-ex-cue">${ex.cue||''}</div>
         </div>
@@ -2704,7 +2784,7 @@ function renderExerciseCard(ex,ei){
     <div class="wo-ex-card-hdr" onclick="toggleExCollapse(${ei})">
       <div class="wo-ex-card-icon">${ex.icon||getExIcon(ex.name)}</div>
       <div class="wo-ex-card-title">
-        <div class="wo-ex-card-name">${ex.swappedTo||ex.name}</div>
+        <div class="wo-ex-card-name">${(()=>{const n=ex.swappedTo||ex.name;const url=ex.formUrl||`https://www.youtube.com/results?search_query=${encodeURIComponent(n+' proper form')}`;return `<a class="wo-ex-name-link" href="${url}" target="_blank" rel="noopener">${n} <span class="wo-ex-link-icon">🔗</span></a>`;})()}</div>
         <div class="wo-ex-card-meta">${ex.sets.length} sets · ${ex.reps||ex.sets[0]?.reps||'—'} reps · ${ex.rest}s rest</div>
       </div>
       <div class="wo-ex-card-check" id="wo-ex-check-${ei}">${ex.sets.every(s=>s.done)?'✅':'○'}</div>
