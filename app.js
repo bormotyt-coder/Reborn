@@ -880,6 +880,43 @@ function getDayContext(){
   return `BORNA'S DATA TODAY:\nMEALS:\n${mealSum||'None logged'}\nTOTALS: ${Math.round(t.cal)} kcal, ${Math.round(t.p)}g P, ${Math.round(t.c)}g C, ${Math.round(t.f)}g F\nTARGET: ${getCalTarget()} kcal (cut phase)\nMACRO TARGETS: 128g P, 200g C, 65g F\nWHOOP:\n${whoopSum}\nWATER: ${cups} cups (${cups*ML_PER_CUP}ml) / 8 cups\nPROFILE: Male, 26, 89.1kg, 25.1% BF, goal 20.1% BF by Apr 27 2026`;
 }
 
+// Build the enriched coach context — called only by generateCoachReport
+function _buildCoachContext(){
+  const now=new Date();
+  const hour=now.getHours();
+  const timeLabel=hour<14?'morning/midday (day not over yet)':hour<18?'late afternoon':'evening (full day done)';
+
+  // ── 3-day rolling average ──
+  let rollingCal=0,rollingP=0,rollingDays=0;
+  for(let i=1;i<=3;i++){
+    const d=new Date();d.setDate(d.getDate()-i);
+    const ms=load(`${KEY}_meals_${d.toISOString().slice(0,10)}`)||[];
+    if(ms.length){
+      rollingCal+=ms.reduce((a,m)=>a+m.calories,0);
+      rollingP  +=ms.reduce((a,m)=>a+m.protein,0);
+      rollingDays++;
+    }
+  }
+  const rolling3=rollingDays>0
+    ?`3-day avg (prev days): ${Math.round(rollingCal/rollingDays)} kcal, ${Math.round(rollingP/rollingDays)}g protein (over ${rollingDays} logged day${rollingDays>1?'s':''})`
+    :'3-day avg: no recent data';
+
+  // ── Yesterday's coach report summary ──
+  const lastReport=localStorage.getItem(`${KEY}_last_coach_report`)||'';
+  const yesterdaySummary=lastReport
+    ?`Yesterday's report summary (1 sentence): "${lastReport.slice(0,280).replace(/\n/g,' ')}${lastReport.length>280?'…':''}"`
+    :'Yesterday\'s report: none stored yet';
+
+  // ── Today's workout ──
+  const todayISO=todayKey();
+  const todayWorkout=woHistory().find(s=>s.date&&s.date.slice(0,10)===todayISO);
+  const workoutCtx=todayWorkout
+    ?`Today's workout: COMPLETED — ${todayWorkout.splitName||'session'}, ${todayWorkout.totalVolume||'—'} kg total volume, ${todayWorkout.duration||'—'} min`
+    :'Today\'s workout: none logged yet';
+
+  return {timeLabel,rolling3,yesterdaySummary,workoutCtx,hour};
+}
+
 let chatHistory=[];
 
 async function generateCoachReport(){
@@ -887,24 +924,56 @@ async function generateCoachReport(){
   gv('coach-loading').classList.add('show');gv('coach-response').classList.remove('show');
   gv('coach-chat').classList.remove('show');
   chatHistory=[];
+
   const ctx=getDayContext();
-  const prompt=`${ctx}\n\nGive me a direct daily debrief:\n1. OVERALL SCORE (1-10, one punchy line)\n2. NUTRITION (specific callouts)\n3. RECOVERY & ACTIVITY\n4. TOP 3 ACTIONS FOR TOMORROW\n\nDirect. No fluff.`;
+  const {timeLabel,rolling3,yesterdaySummary,workoutCtx,hour}=_buildCoachContext();
+
+  // Time-appropriate tone and scoring instruction
+  const isMorning=hour<14;
+  const toneInstruction=isMorning
+    ?`It is currently ${timeLabel}. The day is still in progress — do NOT score the day as complete or call it a failure based on what hasn't been logged yet. Focus on what's been done so far and how to finish the day strong.`
+    :`It is currently ${timeLabel}. Give a full honest assessment of the complete day.`;
+
+  const scoringInstruction=isMorning
+    ?`For OVERALL SCORE: rate effort and trajectory so far (e.g. "7/10 — strong start, protein on track, finish with a solid dinner"). Do NOT penalise for meals not yet eaten.`
+    :`For OVERALL SCORE: rate the full day 1-10 with one punchy honest line.`;
+
+  const prompt=`${ctx}
+
+ROLLING CONTEXT:
+${rolling3}
+${yesterdaySummary}
+${workoutCtx}
+
+${toneInstruction}
+
+Give me a direct daily debrief:
+1. OVERALL SCORE — ${scoringInstruction}
+2. NUTRITION — specific callouts, flag multi-day patterns if protein/calories are consistently off
+3. RECOVERY & ACTIVITY — include workout if completed
+4. TOP 3 ACTIONS — ${isMorning?'for the rest of today':'for tomorrow'}
+
+Direct. No fluff. Reference the rolling context if there are patterns worth calling out.`;
+
   try{
     const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:900,
-        system:'You are a direct, no-nonsense performance and nutrition coach for Borna. Honest, specific, actionable. No filler.',
+        system:'You are a direct, no-nonsense performance and nutrition coach for Borna. Honest, specific, actionable. No filler. When you spot multi-day patterns (e.g. 3rd day under on protein), call them out explicitly.',
         messages:[{role:'user',content:prompt}]})});
     const data=await res.json();
     const text=data.content.map(b=>b.text||'').join('').trim();
+
+    // ── Persist report for tomorrow's context ──
+    // Store first 300 chars as a one-sentence summary seed
+    localStorage.setItem(`${KEY}_last_coach_report`,text);
+
     const re=gv('coach-response');
     re.innerHTML=`<div class="cr-header"><div class="cr-icon">🧠</div><div><div class="cr-title">Daily Debrief</div><div class="cr-time">${new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'})}</div></div></div><div class="cr-body">${text.replace(/\n/g,'<br>')}</div>`;
     re.classList.add('show');
-    // Store debrief in chat history as context
     chatHistory=[
       {role:'user',content:prompt},
       {role:'assistant',content:text}
     ];
-    // Show chat
     gv('chat-messages').innerHTML='';
     gv('coach-chat').classList.add('show');
   }catch(err){alert('Report failed.');console.error(err);}
@@ -2009,73 +2078,128 @@ function openStreakModal(){
   const modal=gv('streak-modal');
   if(!modal)return;
   const streak=calcStreak();
+  const tgt=getCalTarget();
 
-  // Hero count-up
+  // ── Hero count-up ──
   const numEl=gv('sm-num');
   if(numEl){
-    let n=0;const dur=600;const start=performance.now();
-    function tick(now){
+    const dur=700,start=performance.now();
+    (function tick(now){
       const p=Math.min((now-start)/dur,1);
       numEl.textContent=Math.round((1-Math.pow(1-p,3))*streak);
       if(p<1)requestAnimationFrame(tick);
-    }
-    requestAnimationFrame(tick);
+    })(performance.now());
   }
 
-  // Started date
-  const startedEl=gv('sm-started');
-  if(startedEl&&streak>0){
-    const d=new Date();d.setDate(d.getDate()-(streak-1));
-    startedEl.textContent=d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
-  } else if(startedEl) startedEl.textContent='—';
+  // ── Motivational headline ──
+  const headlines=[
+    [30,'Unstoppable 🚀'],
+    [14,'On fire 🔥'],
+    [7,'You\'re building something 💪'],
+    [0,'Just getting started 🌱'],
+  ];
+  const headline=(headlines.find(([d])=>streak>=d)||headlines[headlines.length-1])[1];
+  const hEl=gv('sm-headline');if(hEl)hEl.textContent=headline;
 
-  // Rank
-  const rankEl=gv('sm-rank');
-  if(rankEl) rankEl.textContent=streak>=30?'Elite':streak>=14?'Strong':streak>=7?'Building':streak>=3?'Starting':'New';
-
-  // All-time max
-  const maxEl=gv('sm-max');
-  if(maxEl){
-    let max=0,cur=0;
-    for(let i=0;i<180;i++){
-      const d=new Date();d.setDate(d.getDate()-i);
-      const m=load(`${KEY}_meals_${d.toISOString().slice(0,10)}`)||[];
-      if(m.length>0){cur++;if(cur>max)max=cur;}else cur=0;
-    }
-    maxEl.textContent=`${Math.max(max,streak)}d`;
+  // ── Gather 30 days of data ──
+  const days30=[];
+  for(let i=29;i>=0;i--){
+    const d=new Date();d.setDate(d.getDate()-i);
+    const k=d.toISOString().slice(0,10);
+    const ms=load(`${KEY}_meals_${k}`)||[];
+    const totCal=ms.reduce((a,m)=>a+m.calories,0);
+    const totP  =ms.reduce((a,m)=>a+m.protein,0);
+    const isFuture=d>new Date()&&k!==todayKey();
+    const hasData=ms.length>0&&!isFuture;
+    const onTarget=hasData&&totCal>=tgt*0.85&&totCal<=tgt*1.10;
+    days30.push({k,d,ms,totCal,totP,hasData,onTarget,isFuture});
   }
 
-  // Week dots Mon-Sun
-  const dotsEl=gv('sm-dots');
-  if(dotsEl){
-    const dayLabels=['M','T','W','T','F','S','S'];
-    const today=new Date();const dow=today.getDay();
-    const mondayOffset=dow===0?-6:1-dow;
+  // ── Consistency grade ──
+  const loggedDays=days30.filter(d=>d.hasData).length;
+  const onTargetDays=days30.filter(d=>d.onTarget).length;
+  const onTargetPct=loggedDays>0?Math.round(onTargetDays/Math.max(loggedDays,1)*100):0;
+  const grade=onTargetPct>=90?'A+':onTargetPct>=75?'A':onTargetPct>=55?'B':'C';
+  const gradeEl=gv('sm-grade');
+  if(gradeEl){
+    gradeEl.textContent=grade;
+    gradeEl.className='sm-grade-val '+(grade==='A+'?'grade-aplus':grade==='A'?'grade-a':grade==='B'?'grade-b':'grade-c');
+  }
+
+  // ── KPI stats ──
+  const proteinDays=days30.filter(d=>d.hasData&&d.totP>0);
+  const avgProtein=proteinDays.length?Math.round(proteinDays.reduce((a,d)=>a+d.totP,0)/proteinDays.length):0;
+  const p1=gv('sm-avg-protein');if(p1)p1.textContent=avgProtein?avgProtein+'g':'—';
+  const p2=gv('sm-on-target');if(p2)p2.textContent=loggedDays?onTargetPct+'%':'—';
+  const p3=gv('sm-current');if(p3)p3.textContent=streak+'d';
+
+  // All-time best streak
+  let maxStreak=0,cur=0;
+  for(let i=0;i<365;i++){
+    const d=new Date();d.setDate(d.getDate()-i);
+    const ms=load(`${KEY}_meals_${d.toISOString().slice(0,10)}`)||[];
+    if(ms.length>0){cur++;if(cur>maxStreak)maxStreak=cur;}else cur=0;
+  }
+  maxStreak=Math.max(maxStreak,streak);
+  const p4=gv('sm-best');if(p4)p4.textContent=maxStreak+'d';
+
+  // ── Best day highlight ──
+  const bestDay=days30.filter(d=>d.hasData&&d.totP>0).reduce((best,d)=>(!best||d.totP>best.totP)?d:best,null);
+  const hlEl=gv('sm-highlight');
+  if(hlEl&&bestDay){
+    const dtStr=bestDay.d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+    const htEl=gv('sm-highlight-title');if(htEl)htEl.textContent=`Best day: ${dtStr}`;
+    const hsEl=gv('sm-highlight-sub');
+    if(hsEl)hsEl.textContent=`${Math.round(bestDay.totP)}g protein · ${Math.round(bestDay.totCal)} kcal`;
+    hlEl.style.display='flex';
+  } else if(hlEl) hlEl.style.display='none';
+
+  // ── 30-day heatmap ──
+  const hmEl=gv('sm-heatmap');
+  if(hmEl){
+    // Find what weekday the earliest day fell on (Mon=0)
+    const firstDow=(days30[0].d.getDay()+6)%7; // convert Sun=0 to Mon=0
     let html='';
-    for(let i=0;i<7;i++){
-      const d=new Date(today);d.setDate(today.getDate()+mondayOffset+i);
-      const k=d.toISOString().slice(0,10);
-      const isFuture=d>today&&k!==todayKey();
-      const m=load(`${KEY}_meals_${k}`)||[];
-      const lit=m.length>0&&!isFuture;
-      html+=`<div class="sm-dot"><div class="sm-dot-circle ${lit?'lit':'dim'}">${lit?'🔥':''}</div><div class="sm-dot-day">${dayLabels[i]}</div></div>`;
-    }
-    dotsEl.innerHTML=html;
+    // Pad empty cells before first day
+    for(let i=0;i<firstDow;i++) html+=`<div class="sm-hm-cell empty"></div>`;
+    days30.forEach((day,idx)=>{
+      let cls='sm-hm-cell';
+      if(day.isFuture||(!day.hasData&&!day.onTarget)) cls+=' hm-grey';
+      else if(day.onTarget) cls+=' hm-green';
+      else cls+=' hm-amber';
+      const title=`${day.k}: ${Math.round(day.totCal)} kcal`;
+      html+=`<div class="${cls}" title="${title}"></div>`;
+    });
+    hmEl.innerHTML=html;
+    // Animate dots in with staggered delay
+    const cells=hmEl.querySelectorAll('.sm-hm-cell:not(.empty)');
+    cells.forEach((c,i)=>{c.style.transitionDelay=`${i*18}ms`;c.classList.add('hm-reveal');});
   }
 
-  // Milestone bar
-  const milestones=[7,14,30,60,90,180,365,730];
+  // ── Milestone bar ──
+  const milestones=[7,14,30,60,90,180,365];
   const nextM=milestones.find(m=>m>streak)||365;
   const prevM=[...milestones].reverse().find(m=>m<=streak)||0;
   const pct=nextM>prevM?Math.min(((streak-prevM)/(nextM-prevM))*100,100):100;
-  const mbar=gv('sm-mbar');if(mbar)setTimeout(()=>mbar.style.width=pct+'%',80);
-  const mlabel=gv('sm-mlabel');
-  if(mlabel)mlabel.textContent=streak>=nextM?`🏆 ${nextM}-day milestone reached!`:`${streak} / ${nextM} days to next milestone`;
+  const mbar=gv('sm-mbar'),mglow=gv('sm-mbar-glow');
+  if(mbar)setTimeout(()=>{mbar.style.width=pct+'%';if(mglow)mglow.style.width=pct+'%';},100);
+  const mlEl=gv('sm-mlabel');
+  if(mlEl)mlEl.textContent=streak>=nextM?`🏆 ${nextM}-day milestone!`:`${streak} / ${nextM} days`;
 
-  // Callout
-  const msgs=[[0,'Just Getting Started 💪','Every legend starts at day 1. Log your meals today and build the habit.'],[3,'3 Days — Habit Forming 🌱','Research shows 3 days is when habits start to stick. Keep it going.'],[7,'One Week Strong 🔥','A full week! Your consistency is already beating 80% of people who try.'],[14,'Two Weeks — Locked In 🚀','14 days straight. This is no longer a challenge — it\'s a lifestyle.'],[30,'30-Day Warrior 🏆','One month of daily tracking. Your metabolic data is now deeply accurate.'],[60,'Two Months of Excellence ⚡','60 days straight. You\'ve built something most people only dream about.'],[90,'The 90-Day Club 🌟','Elite tier. Only a tiny fraction of people ever reach this milestone.']];
-  const ctitle=gv('sm-callout-title'),cbody=gv('sm-callout-body');
-  if(ctitle&&cbody){const msg=[...msgs].reverse().find(([d])=>streak>=d)||msgs[0];ctitle.textContent=msg[1];cbody.textContent=msg[2];}
+  // ── Callout ──
+  const msgs=[
+    [90,'The 90-Day Club 🌟','Elite tier. Only a fraction of people ever reach this milestone. Your data is now a powerful body map.'],
+    [60,'Two Months Straight ⚡','60 days of consistency. You\'ve built something most people only dream about.'],
+    [30,'30-Day Warrior 🏆','One full month. Your metabolic data is now deeply accurate and your habits are locked in.'],
+    [14,'Two Weeks — Locked In 🚀','14 days straight. This is no longer a challenge — it\'s who you are.'],
+    [7,'One Week Strong 🔥','A full week! Your consistency is already beating most people who ever try.'],
+    [3,'3 Days — Habit Forming 🌱','Research shows this is when habits start to stick. Keep the momentum.'],
+    [0,'Day One Energy 💪','Every legend starts at day 1. Log your meals today and build the habit.'],
+  ];
+  const msg=msgs.find(([d])=>streak>=d)||msgs[msgs.length-1];
+  const ctEl=gv('sm-callout-title'),cbEl=gv('sm-callout-body');
+  if(ctEl)ctEl.textContent=msg[1];
+  if(cbEl)cbEl.textContent=msg[2];
 
   _startStreakFlame(streak);
   modal.classList.add('active');
@@ -2094,7 +2218,7 @@ function _newFlameParticle(W,H){
 function _startStreakFlame(streak){
   const canvas=gv('streak-flame-canvas');if(!canvas)return;
   const dpr=window.devicePixelRatio||1;
-  const W=260,H=220;
+  const W=220,H=180;
   canvas.width=W*dpr;canvas.height=H*dpr;
   canvas.style.width=W+'px';canvas.style.height=H+'px';
   const ctx=canvas.getContext('2d');ctx.scale(dpr,dpr);
