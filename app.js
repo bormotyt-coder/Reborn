@@ -1,3 +1,4 @@
+
 const PROXY='https://reborn-proxy.bormotyt.workers.dev';
 const TARGETS={cal:2340,p:128,c:200,f:65};
 const BASELINE={weight:89.1,bf:25.1,fatMass:22.4};
