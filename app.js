@@ -93,8 +93,7 @@ function showPage(id,btn){
   btn.classList.add('active');
   incoming.scrollTop=0;
   _currentPage=id;
-  if(id==='weekly')renderWeekly();
-  if(id==='weekly')buildCalendar();
+  if(id==='weekly')switchWeeklyTab(_weeklyTab);
   if(id==='workout')renderWorkoutPage();
 }
 
@@ -359,7 +358,7 @@ async function aiLookupQA(){
   gv('qa-loading').classList.add('show');
   try{
     const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:300,
+      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:300,
         system:'Return ONLY valid JSON, no markdown: {"emoji":"single emoji","calories":number,"protein":number,"carbs":number,"fat":number}',
         messages:[{role:'user',content:`Nutrition facts for: ${name}. Use official label if branded.`}]})});
     const data=await res.json();
@@ -526,7 +525,7 @@ After this meal, remaining for the day: ${remaining.cal} kcal, ${remaining.p}g P
 Give a 2-3 sentence honest assessment: how well this meal fits his cut goals, what it does well or poorly, and one actionable tip. Be direct, no fluff.`;
   try{
     const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:200,
+      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:200,
         messages:[{role:'user',content:prompt}]})});
     const data=await res.json();
     const text=data.content.map(b=>b.text||'').join('').trim();
@@ -570,7 +569,7 @@ async function analyzeMeal(){
   content.push({type:'text',text:prompt});
   try{
     const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1500,
+      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1500,
         system:`Precise nutrition expert. Identify each ingredient separately.
 Return ONLY valid JSON, no markdown:
 {"confidence":"high"|"medium"|"low","confidence_tip":"one sentence or empty","ingredients":[{"name":"name","emoji":"emoji","portion":"e.g. 80g","calories":number,"protein":number,"carbs":number,"fat":number,"fibre":number,"sugar":number,"sodium":number}]}
@@ -796,7 +795,7 @@ async function aiLookupIngredient(){
   gv('ing-lookup-loading').classList.add('show');
   try{
     const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:300,
+      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:300,
         system:'Return ONLY valid JSON, no markdown: {"emoji":"emoji","portion":"portion description","calories":number,"protein":number,"carbs":number,"fat":number}',
         messages:[{role:'user',content:`Nutrition facts for: ${name}`}]})});
     const data=await res.json();
@@ -957,7 +956,7 @@ Direct. No fluff. Reference the rolling context if there are patterns worth call
 
   try{
     const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:900,
+      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:900,
         system:'You are a direct, no-nonsense performance and nutrition coach for Borna. Honest, specific, actionable. No filler. When you spot multi-day patterns (e.g. 3rd day under on protein), call them out explicitly.',
         messages:[{role:'user',content:prompt}]})});
     const data=await res.json();
@@ -1006,7 +1005,7 @@ async function sendChatMessage(){
 
   try{
     const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:600,
+      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:600,
         system:`You are a direct, no-nonsense performance and nutrition coach for Borna. You have full context of his day. Be specific, honest, and actionable. Keep replies concise.\n\n${getDayContext()}`,
         messages:chatHistory})});
     const data=await res.json();
@@ -1626,7 +1625,7 @@ async function snapAndReadBarcode(){
 
   try{
     const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:100,
+      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:100,
         system:'You are a barcode reader. Look at the image and find the barcode number (EAN-13, EAN-8, UPC-A etc). Return ONLY the digits, nothing else. If you cannot find a barcode, return the word NONE.',
         messages:[{role:'user',content:[
           {type:'image',source:{type:'base64',media_type:'image/jpeg',data:b64}},
@@ -1808,7 +1807,7 @@ async function runImpactScan(){
 
   try{
     const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:400,
+      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:400,
         system:'Nutrition expert. Return ONLY valid JSON, no markdown: {"name":"food name","emoji":"single emoji","calories":number,"protein":number,"carbs":number,"fat":number,"verdict":"one punchy sentence about whether this fits remaining targets"}',
         messages:[{role:'user',content}]})});
     const data=await res.json();
@@ -2081,7 +2080,7 @@ Time of day: ${new Date().getHours()}:00. Goal: fat loss cut phase.`;
 
   try{
     const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:600,
+      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:600,
         system:'Return ONLY valid JSON, no markdown: {"suggestions":[{"name":"food name","emoji":"emoji","reason":"one line why this fits","calories":number,"protein":number,"carbs":number,"fat":number}]} — 3 suggestions, practical foods available in Dubai, prioritize whatever macro is most behind.',
         messages:[{role:'user',content:ctx}]})});
     const data=await res.json();
@@ -2662,7 +2661,7 @@ Rules:
 
   try{
     const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:2000,messages:[{role:'user',content:prompt}]})});
+      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:2000,messages:[{role:'user',content:prompt}]})});
     const data=await res.json();
     const text=data.content[0].text.trim().replace(/```json|```/g,'').trim();
     _woPlan=JSON.parse(text);

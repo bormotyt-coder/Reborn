@@ -357,19 +357,20 @@ body {
 
 /* ── FAB WRAP ── */
 .fab-wrap {
-  position: fixed; bottom: calc(88px + env(safe-area-inset-bottom)); right: 16px;
+  position: fixed; bottom: calc(104px + env(safe-area-inset-bottom)); right: 16px;
   display: flex; flex-direction: column; align-items: flex-end; gap: 10px; z-index: 52;
 }
 
 /* ── FAB MAIN BUTTON ── */
 .fab-main {
   width: 58px; height: 58px; border-radius: 50%;
-  background: linear-gradient(135deg, #a259ff, #7c3aed);
+  background: linear-gradient(135deg, #4ade80, #16a34a);
   border: none; color: #fff; cursor: pointer;
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-  box-shadow: 0 6px 24px rgba(162,89,255,0.45), 0 2px 8px rgba(0,0,0,0.4);
+  box-shadow: 0 6px 24px rgba(74,222,128,0.45), 0 2px 8px rgba(0,0,0,0.4);
   transition: transform .22s cubic-bezier(.34,1.56,.64,1);
   -webkit-tap-highlight-color: transparent;
+  pointer-events: auto;
 }
 .fab-main:active { transform: scale(.91); }
 .fab-main.open  { transform: rotate(45deg); }
