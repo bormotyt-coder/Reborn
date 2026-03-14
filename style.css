@@ -359,6 +359,7 @@ body {
 .fab-wrap {
   position: fixed; bottom: calc(104px + env(safe-area-inset-bottom)); right: 16px;
   display: flex; flex-direction: column; align-items: flex-end; gap: 10px; z-index: 52;
+  pointer-events: none;
 }
 
 /* ── FAB MAIN BUTTON ── */
@@ -374,7 +375,7 @@ body {
 }
 .fab-main:active { transform: scale(.91); }
 .fab-main.open  { transform: rotate(45deg); }
-#fab-icon { width: 24px; height: 24px; }
+#fab-icon { width: 24px; height: 24px; pointer-events: none; }
 
 /* ── FAB PILL CONTAINER ── */
 .fab-sub-btns {
