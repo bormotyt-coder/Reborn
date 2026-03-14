@@ -1961,7 +1961,80 @@ function renderWeekly(){
   });
   html+=`</div>`;
 
-  // Per-day detail list
+  // ── Weight projection card ──
+  // Current weight: latest progress entry, fallback 89.1kg
+  const latestEntry=[...entries].reverse().find(e=>e.weight!=null);
+  const currentWeight=latestEntry?parseFloat(latestEntry.weight):89.1;
+
+  // Calorie deficit from logged days this week
+  let totalFoodDeficit=0;
+  let deficitDays=0;
+  days.forEach(d=>{
+    if(d.hasData){
+      // per-day target (respects WHOOP burned adjustments already baked into getCalTarget snapshot)
+      totalFoodDeficit+=(tgt-d.t.cal);
+      deficitDays++;
+    }
+  });
+
+  // Calories burned from workouts this week
+  const weekStart=days[0].key; // Monday ISO date
+  const weekWorkouts=woHistory().filter(s=>s.date&&s.date.slice(0,10)>=weekStart);
+  const workoutBurnedKcal=weekWorkouts.reduce((a,s)=>{
+    // totalVolume is kg lifted — not kcal. Use WHOOP burned if available, else skip.
+    // Pull WHOOP burned from the session date's snapshot
+    const k=s.date.slice(0,10);
+    const snaps=load(`${KEY}_whoopsnaps_${k}`,[null,null,null]);
+    const burned=Math.max(snaps[1]?.burned||0,snaps[2]?.burned||0);
+    return a+burned;
+  },0);
+
+  // Total deficit = food deficit + workout burn
+  // But workout calories are already partially reflected in the food target if user set burned in WHOOP.
+  // To avoid double-counting, only add workout burn on days with NO whoop burned data logged.
+  // Simple approach: just use food deficit (target vs actual), which already includes WHOOP-adjusted target.
+  const totalDeficit=Math.round(totalFoodDeficit);
+  const avgDailyDeficit=deficitDays>0?Math.round(totalDeficit/deficitDays):0;
+  const fatLossKg=totalDeficit/7700;
+  const projectedWeight=Math.round((currentWeight-fatLossKg)*10)/10;
+  const rangeLow=(projectedWeight-0.3).toFixed(1);
+  const rangeHigh=(projectedWeight+0.3).toFixed(1);
+
+  // Days left until Sunday
+  const todayDow=new Date().getDay(); // 0=Sun,6=Sat
+  const daysToSunday=todayDow===0?0:(7-todayDow);
+  const sundayLabel=daysToSunday===0?'today':`this Sunday`;
+
+  // Only show if we have at least one logged day
+  if(deficitDays>0){
+    const deficitColor=totalDeficit>0?'var(--green)':'var(--red)';
+    const deficitSign=totalDeficit>=0?'-':'+';
+    html+=`
+    <div class="wk-proj-card">
+      <div class="wk-proj-top">
+        <div class="wk-proj-icon">⚖️</div>
+        <div class="wk-proj-heading">Weight Projection</div>
+        <div class="wk-proj-badge">${sundayLabel}</div>
+      </div>
+      <div class="wk-proj-weight">${projectedWeight} <span class="wk-proj-unit">kg</span></div>
+      <div class="wk-proj-range">range ${rangeLow} – ${rangeHigh} kg</div>
+      <div class="wk-proj-divider"></div>
+      <div class="wk-proj-stats">
+        <div class="wk-proj-stat">
+          <div class="wk-proj-sv" style="color:${deficitColor}">${deficitSign}${Math.abs(totalDeficit).toLocaleString()} kcal</div>
+          <div class="wk-proj-sl">weekly deficit</div>
+        </div>
+        <div class="wk-proj-stat">
+          <div class="wk-proj-sv" style="color:${deficitColor}">${deficitSign}${Math.abs(avgDailyDeficit).toLocaleString()} kcal</div>
+          <div class="wk-proj-sl">daily avg deficit</div>
+        </div>
+        <div class="wk-proj-stat">
+          <div class="wk-proj-sv" style="color:var(--muted)">${fatLossKg>=0?'−':'+'}${Math.abs(fatLossKg).toFixed(2)} kg</div>
+          <div class="wk-proj-sl">est. fat loss</div>
+        </div>
+      </div>
+      <div class="wk-proj-note">Based on ${currentWeight} kg current · ${deficitDays} logged day${deficitDays!==1?'s':''} · 7,700 kcal/kg fat</div>
+    </div>`;\n  }\n\n  // Per-day detail list
   html+=`<div class="week-days">`;
   [...days].reverse().forEach(d=>{
     if(!d.hasData&&!d.isToday)return;
