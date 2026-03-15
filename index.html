@@ -646,24 +646,23 @@
 <!-- FAB: floating action button -->
 <div id="fab-wrap" class="fab-wrap">
 
-  <!-- Recent meals panel (slides in above pills when Recent tapped) -->
-  <div id="fab-recent-panel" class="fab-recent-panel">
-    <div class="fab-rp-header">
-      <span class="fab-rp-title">Recent Meals</span>
-      <button class="fab-rp-close" onclick="fabRecentClose()">✕</button>
-    </div>
-    <div id="fab-recent-list" class="fab-rp-list"></div>
-  </div>
-
   <!-- Today pill rows -->
   <div id="fab-sub-btns" class="fab-sub-btns">
-    <div class="fab-pill fab-today-pill" style="--i:1" onclick="fabPillRecent()">
+    <div class="fab-pill fab-today-pill" style="--i:3" onclick="fabPillRecent()">
       <span class="fab-pill-lbl">Recent</span>
       <span class="fab-pill-ico">🕐</span>
     </div>
-    <div class="fab-pill fab-today-pill" style="--i:0" onclick="fabClose();openLogChoiceModal()">
-      <span class="fab-pill-lbl">Log Food</span>
-      <span class="fab-pill-ico">🍽️</span>
+    <div class="fab-pill fab-today-pill" style="--i:2" onclick="fabClose();openQAModal()">
+      <span class="fab-pill-lbl">Quick Add</span>
+      <span class="fab-pill-ico">⚡</span>
+    </div>
+    <div class="fab-pill fab-today-pill" style="--i:1" onclick="fabClose();openBarcodeModal()">
+      <span class="fab-pill-lbl">Scan Barcode</span>
+      <span class="fab-pill-ico">📊</span>
+    </div>
+    <div class="fab-pill fab-today-pill" style="--i:0" onclick="fabClose();openLogModal()">
+      <span class="fab-pill-lbl">Photo or Description</span>
+      <span class="fab-pill-ico">📷</span>
     </div>
     <!-- Workout pill rows (hidden by default, shown via fab-wo-mode) -->
     <div class="fab-pill fab-wo-pill" style="--i:1" onclick="fabClose();generateWorkout()">
@@ -675,6 +674,16 @@
   <button id="fab-main" class="fab-main" onclick="fabToggle()">
     <svg id="fab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
   </button>
+
+  <!-- Recent meals panel — kept last so it paints above pills -->
+  <div id="fab-recent-panel" class="fab-recent-panel">
+    <div class="fab-rp-header">
+      <span class="fab-rp-title">Recent Meals</span>
+      <button class="fab-rp-close" onclick="fabRecentClose()">✕</button>
+    </div>
+    <div id="fab-recent-list" class="fab-rp-list"></div>
+  </div>
+
 </div>
 
 <div class="overlay" id="streak-modal" onclick="closeStreakModal()">
@@ -774,57 +783,6 @@
   </div>
 </div>
 
-<!-- MODAL: LOG CHOICE -->
-<div class="overlay" id="log-choice-modal" onclick="closeLogChoiceModal()">
-  <div class="modal" onclick="event.stopPropagation()">
-    <div class="m-handle"></div>
-    <div class="m-title">Add Food</div>
-    <div class="lc-row" onclick="closeLogChoiceModal();openBarcodeModal()">
-      <span class="lc-row-icon">📊</span>
-      <div style="flex:1">
-        <div class="lc-row-title">Scan Barcode</div>
-        <div class="lc-row-sub">Any packaged product with a label — fastest option</div>
-      </div>
-      <span class="lc-row-arrow">›</span>
-    </div>
-    <div class="lc-row" onclick="closeLogChoiceModal();openLogModal()">
-      <span class="lc-row-icon">📷</span>
-      <div style="flex:1">
-        <div class="lc-row-title">Photo or Description</div>
-        <div class="lc-row-sub">Meals, home cooking, restaurants, anything without a label</div>
-      </div>
-      <span class="lc-row-arrow">›</span>
-    </div>
-    <div class="lc-row" style="border-bottom:none" onclick="closeLogChoiceModal();openSearchModal()">
-      <span class="lc-row-icon">🔍</span>
-      <div style="flex:1">
-        <div class="lc-row-title">Search Database</div>
-        <div class="lc-row-sub">Can't scan? Search Open Food Facts by name</div>
-      </div>
-      <span class="lc-row-arrow">›</span>
-    </div>
-    <div style="text-align:center;margin-top:16px">
-      <button onclick="closeLogChoiceModal();openQAModal()" style="background:none;border:none;color:var(--muted);font-family:var(--font);font-size:13px;cursor:pointer;padding:6px 12px">⚡ Quick Add</button>
-    </div>
-  </div>
-</div>
-
-<!-- MODAL: FOOD SEARCH -->
-<div class="overlay" id="search-modal" onclick="closeSearchModal()">
-  <div class="modal" onclick="event.stopPropagation()">
-    <div class="m-handle"></div>
-    <div class="m-title">Search Food Database</div>
-    <input type="text" id="search-input" placeholder="e.g. GHOST Whey, Arla protein milk, Quest bar…" style="margin-bottom:10px"/>
-    <div id="search-loading" style="display:none;text-align:center;padding:16px 0">
-      <div class="spin"></div>
-    </div>
-    <div id="search-results"></div>
-    <div id="search-serving-panel" style="display:none"></div>
-    <div style="text-align:center;margin-top:16px">
-      <button onclick="closeSearchModal();openLogModal()" style="background:none;border:none;color:var(--muted);font-family:var(--font);font-size:13px;cursor:pointer;padding:6px 12px">Can't find it? Log with AI →</button>
-    </div>
-  </div>
-</div>
 
 <script src="data.js"></script>
 <script src="app.js"></script>

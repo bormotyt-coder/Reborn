@@ -417,7 +417,7 @@ body {
 
 /* ── RECENT MEALS PANEL ── */
 .fab-recent-panel {
-  position: absolute; bottom: 72px; right: 0;
+  position: absolute; bottom: 72px; right: 0; z-index: 1;
   width: 284px;
   background: rgba(7,9,18,0.97); border: 1px solid rgba(255,255,255,0.10);
   border-radius: 18px; overflow: hidden;
@@ -1683,28 +1683,3 @@ input:focus, textarea:focus, select:focus { border-color: var(--blue); }
   font-family: var(--font-body);
 }
 .wo-coach-arrow { width: 18px; height: 18px; color: rgba(196,181,253,0.5); flex-shrink: 0; }
-
-/* ── LOG CHOICE MODAL ROWS ── */
-.lc-row {
-  display: flex; align-items: center; gap: 0;
-  padding: 16px 0; border-bottom: 1px solid var(--border);
-  cursor: pointer; -webkit-tap-highlight-color: transparent;
-}
-.lc-row:active { opacity: 0.7; }
-.lc-row-icon { font-size: 26px; width: 42px; flex-shrink: 0; }
-.lc-row-title { font-family: var(--font); font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 2px; }
-.lc-row-sub { font-size: 12px; color: var(--muted); line-height: 1.4; }
-.lc-row-arrow { font-size: 20px; color: var(--muted); flex-shrink: 0; margin-left: 8px; }
-
-/* ── SEARCH RESULT ROWS ── */
-.sr-row {
-  display: flex; align-items: center; gap: 10px;
-  padding: 13px 0; border-bottom: 1px solid var(--border);
-  cursor: pointer; -webkit-tap-highlight-color: transparent;
-}
-.sr-row:last-child { border-bottom: none; }
-.sr-row:active { opacity: 0.7; }
-.sr-info { flex: 1; min-width: 0; }
-.sr-name { font-family: var(--font); font-size: 14px; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sr-brand { font-size: 11px; color: var(--muted); margin-top: 1px; }
-.sr-kcal { font-family: var(--font); font-size: 15px; font-weight: 700; color: var(--blue2); flex-shrink: 0; text-align: right; }
