@@ -2168,6 +2168,7 @@ function openStreakModal(){
       if(day.isFuture||(!day.hasData&&!day.onTarget)) cls+=' hm-grey';
       else if(day.onTarget) cls+=' hm-green';
       else cls+=' hm-amber';
+      if(day.k===todayKey()) cls+=' hm-today';
       const title=`${day.k}: ${Math.round(day.totCal)} kcal`;
       html+=`<div class="${cls}" title="${title}"></div>`;
     });
@@ -2219,7 +2220,7 @@ function _newFlameParticle(W,H){
 function _startStreakFlame(streak){
   const canvas=gv('streak-flame-canvas');if(!canvas)return;
   const dpr=window.devicePixelRatio||1;
-  const W=220,H=180;
+  const W=260,H=200;
   canvas.width=W*dpr;canvas.height=H*dpr;
   canvas.style.width=W+'px';canvas.style.height=H+'px';
   const ctx=canvas.getContext('2d');ctx.scale(dpr,dpr);

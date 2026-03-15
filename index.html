@@ -721,30 +721,49 @@
     <div class="m-handle"></div>
     <button class="sm-close-btn" onclick="closeStreakModal()">✕</button>
 
-    <!-- Flame canvas -->
-    <canvas id="streak-flame-canvas" class="sm-flame-canvas"></canvas>
-
-    <!-- Hero number + headline -->
-    <div class="sm-hero">
-      <div class="sm-hero-num-wrap">
-        <span class="sm-num" id="sm-num">0</span>
-        <span class="sm-num-unit">days</span>
+    <!-- Flame + Hero section -->
+    <div class="sm-hero-section">
+      <div class="sm-flame-glow"></div>
+      <canvas id="streak-flame-canvas" class="sm-flame-canvas"></canvas>
+      <div class="sm-hero">
+        <div class="sm-hero-num-wrap">
+          <span class="sm-num" id="sm-num">0</span>
+          <span class="sm-num-unit">days</span>
+        </div>
+        <div class="sm-headline" id="sm-headline">Loading…</div>
       </div>
-      <div class="sm-headline" id="sm-headline">Loading…</div>
     </div>
 
-    <!-- Grade + stats row -->
-    <div class="sm-grade-row">
-      <div class="sm-grade-card">
-        <div class="sm-grade-val" id="sm-grade">—</div>
+    <!-- Grade award card -->
+    <div class="sm-grade-award">
+      <div class="sm-grade-ring-wrap">
+        <div class="sm-grade-ring">
+          <div class="sm-grade-val" id="sm-grade">—</div>
+        </div>
         <div class="sm-grade-lbl">Consistency</div>
       </div>
-      <div class="sm-grade-divider"></div>
-      <div class="sm-kpi-grid">
-        <div class="sm-kpi"><span class="sm-kpi-v" id="sm-avg-protein">—</span><span class="sm-kpi-l">avg protein</span></div>
-        <div class="sm-kpi"><span class="sm-kpi-v" id="sm-on-target">—</span><span class="sm-kpi-l">on target</span></div>
-        <div class="sm-kpi"><span class="sm-kpi-v" id="sm-current">—</span><span class="sm-kpi-l">current</span></div>
-        <div class="sm-kpi"><span class="sm-kpi-v" id="sm-best">—</span><span class="sm-kpi-l">best ever</span></div>
+      <div class="sm-grade-kpis">
+        <div class="sm-kpi">
+          <span class="sm-kpi-l">Avg protein</span>
+          <span class="sm-kpi-v" id="sm-avg-protein">—</span>
+        </div>
+        <div class="sm-kpi">
+          <span class="sm-kpi-l">On-target days</span>
+          <span class="sm-kpi-v" id="sm-on-target">—</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Current vs Best streak -->
+    <div class="sm-streaks-row">
+      <div class="sm-streak-tile">
+        <span class="sm-streak-tile-val" id="sm-current">—</span>
+        <span class="sm-streak-tile-lbl">current streak</span>
+      </div>
+      <div class="sm-streak-tile-sep">vs</div>
+      <div class="sm-streak-tile sm-streak-tile-best">
+        <span class="sm-streak-tile-val" id="sm-best">—</span>
+        <span class="sm-streak-tile-lbl">personal best</span>
       </div>
     </div>
 
