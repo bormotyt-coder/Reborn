@@ -472,6 +472,11 @@ body {
 }
 .fab-rp-add:active { background: rgba(162,89,255,0.28); transform: scale(.87); }
 
+/* ── FAB COACH MODE (workout page) ── */
+.fab-wrap.fab-coach-mode .fab-sub-btns,
+.fab-wrap.fab-coach-mode .fab-recent-panel { display: none; }
+.fab-wrap.fab-coach-mode .fab-main.open { transform: none; }
+
 /* ══════════════════════════════════════
    FOOD LIST — meal items
    New: macro mini-bars per item
