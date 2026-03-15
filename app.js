@@ -1962,6 +1962,52 @@ function renderWeekly(){
   });
   html+=`</div>`;
 
+  // ── Weight Projection Card ──
+  const weekKeys2=new Set(days.map(d=>d.key));
+  let weekDeficit=0,projLogged=0;
+  days.forEach(d=>{if(d.hasData){weekDeficit+=tgt-d.t.cal;projLogged++;}});
+  const woBurned=woHistory()
+    .filter(s=>weekKeys2.has((s.date||'').slice(0,10)))
+    .reduce((a,s)=>a+(s.calories||Math.round((s.duration||0)*5)),0);
+  const effDef=weekDeficit+woBurned;
+  const latestW=[...entries].reverse().find(e=>e.weight!=null);
+  const curW=latestW?.weight??89.1;
+  const projW=Math.round((curW-effDef/7700)*10)/10;
+  const avgDef=projLogged?Math.round(effDef/projLogged):0;
+  const nowD=new Date(),dToSun=(7-nowD.getDay())%7;
+  const sunD=new Date(nowD);sunD.setDate(nowD.getDate()+dToSun);
+  const sunLbl=dToSun===0?'today':'Sun '+sunD.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  const defCol=effDef>=0?'#4ade80':'var(--amber)';
+  const defWord=effDef>=0?'deficit':'surplus';
+  html+=`
+  <div class="wk-proj-card">
+    <div class="wk-proj-head">
+      <span class="wk-proj-title">Weight Projection</span>
+      <span class="wk-proj-period">→ ${sunLbl}</span>
+    </div>
+    <div class="wk-proj-body">
+      <div>
+        <div class="wk-proj-est">Est. Sunday weight</div>
+        <div class="wk-proj-num">${projLogged?projW.toFixed(1)+' kg':'—'}</div>
+      </div>
+      ${projLogged
+        ?`<div class="wk-proj-range-block"><div class="wk-proj-range">±0.3 kg</div><div class="wk-proj-from">from ${curW}kg baseline</div></div>`
+        :`<div class="wk-proj-nodata">Log meals to see projection</div>`}
+    </div>
+    <div class="wk-proj-stats">
+      <div class="wk-proj-stat">
+        <span class="wk-proj-sv" style="color:${defCol}">${projLogged?Math.abs(Math.round(effDef)).toLocaleString():'—'}</span>
+        <span class="wk-proj-sl">kcal ${defWord}</span>
+      </div>
+      <div class="wk-proj-div"></div>
+      <div class="wk-proj-stat">
+        <span class="wk-proj-sv" style="color:${defCol}">${projLogged?Math.abs(avgDef).toLocaleString():'—'}</span>
+        <span class="wk-proj-sl">avg deficit/day</span>
+      </div>
+      ${woBurned>0?`<div class="wk-proj-div"></div><div class="wk-proj-stat"><span class="wk-proj-sv" style="color:var(--cyan)">${woBurned.toLocaleString()}</span><span class="wk-proj-sl">workout kcal</span></div>`:''}
+    </div>
+  </div>`;
+
   // Per-day detail list
   html+=`<div class="week-days">`;
   [...days].reverse().forEach(d=>{
