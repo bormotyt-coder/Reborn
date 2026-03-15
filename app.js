@@ -97,7 +97,7 @@ function showPage(id,btn){
   if(id==='progress')renderProgressPage();
   if(id==='progress')buildCalendar();
   if(id==='workout')renderWorkoutPage();
-  if(id==='coach')updateCoachStats();
+  if(id==='coach'){updateCoachStats();if(!chatHistory.length)generateCoachReport();}
 }
 
 
@@ -936,24 +936,25 @@ function _buildCoachContext(){
 let chatHistory=[];
 
 async function generateCoachReport(){
-  if(!meals.length&&!whoopSnaps.some(s=>s!==null)){alert('Log some meals or Whoop data first.');return;}
-  gv('coach-loading').classList.add('show');gv('coach-response').classList.remove('show');
-  gv('coach-chat').classList.remove('show');
-  chatHistory=[];
+  if(chatHistory.length)return;
+  const msgEl=gv('chat-messages');
+
+  // Typing bubble
+  const typingDiv=document.createElement('div');
+  typingDiv.className='chat-msg coach coach-typing';
+  typingDiv.innerHTML='<span></span><span></span><span></span>';
+  msgEl.appendChild(typingDiv);
+  msgEl.scrollTop=msgEl.scrollHeight;
 
   const ctx=getDayContext();
   const {timeLabel,rolling3,yesterdaySummary,workoutCtx,hour}=_buildCoachContext();
-
-  // Time-appropriate tone and scoring instruction
   const isMorning=hour<14;
   const toneInstruction=isMorning
     ?`It is currently ${timeLabel}. The day is still in progress — do NOT score the day as complete or call it a failure based on what hasn't been logged yet. Focus on what's been done so far and how to finish the day strong.`
     :`It is currently ${timeLabel}. Give a full honest assessment of the complete day.`;
-
   const scoringInstruction=isMorning
     ?`For OVERALL SCORE: rate effort and trajectory so far (e.g. "7/10 — strong start, protein on track, finish with a solid dinner"). Do NOT penalise for meals not yet eaten.`
     :`For OVERALL SCORE: rate the full day 1-10 with one punchy honest line.`;
-
   const prompt=`${ctx}
 
 ROLLING CONTEXT:
@@ -978,22 +979,38 @@ Direct. No fluff. Reference the rolling context if there are patterns worth call
         messages:[{role:'user',content:prompt}]})});
     const data=await res.json();
     const text=data.content.map(b=>b.text||'').join('').trim();
-
-    // ── Persist report for tomorrow's context ──
-    // Store first 300 chars as a one-sentence summary seed
     localStorage.setItem(`${KEY}_last_coach_report`,text);
+    chatHistory=[{role:'user',content:prompt},{role:'assistant',content:text}];
+    typingDiv.className='chat-msg coach';
+    typingDiv.innerHTML=text.replace(/\n/g,'<br>');
+    msgEl.scrollTop=msgEl.scrollHeight;
+    generateSuggestions(text);
+  }catch(err){
+    typingDiv.className='chat-msg coach';
+    typingDiv.textContent='Could not load debrief. Try again later.';
+    console.error(err);
+  }
+}
 
-    const re=gv('coach-response');
-    re.innerHTML=`<div class="cr-header"><div class="cr-icon">🧠</div><div><div class="cr-title">Daily Debrief</div><div class="cr-time">${new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'})}</div></div></div><div class="cr-body">${text.replace(/\n/g,'<br>')}</div>`;
-    re.classList.add('show');
-    chatHistory=[
-      {role:'user',content:prompt},
-      {role:'assistant',content:text}
-    ];
-    gv('chat-messages').innerHTML='';
-    gv('coach-chat').classList.add('show');
-  }catch(err){alert('Report failed.');console.error(err);}
-  finally{gv('coach-loading').classList.remove('show');}
+async function generateSuggestions(debriefText){
+  try{
+    const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:120,
+        system:'You are a nutrition and performance coach.',
+        messages:[{role:'user',content:`Based on this daily debrief, suggest 3 short follow-up questions I might want to ask. Return ONLY 3 lines, one question per line, no numbering, under 10 words each.\n\n${debriefText}`}]})});
+    const data=await res.json();
+    const chips=data.content.map(b=>b.text||'').join('').trim().split('\n').map(s=>s.trim()).filter(Boolean).slice(0,3);
+    const el=gv('coach-suggestions');
+    if(!el||!chips.length)return;
+    el.innerHTML='';
+    chips.forEach(q=>{
+      const btn=document.createElement('button');
+      btn.className='coach-sug-chip';
+      btn.textContent=q;
+      btn.onclick=()=>{gv('chat-input').value=q;el.innerHTML='';sendChatMessage();};
+      el.appendChild(btn);
+    });
+  }catch(e){console.error('suggestions failed',e);}
 }
 
 function handleChatKey(e){
@@ -1004,6 +1021,7 @@ async function sendChatMessage(){
   const inp=gv('chat-input');
   const msg=inp.value.trim();if(!msg)return;
   inp.value='';inp.style.height='auto';
+  const sugEl=gv('coach-suggestions');if(sugEl)sugEl.innerHTML='';
 
   const msgEl=gv('chat-messages');
   // Add user bubble

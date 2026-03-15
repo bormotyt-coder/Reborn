@@ -267,34 +267,28 @@
 
 <!-- ═══ AI COACH PAGE ═══ -->
 <div id="pg-coach" class="page">
-  <div class="coach-pg">
-    <div class="coach-hdr">
-      <div class="coach-title">Today's Report</div>
-      <div class="coach-date" id="coach-date"></div>
-    </div>
-    <div class="coach-stats">
-      <div class="cs-card"><div class="cs-v" id="cs-cal" style="color:var(--blue2)">—</div><div class="cs-l">kcal eaten</div></div>
-      <div class="cs-card"><div class="cs-v" id="cs-protein" style="color:var(--pc)">—</div><div class="cs-l">protein g</div></div>
-      <div class="cs-card"><div class="cs-v" id="cs-water" style="color:var(--wc)">—</div><div class="cs-l">water mL</div></div>
-    </div>
-    <button class="coach-generate" onclick="generateCoachReport()">
-      <div class="cg-icon">🧠</div>
-      <div class="cg-title">Generate Daily Debrief</div>
-      <div class="cg-sub">Claude analyses your meals, macros, Whoop data and hydration — and gives you a direct, honest breakdown.</div>
-    </button>
-    <div class="coach-loading" id="coach-loading">
-      <div class="coach-spin"></div><br>Analysing your day…
-    </div>
-    <div class="coach-response" id="coach-response"></div>
-    <div class="coach-chat" id="coach-chat">
-      <div style="font-family:var(--font);font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px">Ask Your Coach</div>
-      <div class="chat-messages" id="chat-messages"></div>
-      <div class="chat-input-row">
-        <textarea class="chat-input" id="chat-input" rows="1" placeholder="Ask anything about today…" onkeydown="handleChatKey(event)" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,100)+'px'"></textarea>
-        <button class="chat-send" onclick="sendChatMessage()">
-          <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-        </button>
+  <div class="coach-topbar">
+    <div class="coach-tb-left">
+      <div class="coach-tb-avatar">🧠</div>
+      <div class="coach-tb-info">
+        <div class="coach-tb-name">Coach</div>
+        <div class="coach-tb-date" id="coach-date"></div>
       </div>
+    </div>
+    <div class="coach-tb-stats">
+      <div><span id="cs-cal" style="color:var(--blue2)">—</span><span class="coach-tb-unit"> kcal</span></div>
+      <div><span id="cs-protein" style="color:var(--pc)">—</span><span class="coach-tb-unit">g P</span></div>
+      <div><span id="cs-water" style="color:var(--wc)">—</span><span class="coach-tb-unit"> mL</span></div>
+    </div>
+  </div>
+  <div class="coach-chat-area" id="chat-messages"></div>
+  <div class="coach-bottom">
+    <div class="coach-suggestions" id="coach-suggestions"></div>
+    <div class="chat-input-row">
+      <textarea class="chat-input" id="chat-input" rows="1" placeholder="Ask anything about today…" onkeydown="handleChatKey(event)" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,100)+'px'"></textarea>
+      <button class="chat-send" onclick="sendChatMessage()">
+        <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      </button>
     </div>
   </div>
 </div>
