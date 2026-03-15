@@ -247,6 +247,7 @@
   <div class="wk-tab-bar">
     <button class="wk-tab active" id="wk-tab-weekly" onclick="switchWeeklyTab('weekly')">Overview</button>
     <button class="wk-tab" id="wk-tab-calendar" onclick="switchWeeklyTab('calendar')">Calendar</button>
+    <button class="wk-tab" id="wk-tab-stats" onclick="switchWeeklyTab('stats')">Stats</button>
   </div>
   <div id="wk-tab-content-weekly" class="week-pg">
     <div id="progress-content"></div>
@@ -262,6 +263,9 @@
       <div class="cal-grid" id="cal-grid"></div>
       <div class="day-detail" id="day-detail"></div>
     </div>
+  </div>
+  <div id="wk-tab-content-stats" class="week-pg" style="display:none">
+    <div id="progress-stats-content"></div>
   </div>
 </div>
 

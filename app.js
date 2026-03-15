@@ -1950,6 +1950,7 @@ function renderProgressPage(){
   const goalPct=Math.max(0,Math.min(100,Math.round((fatLost/totalLose)*100)));
 
   let html='';
+  let statsHtml='';
 
   // ── 1. Streak card ──
   html+=`
@@ -1960,8 +1961,8 @@ function renderProgressPage(){
     <div style="margin-left:auto;font-size:20px;color:var(--muted);font-weight:300">›</div>
   </div>`;
 
-  // ── 2. Body stats ──
-  html+=`
+  // ── 2. Body stats (Stats tab) ──
+  statsHtml+=`
   <div class="prog-hdr"><div class="prog-title">Body Stats</div><button class="add-btn" onclick="openEntryModal()">+ Log</button></div>
   <div class="stats-grid">
     <div class="sc"><div class="sc-lbl">Weight</div><div class="sc-val" style="color:var(--blue2)">${dispW}</div><div class="sc-unit">kg</div>
@@ -1972,8 +1973,8 @@ function renderProgressPage(){
     </div>
   </div>`;
 
-  // ── 3. Goal card ──
-  html+=`
+  // ── 3. Goal card (Stats tab) ──
+  statsHtml+=`
   <div class="goal-card">
     <div class="goal-top"><div class="goal-lbl">Fat Loss Goal</div><div class="goal-pct">${goalPct}%</div></div>
     <div class="gbar"><div class="gbar-f" style="width:${goalPct}%"></div></div>
@@ -2051,8 +2052,8 @@ function renderProgressPage(){
     </div>
   </div>`;
 
-  // ── 5. Trend charts ──
-  html+=`
+  // ── 5. Trend charts (Stats tab) ──
+  statsHtml+=`
   <div class="sec-lbl" style="padding-left:0;padding-top:8px">Trends</div>
   <div class="chart-card"><div class="chart-title">Weight (kg)</div><div class="chart-area" id="chart-w"></div></div>
   <div class="chart-card"><div class="chart-title">Body Fat %</div><div class="chart-area" id="chart-bf"></div></div>`;
@@ -2077,21 +2078,25 @@ function renderProgressPage(){
   });
   html+=`</div>`;
 
-  // ── 7. History ──
+  // ── 7. History (Stats tab) ──
   if(entries.length){
-    html+=`<div class="sec-lbl" style="padding-left:0;padding-top:8px">History</div><div class="entries-list">`;
+    statsHtml+=`<div class="sec-lbl" style="padding-left:0;padding-top:8px">History</div><div class="entries-list">`;
     [...entries].reverse().forEach((e,ri)=>{
       const i=entries.length-1-ri;
       const ds=new Date(e.date).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'});
-      html+=`<div class="ei"><div><div class="ei-date">${ds}</div>${e.notes?`<div class="ei-note">${e.notes}</div>`:''}</div>
+      statsHtml+=`<div class="ei"><div><div class="ei-date">${ds}</div>${e.notes?`<div class="ei-note">${e.notes}</div>`:''}</div>
         <div class="ei-vals">${e.weight!=null?`<div class="ei-v"><div class="ei-vn" style="color:var(--blue2)">${e.weight}</div><div class="ei-vl">kg</div></div>`:''}
         ${e.bf!=null?`<div class="ei-v"><div class="ei-vn" style="color:var(--cyan)">${e.bf}%</div><div class="ei-vl">BF</div></div>`:''}
         <button class="ei-del" onclick="deleteEntry(${i})">✕</button></div></div>`;
     });
-    html+=`</div>`;
+    statsHtml+=`</div>`;
   }
 
+  statsHtml+=`<button onclick="openEntryModal()" style="width:100%;margin-top:10px;background:rgba(56,139,253,0.08);border:1.5px dashed rgba(56,139,253,0.3);border-radius:12px;padding:13px;font-family:var(--font);font-size:15px;font-weight:700;color:var(--blue2);cursor:pointer;letter-spacing:.05em">+ Log Entry</button>`;
+
   el.innerHTML=html;
+  const statsEl=gv('progress-stats-content');
+  if(statsEl)statsEl.innerHTML=statsHtml;
 
   // Render charts after DOM is set
   renderChart('chart-w',wEs.slice(-8),'weight','kg','#388bfd',84,92);
@@ -3260,8 +3265,10 @@ function switchWeeklyTab(tab){
   _weeklyTab=tab;
   gv('wk-tab-weekly').classList.toggle('active',tab==='weekly');
   gv('wk-tab-calendar').classList.toggle('active',tab==='calendar');
+  gv('wk-tab-stats').classList.toggle('active',tab==='stats');
   gv('wk-tab-content-weekly').style.display=tab==='weekly'?'block':'none';
   gv('wk-tab-content-calendar').style.display=tab==='calendar'?'block':'none';
+  gv('wk-tab-content-stats').style.display=tab==='stats'?'block':'none';
   if(tab==='calendar')buildCalendar();
-  if(tab==='weekly')renderProgressPage();
+  if(tab==='weekly'||tab==='stats')renderProgressPage();
 }
