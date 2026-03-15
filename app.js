@@ -2622,15 +2622,48 @@ async function generateWorkout(){
   const histSummary=recentSessions.map(s=>`${new Date(s.date).toLocaleDateString('en-US',{weekday:'short'})}: ${s.splitName} (${(s.muscleGroups||[]).join(', ')})`).join('\n');
   const pbSummary=Object.entries(pbs).slice(0,20).map(([ex,pb])=>`${ex}: ${pb.weight}kg x${pb.reps} (1RM ~${pb.oneRM}kg)`).join('\n');
 
-  const prompt=`You are a strength & conditioning coach for a 26-year-old male, 89.1kg, 173cm, 25.1% body fat, goal is fat loss while preserving lean mass (target 64kg lean mass). He trains FASTED in the morning before his first meal.
+  const prompt=`You are an evidence-based strength & hypertrophy coach for a 26-year-old male, 89.1kg, 173cm, 25.1% body fat, goal is fat loss while preserving lean mass (target 64kg lean mass). He trains FASTED in the morning before his first meal. He's an intermediate lifter — past the beginner phase but still making solid progress. Talk to him like a knowledgeable training partner, not a textbook.
 
-TODAY'S CONTEXT:
+═══ TRAINING PHILOSOPHY & EXERCISE SCIENCE BRIEF ═══
+
+1. MECHANICAL TENSION is the primary hypertrophy driver. Prioritize exercises that load the target muscle through a full ROM, especially in the LENGTHENED (stretched) position — research consistently shows stretched-position training produces superior growth. Examples: incline DB curls (biceps stretched at bottom), overhead tricep extensions (long head stretched), Romanian deadlifts (hamstrings loaded at full hip flexion), cable flyes from low pulleys (chest stretched).
+
+2. MIND-MUSCLE CONNECTION (MMC) CUES — every exercise needs a specific internal-focus cue that tells the lifter WHERE to feel the contraction and HOW to initiate the rep:
+   - BAD cue: "keep good form" or "go slow" (too vague)
+   - GOOD cue: "Initiate by driving your elbows back and squeezing your shoulder blades — you should feel your mid-traps and rhomboids fire before your arms bend" (cable row)
+   - GOOD cue: "Push the floor away from you, don't think about pushing the bar up — feel your quads do the work out of the hole" (squat)
+   - Always specify: what muscle should be contracting, what the lifter should feel, a visualization or movement initiation point
+
+3. PROGRESSIVE OVERLOAD METHODS — rotate these to keep driving adaptation:
+   - Straight sets: standard sets across (default for heavy compounds)
+   - Rest-pause: hit near-failure, rack it, rest 15-20s, grind out 3-5 more reps. Great for machines and isolation moves where form breakdown is low-risk
+   - Drop set: on the LAST set, reduce weight ~25% and immediately rep to failure. Best for isolation/cables
+   - Myo-reps: one activation set to ~2 RIR, then 4-5 mini-sets of 3-5 reps with only 10-15s rest between. Insanely time-efficient for accessories
+   - Lengthened partials: after hitting failure on full reps, keep going with partial reps in the bottom (stretched) portion only. Emerging research shows massive hypertrophy stimulus from this technique
+
+4. UNDERRATED EXERCISES — vary the selection, don't default to the same basics every session:
+   Chest: low-to-high cable fly, chest-focused dip (lean forward), svend press, slight-decline DB press
+   Back: chest-supported T-bar row, meadows row, straight-arm cable pulldown, seal row, single-arm lat pulldown
+   Shoulders: cable Y-raise, Lu raise (front raise to press), prone incline lateral raise, behind-the-neck press (light)
+   Biceps: incline DB curl, spider curl, bayesian cable curl, preacher curl EZ-bar (wide grip for short head)
+   Triceps: overhead cable extension (rope), JM press, cross-body cable pushdown, skull crusher (to forehead)
+   Quads: heel-elevated goblet squat, sissy squat, leg press feet low & narrow, pendulum squat, Spanish squat
+   Hamstrings: Nordic curl, seated leg curl (most lengthened position), single-leg RDL, slider hamstring curl
+   Glutes: barbell hip thrust, 45° back extension, cable pull-through, B-stance RDL, step-up with forward lean
+
+5. SESSION STRUCTURE:
+   - Start with 1-2 heavy compounds (mechanical tension focus, straight sets)
+   - Move to moderate-load work (8-12 reps, controlled tempo)
+   - Finish with isolation/cable work using intensity techniques (rest-pause, drop sets, myo-reps, lengthened partials)
+   - Include at least ONE exercise per primary muscle that loads it in the lengthened/stretched position
+
+═══ TODAY'S CONTEXT ═══
 - WHOOP Recovery: ${rec}%
-- Sleep duration: ${sleepSnap.sleep!=null?(()=>{const hh=Math.floor(sleepSnap.sleep),mm=Math.round((sleepSnap.sleep-hh)*60);return hh+'h'+(mm>0?' '+mm+'m':'');})():'unknown'}
+- Sleep: ${sleepSnap.sleep!=null?(()=>{const hh=Math.floor(sleepSnap.sleep),mm=Math.round((sleepSnap.sleep-hh)*60);return hh+'h'+(mm>0?' '+mm+'m':'');})():'unknown'}
 - HRV: ${sleepSnap.hrv||'unknown'}
 - Yesterday's nutrition: ${Math.round(yest.p||0)}g protein, ${Math.round(yest.cal||0)} kcal, ${Math.round(yest.c||0)}g carbs
 
-RECENT TRAINING HISTORY (last 7 sessions):
+RECENT TRAINING (last 7 sessions):
 ${histSummary||'No recent sessions logged'}
 
 DAYS SINCE MUSCLE GROUP TRAINED:
@@ -2639,24 +2672,26 @@ ${Object.entries(daysAgo).map(([m,d])=>`${m}: ${d} days ago`).join(', ')||'No hi
 PERSONAL BESTS:
 ${pbSummary||'No PBs yet — first session'}
 
+═══ TASK ═══
 Generate a workout split for today. Return ONLY valid JSON, no markdown, no explanation.
 
 JSON format:
 {
   "splitName": "Push — Chest & Shoulders",
   "muscleGroups": ["Chest","Shoulders","Triceps"],
-  "coachNote": "2-line rationale based on recovery and yesterday's nutrition",
+  "coachNote": "2-line rationale referencing recovery data and how it shaped today's plan",
   "exercises": [
     {
-      "name": "Barbell Bench Press",
+      "name": "Incline Dumbbell Press",
       "icon": "💪",
-      "cue": "retract scapula, drive feet into floor",
+      "cue": "Squeeze shoulder blades into the bench, lower until you feel a deep chest stretch, then drive through your palms — feel your upper pecs initiate the push",
+      "intensityTechnique": "straight sets",
       "sets": 4,
       "reps": "6-8",
       "rest": 120,
       "lastWeight": null,
       "suggestedWeight": null,
-      "alternatives": ["Dumbbell Bench Press","Machine Chest Press","Cable Chest Fly"]
+      "alternatives": ["Barbell Bench Press","Machine Chest Press","Smith Incline Press"]
     }
   ],
   "cardio": {
@@ -2672,13 +2707,17 @@ JSON format:
 
 Rules:
 - 6-8 exercises (fewer if recovery < 40)
-- If recovery >= 67: heavy compound focus, 4-5 sets, 5-8 reps
-- If recovery 34-66: moderate volume, 3-4 sets, 8-12 reps  
-- If recovery < 34: light/technique focus, 3 sets, 12-15 reps
+- If recovery >= 67: heavy compound focus, 4-5 sets, 5-8 reps, straight sets on compounds
+- If recovery 34-66: moderate volume, 3-4 sets, 8-12 reps, lean on intensity techniques for efficiency
+- If recovery < 34: light/technique focus, 3 sets, 12-15 reps, prioritize MMC and lengthened partials
 - Fasted training: avoid maximal CNS-heavy lifts if recovery < 50
 - Do NOT repeat muscle groups trained in last 48 hours unless recovery > 80
-- Cardio: fasted morning = prefer steady state (incline walk, moderate bike). Only recommend HIIT if recovery > 80
+- Include at least one lengthened-position exercise per primary muscle group
+- Mix up exercise selection — pull from the underrated exercises list, don't just default to barbell bench/squat/deadlift every time
+- intensityTechnique: one of "straight sets", "rest-pause", "drop set", "myo-reps", "lengthened partials" — use straight sets for heavy compounds, rotate techniques on accessories
+- cue: MUST be a specific MMC cue — what muscle to feel, where to initiate, a visualization. Never generic
 - suggestedWeight: fill in if PB exists for that exercise (suggest same or slight increase), else null
+- Cardio: fasted morning = prefer steady state (incline walk, moderate bike). Only recommend HIIT if recovery > 80
 - Return valid JSON only`;
 
   try{
@@ -2708,9 +2747,10 @@ function renderWorkoutPreview(){
       <div class="wo-ex-preview">
         <div class="wo-ex-icon">${ex.icon||getExIcon(ex.name)}</div>
         <div class="wo-ex-info">
-          <div class="wo-ex-name">${ex.name}</div>
+          <div class="wo-ex-name"><a href="https://www.youtube.com/results?search_query=${encodeURIComponent(ex.name+' proper form')}" target="_blank" rel="noopener" class="wo-ex-link" onclick="event.stopPropagation()">${ex.name}</a></div>
           <div class="wo-ex-meta">${ex.sets} sets · ${ex.reps} reps · ${ex.rest}s rest</div>
           <div class="wo-ex-cue">${ex.cue||''}</div>
+          ${ex.intensityTechnique&&ex.intensityTechnique!=='straight sets'?`<div class="wo-ex-intensity">⚡ ${ex.intensityTechnique}</div>`:''}
         </div>
         ${ex.lastWeight?`<div class="wo-ex-last">${ex.lastWeight}kg</div>`:''}
       </div>`).join('');
@@ -2807,13 +2847,14 @@ function renderExerciseCard(ex,ei){
     <div class="wo-ex-card-hdr" onclick="toggleExCollapse(${ei})">
       <div class="wo-ex-card-icon">${ex.icon||getExIcon(ex.name)}</div>
       <div class="wo-ex-card-title">
-        <div class="wo-ex-card-name">${ex.swappedTo||ex.name}</div>
+        <div class="wo-ex-card-name"><a href="https://www.youtube.com/results?search_query=${encodeURIComponent((ex.swappedTo||ex.name)+' proper form')}" target="_blank" rel="noopener" class="wo-ex-link" onclick="event.stopPropagation()">${ex.swappedTo||ex.name}</a></div>
         <div class="wo-ex-card-meta">${ex.sets.length} sets · ${ex.reps||ex.sets[0]?.reps||'—'} reps · ${ex.rest}s rest</div>
       </div>
       <div class="wo-ex-card-check" id="wo-ex-check-${ei}">${ex.sets.every(s=>s.done)?'✅':'○'}</div>
     </div>
     <div class="wo-ex-card-body">
       <div class="wo-ex-cue-line">💡 ${ex.cue||''}</div>
+      ${ex.intensityTechnique&&ex.intensityTechnique!=='straight sets'?`<div class="wo-ex-intensity">⚡ ${ex.intensityTechnique}</div>`:''}
       ${pbLine}
       <div class="wo-sets-header">
         <span>Set</span><span>Last</span><span>Weight</span><span></span><span>Reps</span><span>1RM</span><span></span>

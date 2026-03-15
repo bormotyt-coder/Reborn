@@ -1384,6 +1384,14 @@ input:focus, textarea:focus, select:focus { border-color: var(--blue); }
 .wo-ex-card-check { font-size: 18px; flex-shrink: 0; }
 .wo-ex-card-body { padding: 0 14px 14px; border-top: 1px solid var(--border2); }
 .wo-ex-cue-line { font-size: 11px; color: var(--text2); font-style: italic; padding: 10px 0 6px; }
+.wo-ex-link { color: inherit; text-decoration: none; border-bottom: 1px dashed rgba(255,255,255,0.22); transition: color .15s, border-color .15s; }
+.wo-ex-link:active { color: var(--blue2); border-color: var(--blue2); }
+.wo-ex-intensity {
+  display: inline-block; font-family: var(--font); font-size: 10px; font-weight: 700;
+  color: var(--amber); text-transform: uppercase; letter-spacing: .08em;
+  background: rgba(245,166,35,0.1); border: 1px solid rgba(245,166,35,0.2);
+  border-radius: 6px; padding: 3px 8px; margin: 4px 0 6px;
+}
 .wo-pb-badge {
   background: rgba(162,89,255,0.1); border: 1px solid rgba(162,89,255,0.2);
   border-radius: 8px; padding: 4px 10px; font-size: 11px; color: #b57aff;
