@@ -2966,7 +2966,12 @@ function startRestTimer(ei,secs){
     el.textContent=`Rest: ${remaining}s`;
     el.style.background=remaining<=10?'rgba(248,81,73,0.15)':'rgba(56,139,253,0.10)';
     el.style.color=remaining<=10?'var(--red)':'var(--blue2)';
-    if(remaining<=0){el.textContent='Go! 💪';clearInterval(_woRestInt);setTimeout(()=>{el.style.display='none';},1500);return;}
+    if(remaining<=0){
+      el.textContent='Go! 💪';clearInterval(_woRestInt);setTimeout(()=>{el.style.display='none';},1500);
+      try{const ac=new AudioContext();const o=ac.createOscillator();o.type='sine';o.frequency.value=880;o.connect(ac.destination);o.start();o.stop(ac.currentTime+0.15);}catch(e){}
+      if(navigator.vibrate)navigator.vibrate([200,100,200]);
+      return;
+    }
     remaining--;
   };
   update();
