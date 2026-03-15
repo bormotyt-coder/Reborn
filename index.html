@@ -197,19 +197,10 @@
   <!-- GENERATE VIEW -->
   <div id="wo-generate-view">
     <div id="wo-last-session"></div>
-    <button class="wo-coach-btn" onclick="openCoachModal()">
-      <span class="wo-coach-icon">🧠</span>
-      <div class="wo-coach-text">
-        <div class="wo-coach-title">Daily Coach</div>
-        <div class="wo-coach-sub">Debrief · macros · recovery · chat</div>
-      </div>
-      <svg class="wo-coach-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
-    </button>
-    <button class="wo-gen-btn" id="wo-gen-btn" onclick="generateWorkout()">
-      <div class="wo-gen-icon">⚡</div>
-      <div class="wo-gen-title">Generate Today's Split</div>
-      <div class="wo-gen-sub">AI analyses your recovery, yesterday's nutrition &amp; training history</div>
-    </button>
+    <div id="wo-generating" class="wo-generating" style="display:none">
+      <div class="coach-spin"></div>
+      <span>Generating your split…</span>
+    </div>
     <div id="wo-plan-preview" style="display:none">
       <div class="wo-plan-header">
         <div style="flex:1">
@@ -661,23 +652,32 @@
     <div id="fab-recent-list" class="fab-rp-list"></div>
   </div>
 
-  <!-- Four pill rows, fanning upward -->
+  <!-- Today pill rows -->
   <div id="fab-sub-btns" class="fab-sub-btns">
-    <div class="fab-pill" style="--i:3" onclick="fabPillRecent()">
+    <div class="fab-pill fab-today-pill" style="--i:3" onclick="fabPillRecent()">
       <span class="fab-pill-lbl">Recent</span>
       <span class="fab-pill-ico">🕐</span>
     </div>
-    <div class="fab-pill" style="--i:2" onclick="fabClose();openQAModal()">
+    <div class="fab-pill fab-today-pill" style="--i:2" onclick="fabClose();openQAModal()">
       <span class="fab-pill-lbl">Quick Add</span>
       <span class="fab-pill-ico">⚡</span>
     </div>
-    <div class="fab-pill" style="--i:1" onclick="fabClose();openBarcodeModal()">
+    <div class="fab-pill fab-today-pill" style="--i:1" onclick="fabClose();openBarcodeModal()">
       <span class="fab-pill-lbl">Scan Barcode</span>
       <span class="fab-pill-ico">📊</span>
     </div>
-    <div class="fab-pill" style="--i:0" onclick="fabClose();openLogModal()">
+    <div class="fab-pill fab-today-pill" style="--i:0" onclick="fabClose();openLogModal()">
       <span class="fab-pill-lbl">Log Meal</span>
       <span class="fab-pill-ico">📷</span>
+    </div>
+    <!-- Workout pill rows (hidden by default, shown via fab-wo-mode) -->
+    <div class="fab-pill fab-wo-pill" style="--i:1" onclick="fabClose();generateWorkout()">
+      <span class="fab-pill-lbl">Generate Split</span>
+      <span class="fab-pill-ico">⚡</span>
+    </div>
+    <div class="fab-pill fab-wo-pill" style="--i:0" onclick="fabClose();openCoachModal()">
+      <span class="fab-pill-lbl">Daily Coach</span>
+      <span class="fab-pill-ico">🧠</span>
     </div>
   </div>
 

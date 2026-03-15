@@ -472,10 +472,11 @@ body {
 }
 .fab-rp-add:active { background: rgba(162,89,255,0.28); transform: scale(.87); }
 
-/* ── FAB COACH MODE (workout page) ── */
-.fab-wrap.fab-coach-mode .fab-sub-btns,
-.fab-wrap.fab-coach-mode .fab-recent-panel { display: none; }
-.fab-wrap.fab-coach-mode .fab-main.open { transform: none; }
+/* ── FAB workout mode (swap pills) ── */
+.fab-wo-pill { display: none !important; }
+.fab-wrap.fab-wo-mode .fab-today-pill { display: none !important; }
+.fab-wrap.fab-wo-mode .fab-recent-panel { display: none; }
+.fab-wrap.fab-wo-mode .fab-wo-pill { display: flex !important; }
 
 /* ══════════════════════════════════════
    FOOD LIST — meal items
@@ -1302,6 +1303,13 @@ input:focus, textarea:focus, select:focus { border-color: var(--blue); }
 .wo-gen-icon { font-size: 28px; margin-bottom: 6px; }
 .wo-gen-title { font-family: var(--font); font-size: 17px; font-weight: 800; color: var(--text); margin-bottom: 4px; }
 .wo-gen-sub { font-size: 12px; color: var(--muted); line-height: 1.4; }
+.wo-generating {
+  display: none; align-items: center; justify-content: center; gap: 12px;
+  padding: 24px; margin: 12px 14px 0; color: var(--muted);
+  font-family: var(--font); font-size: 14px; font-weight: 600;
+  background: var(--glass); border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+}
 
 /* Last session card */
 .wo-last-card {

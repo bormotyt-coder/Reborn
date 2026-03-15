@@ -2429,16 +2429,11 @@ function _updateFab(page){
   const mainBtn=gv('fab-main');
   if(!wrap||!icon||!mainBtn) return;
   fabClose();
-  if(page==='today'){
+  if(page==='today'||page==='workout'){
     wrap.style.display='';
-    wrap.classList.remove('fab-coach-mode');
+    wrap.classList.toggle('fab-wo-mode',page==='workout');
     mainBtn.onclick=fabToggle;
     icon.innerHTML='<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>';
-  } else if(page==='workout'){
-    wrap.style.display='';
-    wrap.classList.add('fab-coach-mode');
-    mainBtn.onclick=openCoachModal;
-    icon.innerHTML='<path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2Z"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2Z"/>';
   } else {
     wrap.style.display='none';
   }
@@ -2608,8 +2603,8 @@ function renderLastSession(){
 
 // ── AI Workout Generation ──
 async function generateWorkout(){
-  const btn=gv('wo-gen-btn');
-  if(btn){btn.disabled=true;btn.querySelector('.wo-gen-title').textContent='Generating…';btn.querySelector('.wo-gen-icon').textContent='⏳';}
+  const loader=gv('wo-generating');
+  if(loader)loader.style.display='flex';
 
   const yest=getYesterdayNutrition();
   const rec=_woRecovery||'unknown';
@@ -2731,7 +2726,7 @@ Rules:
     console.error('Workout gen error',e);
     alert('Could not generate workout. Check your connection.');
   }finally{
-    if(btn){btn.disabled=false;btn.querySelector('.wo-gen-title').textContent='Generate Today\'s Split';btn.querySelector('.wo-gen-icon').textContent='⚡';}
+    if(loader)loader.style.display='none';
   }
 }
 
