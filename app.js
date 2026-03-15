@@ -1665,7 +1665,9 @@ async function lookupBarcode(code){
     const res=await fetch(`https://world.openfoodfacts.org/api/v2/product/${code.trim()}?fields=product_name,brands,nutriments,serving_size,serving_quantity,image_front_small_url`);
     const data=await res.json();
     if(data.status!==1||!data.product){
-      _barcodeScanning=false; setBarcodeStatus('error','Product not found in database — try typing the name in Log a Meal instead.');
+      _barcodeScanning=false;
+      setBarcodeStatus('idle','Not found — switching to AI log');
+      setTimeout(()=>{closeBarcodeModal();openLogModal();const d=gv('meal-desc');if(d)d.value=`Barcode: ${code.trim()} — please identify this product and provide macros`;},800);
       return;
     }
     const p=data.product;
@@ -3335,3 +3337,128 @@ function switchWeeklyTab(tab){
   if(tab==='calendar')buildCalendar();
   if(tab==='weekly'||tab==='stats')renderProgressPage();
 }
+
+// ══════════════════════════════════════════════════════════════════════════
+// LOG CHOICE MODAL
+// ══════════════════════════════════════════════════════════════════════════
+function openLogChoiceModal(){gv('log-choice-modal').classList.add('open');}
+function closeLogChoiceModal(){gv('log-choice-modal').classList.remove('open');}
+
+// ══════════════════════════════════════════════════════════════════════════
+// FOOD SEARCH MODAL
+// ══════════════════════════════════════════════════════════════════════════
+function openSearchModal(){
+  gv('search-modal').classList.add('open');
+  gv('search-input').value='';
+  gv('search-results').innerHTML='';
+  gv('search-serving-panel').style.display='none';
+  gv('search-loading').style.display='none';
+  setTimeout(()=>gv('search-input').focus(),100);
+}
+function closeSearchModal(){gv('search-modal').classList.remove('open');}
+
+function selectSearchResult(idx){
+  const el=gv('search-results');
+  const products=el._products||[];
+  const p=products[idx];
+  if(!p)return;
+  const n=p.nutriments||{};
+  const kcalPer100=n['energy-kcal_100g']||0;
+  const pPer100=n['proteins_100g']||0;
+  const cPer100=n['carbohydrates_100g']||0;
+  const fPer100=n['fat_100g']||0;
+  const brand=p.brands?p.brands.split(',')[0].trim():'';
+  const name=(brand?brand+' ':'')+p.product_name;
+  const defaultGrams=Math.round(parseFloat(p.serving_size)||100);
+  const safeName=name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  const panel=gv('search-serving-panel');
+  el.style.display='none';
+  panel.style.display='block';
+  panel.innerHTML=`
+    <div style="margin-bottom:14px">
+      <div style="font-family:var(--font);font-size:17px;font-weight:800;margin-bottom:2px">${name}</div>
+      ${brand?`<div style="font-size:12px;color:var(--muted)">${brand}</div>`:''}
+    </div>
+    <label class="flbl">Serving size (g)</label>
+    <input type="number" id="search-grams" value="${defaultGrams}" min="1" step="1" style="margin-bottom:12px"/>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;padding:10px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border)">
+      <span id="sm-cal" style="color:var(--blue2);font-family:var(--font);font-weight:700;font-size:14px"></span>
+      <span id="sm-p" style="color:var(--pc);font-family:var(--font);font-weight:700;font-size:14px"></span>
+      <span id="sm-c" style="color:var(--cc);font-family:var(--font);font-weight:700;font-size:14px"></span>
+      <span id="sm-f" style="color:var(--fc);font-family:var(--font);font-weight:700;font-size:14px"></span>
+    </div>
+    <button onclick="confirmSearchMeal('${safeName}',${kcalPer100},${pPer100},${cPer100},${fPer100})" style="width:100%;background:linear-gradient(135deg,var(--blue),rgba(56,139,253,0.75));color:#fff;border:none;border-radius:14px;padding:14px;font-family:var(--font);font-size:18px;font-weight:800;cursor:pointer;margin-bottom:10px">+ ADD TO TODAY'S LOG</button>
+    <div style="text-align:center"><button onclick="gv('search-results').style.display='block';gv('search-serving-panel').style.display='none'" style="background:none;border:none;color:var(--muted);font-family:var(--font);font-size:13px;cursor:pointer;padding:6px 12px">← Back to results</button></div>`;
+  function updatePreview(){
+    const g=parseFloat(gv('search-grams').value)||0;
+    gv('sm-cal').textContent=Math.round(kcalPer100/100*g)+' kcal';
+    gv('sm-p').textContent=Math.round(pPer100/100*g*10)/10+'g P';
+    gv('sm-c').textContent=Math.round(cPer100/100*g*10)/10+'g C';
+    gv('sm-f').textContent=Math.round(fPer100/100*g*10)/10+'g F';
+  }
+  updatePreview();
+  gv('search-grams').addEventListener('input',updatePreview);
+}
+
+function confirmSearchMeal(name,kcalPer100,pPer100,cPer100,fPer100){
+  const g=parseFloat(gv('search-grams').value)||100;
+  const entry={
+    name,emoji:'🔍',
+    calories:Math.round(kcalPer100/100*g),
+    protein:Math.round(pPer100/100*g*10)/10,
+    carbs:Math.round(cPer100/100*g*10)/10,
+    fat:Math.round(fPer100/100*g*10)/10,
+    fibre:0,sugar:0,sodium:0,thumb:null
+  };
+  meals.push(entry);
+  save(`${KEY}_meals_${todayKey()}`,meals);
+  renderAll();
+  closeSearchModal();
+  const todayBtn=document.querySelector('.nb');
+  if(todayBtn)showPage('today',todayBtn);
+}
+
+// ── Search input: debounced listener (attached after DOM ready) ──
+(function initSearchInput(){
+  const input=gv('search-input');
+  if(!input)return;
+  let _searchTimer;
+  input.addEventListener('input',()=>{
+    clearTimeout(_searchTimer);
+    _searchTimer=setTimeout(async()=>{
+      const q=input.value.trim();
+      const resultsEl=gv('search-results');
+      const loadingEl=gv('search-loading');
+      const panelEl=gv('search-serving-panel');
+      if(!q){resultsEl.innerHTML='';return;}
+      loadingEl.style.display='block';
+      resultsEl.innerHTML='';
+      panelEl.style.display='none';
+      try{
+        const res=await fetch(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=10&fields=product_name,nutriments,serving_size,brands`);
+        const data=await res.json();
+        const products=(data.products||[]).filter(p=>p.product_name&&p.nutriments&&p.nutriments['energy-kcal_100g']);
+        loadingEl.style.display='none';
+        resultsEl._products=products;
+        if(!products.length){
+          resultsEl.innerHTML='<div style="color:var(--muted);font-size:13px;padding:16px 0;text-align:center">No results found</div>';
+          return;
+        }
+        resultsEl.innerHTML=products.map((p,i)=>{
+          const brand=p.brands?p.brands.split(',')[0].trim():'';
+          const kcal=Math.round(p.nutriments['energy-kcal_100g']);
+          return `<div class="sr-row" onclick="selectSearchResult(${i})">
+            <div class="sr-info">
+              <div class="sr-name">${p.product_name}</div>
+              ${brand?`<div class="sr-brand">${brand}</div>`:''}
+            </div>
+            <div class="sr-kcal">${kcal}<span style="font-size:11px;font-weight:400;color:var(--muted)"> kcal/100g</span></div>
+          </div>`;
+        }).join('');
+      }catch(e){
+        loadingEl.style.display='none';
+        resultsEl.innerHTML='<div style="color:var(--muted);font-size:13px;padding:16px 0;text-align:center">Search failed — check connection</div>';
+      }
+    },400);
+  });
+})();
