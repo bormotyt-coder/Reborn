@@ -265,44 +265,35 @@
   </div>
 </div>
 
-<!-- ═══ AI COACH ═══ -->
-<!-- COACH MODAL OVERLAY (bottom sheet) -->
-<div id="coach-modal-overlay" class="coach-modal-overlay">
-  <div class="coach-modal-sheet">
-    <div class="coach-modal-topbar">
-      <div class="coach-modal-handle"></div>
-      <button class="coach-modal-close" onclick="closeCoachModal()">✕</button>
+<!-- ═══ AI COACH PAGE ═══ -->
+<div id="pg-coach" class="page">
+  <div class="coach-pg">
+    <div class="coach-hdr">
+      <div class="coach-title">Today's Report</div>
+      <div class="coach-date" id="coach-date"></div>
     </div>
-    <div class="coach-modal-scroll">
-      <div class="coach-pg">
-        <div class="coach-hdr">
-          <div class="coach-title">Today's Report</div>
-          <div class="coach-date" id="coach-date"></div>
-        </div>
-        <div class="coach-stats">
-          <div class="cs-card"><div class="cs-v" id="cs-cal" style="color:var(--blue2)">—</div><div class="cs-l">kcal eaten</div></div>
-          <div class="cs-card"><div class="cs-v" id="cs-protein" style="color:var(--pc)">—</div><div class="cs-l">protein g</div></div>
-          <div class="cs-card"><div class="cs-v" id="cs-water" style="color:var(--wc)">—</div><div class="cs-l">water mL</div></div>
-        </div>
-        <button class="coach-generate" onclick="generateCoachReport()">
-          <div class="cg-icon">🧠</div>
-          <div class="cg-title">Generate Daily Debrief</div>
-          <div class="cg-sub">Claude analyses your meals, macros, Whoop data and hydration — and gives you a direct, honest breakdown.</div>
+    <div class="coach-stats">
+      <div class="cs-card"><div class="cs-v" id="cs-cal" style="color:var(--blue2)">—</div><div class="cs-l">kcal eaten</div></div>
+      <div class="cs-card"><div class="cs-v" id="cs-protein" style="color:var(--pc)">—</div><div class="cs-l">protein g</div></div>
+      <div class="cs-card"><div class="cs-v" id="cs-water" style="color:var(--wc)">—</div><div class="cs-l">water mL</div></div>
+    </div>
+    <button class="coach-generate" onclick="generateCoachReport()">
+      <div class="cg-icon">🧠</div>
+      <div class="cg-title">Generate Daily Debrief</div>
+      <div class="cg-sub">Claude analyses your meals, macros, Whoop data and hydration — and gives you a direct, honest breakdown.</div>
+    </button>
+    <div class="coach-loading" id="coach-loading">
+      <div class="coach-spin"></div><br>Analysing your day…
+    </div>
+    <div class="coach-response" id="coach-response"></div>
+    <div class="coach-chat" id="coach-chat">
+      <div style="font-family:var(--font);font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px">Ask Your Coach</div>
+      <div class="chat-messages" id="chat-messages"></div>
+      <div class="chat-input-row">
+        <textarea class="chat-input" id="chat-input" rows="1" placeholder="Ask anything about today…" onkeydown="handleChatKey(event)" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,100)+'px'"></textarea>
+        <button class="chat-send" onclick="sendChatMessage()">
+          <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
         </button>
-        <div class="coach-loading" id="coach-loading">
-          <div class="coach-spin"></div><br>Analysing your day…
-        </div>
-        <div class="coach-response" id="coach-response"></div>
-        <div class="coach-chat" id="coach-chat">
-          <div style="font-family:var(--font);font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px">Ask Your Coach</div>
-          <div class="chat-messages" id="chat-messages"></div>
-          <div class="chat-input-row">
-            <textarea class="chat-input" id="chat-input" rows="1" placeholder="Ask anything about today…" onkeydown="handleChatKey(event)" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,100)+'px'"></textarea>
-            <button class="chat-send" onclick="sendChatMessage()">
-              <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-            </button>
-          </div>
-        </div>
       </div>
     </div>
   </div>
@@ -321,6 +312,10 @@
     <button class="nb" onclick="showPage('workout',this)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6.5 6.5h11M6.5 17.5h11M4 12h16M2 9l2 3-2 3M22 9l-2 3 2 3"/></svg>
       <span>Workout</span>
+    </button>
+    <button class="nb" onclick="showPage('coach',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2a10 10 0 110 20A10 10 0 0112 2z"/><path d="M12 16v-4M12 8h.01"/></svg>
+      <span>Coach</span>
     </button>
     <button class="nb" onclick="showPage('progress',this)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
@@ -675,10 +670,6 @@
     <div class="fab-pill fab-wo-pill" style="--i:1" onclick="fabClose();generateWorkout()">
       <span class="fab-pill-lbl">Generate Split</span>
       <span class="fab-pill-ico">⚡</span>
-    </div>
-    <div class="fab-pill fab-wo-pill" style="--i:0" onclick="fabClose();openCoachModal()">
-      <span class="fab-pill-lbl">Daily Coach</span>
-      <span class="fab-pill-ico">🧠</span>
     </div>
   </div>
 

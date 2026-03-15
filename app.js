@@ -69,7 +69,7 @@ function renderAll(){
 }
 
 // NAV
-const PAGE_ORDER=['today','workout','progress'];
+const PAGE_ORDER=['today','workout','coach','progress'];
 let _currentPage='today';
 function showPage(id,btn){
   const pages=document.querySelectorAll('.page');
@@ -97,21 +97,9 @@ function showPage(id,btn){
   if(id==='progress')renderProgressPage();
   if(id==='progress')buildCalendar();
   if(id==='workout')renderWorkoutPage();
+  if(id==='coach')updateCoachStats();
 }
 
-function openCoachModal(){
-  updateCoachStats();
-  const el=gv('coach-modal-overlay');
-  if(!el)return;
-  el.classList.add('open');
-  document.body.style.overflow='hidden';
-}
-function closeCoachModal(){
-  const el=gv('coach-modal-overlay');
-  if(!el)return;
-  el.classList.remove('open');
-  document.body.style.overflow='';
-}
 
 // ── WHOOP 3-SNAPSHOT ──
 function selectWhoopTab(i){
