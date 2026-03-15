@@ -93,7 +93,8 @@ function showPage(id,btn){
   btn.classList.add('active');
   incoming.scrollTop=0;
   _currentPage=id;
-  if(id==='weekly')switchWeeklyTab(_weeklyTab);
+  if(id==='weekly')renderWeekly();
+  if(id==='weekly')buildCalendar();
   if(id==='workout')renderWorkoutPage();
 }
 
@@ -358,7 +359,7 @@ async function aiLookupQA(){
   gv('qa-loading').classList.add('show');
   try{
     const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:300,
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:300,
         system:'Return ONLY valid JSON, no markdown: {"emoji":"single emoji","calories":number,"protein":number,"carbs":number,"fat":number}',
         messages:[{role:'user',content:`Nutrition facts for: ${name}. Use official label if branded.`}]})});
     const data=await res.json();
@@ -525,7 +526,7 @@ After this meal, remaining for the day: ${remaining.cal} kcal, ${remaining.p}g P
 Give a 2-3 sentence honest assessment: how well this meal fits his cut goals, what it does well or poorly, and one actionable tip. Be direct, no fluff.`;
   try{
     const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:200,
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:200,
         messages:[{role:'user',content:prompt}]})});
     const data=await res.json();
     const text=data.content.map(b=>b.text||'').join('').trim();
@@ -569,7 +570,7 @@ async function analyzeMeal(){
   content.push({type:'text',text:prompt});
   try{
     const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1500,
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1500,
         system:`Precise nutrition expert. Identify each ingredient separately.
 Return ONLY valid JSON, no markdown:
 {"confidence":"high"|"medium"|"low","confidence_tip":"one sentence or empty","ingredients":[{"name":"name","emoji":"emoji","portion":"e.g. 80g","calories":number,"protein":number,"carbs":number,"fat":number,"fibre":number,"sugar":number,"sodium":number}]}
@@ -795,7 +796,7 @@ async function aiLookupIngredient(){
   gv('ing-lookup-loading').classList.add('show');
   try{
     const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:300,
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:300,
         system:'Return ONLY valid JSON, no markdown: {"emoji":"emoji","portion":"portion description","calories":number,"protein":number,"carbs":number,"fat":number}',
         messages:[{role:'user',content:`Nutrition facts for: ${name}`}]})});
     const data=await res.json();
@@ -956,7 +957,7 @@ Direct. No fluff. Reference the rolling context if there are patterns worth call
 
   try{
     const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:900,
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:900,
         system:'You are a direct, no-nonsense performance and nutrition coach for Borna. Honest, specific, actionable. No filler. When you spot multi-day patterns (e.g. 3rd day under on protein), call them out explicitly.',
         messages:[{role:'user',content:prompt}]})});
     const data=await res.json();
@@ -1005,7 +1006,7 @@ async function sendChatMessage(){
 
   try{
     const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:600,
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:600,
         system:`You are a direct, no-nonsense performance and nutrition coach for Borna. You have full context of his day. Be specific, honest, and actionable. Keep replies concise.\n\n${getDayContext()}`,
         messages:chatHistory})});
     const data=await res.json();
@@ -1625,7 +1626,7 @@ async function snapAndReadBarcode(){
 
   try{
     const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:100,
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:100,
         system:'You are a barcode reader. Look at the image and find the barcode number (EAN-13, EAN-8, UPC-A etc). Return ONLY the digits, nothing else. If you cannot find a barcode, return the word NONE.',
         messages:[{role:'user',content:[
           {type:'image',source:{type:'base64',media_type:'image/jpeg',data:b64}},
@@ -1807,7 +1808,7 @@ async function runImpactScan(){
 
   try{
     const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:400,
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:400,
         system:'Nutrition expert. Return ONLY valid JSON, no markdown: {"name":"food name","emoji":"single emoji","calories":number,"protein":number,"carbs":number,"fat":number,"verdict":"one punchy sentence about whether this fits remaining targets"}',
         messages:[{role:'user',content}]})});
     const data=await res.json();
@@ -1960,82 +1961,6 @@ function renderWeekly(){
   });
   html+=`</div>`;
 
-  // ── Weight projection card ──
-  // Current weight: latest progress entry, fallback 89.1kg
-  const latestEntry=[...entries].reverse().find(e=>e.weight!=null);
-  const currentWeight=latestEntry?parseFloat(latestEntry.weight):89.1;
-
-  // Calorie deficit from logged days this week
-  let totalFoodDeficit=0;
-  let deficitDays=0;
-  days.forEach(d=>{
-    if(d.hasData){
-      // per-day target (respects WHOOP burned adjustments already baked into getCalTarget snapshot)
-      totalFoodDeficit+=(tgt-d.t.cal);
-      deficitDays++;
-    }
-  });
-
-  // Calories burned from workouts this week
-  const weekStart=days[0].key; // Monday ISO date
-  const weekWorkouts=(typeof woHistory==='function'?woHistory():[]).filter(s=>s.date&&s.date.slice(0,10)>=weekStart);
-  const workoutBurnedKcal=weekWorkouts.reduce((a,s)=>{
-    // totalVolume is kg lifted — not kcal. Use WHOOP burned if available, else skip.
-    // Pull WHOOP burned from the session date's snapshot
-    const k=s.date.slice(0,10);
-    const snaps=load(`${KEY}_whoopsnaps_${k}`,[null,null,null]);
-    const burned=Math.max(snaps[1]?.burned||0,snaps[2]?.burned||0);
-    return a+burned;
-  },0);
-
-  // Total deficit = food deficit + workout burn
-  // But workout calories are already partially reflected in the food target if user set burned in WHOOP.
-  // To avoid double-counting, only add workout burn on days with NO whoop burned data logged.
-  // Simple approach: just use food deficit (target vs actual), which already includes WHOOP-adjusted target.
-  const totalDeficit=Math.round(totalFoodDeficit);
-  const avgDailyDeficit=deficitDays>0?Math.round(totalDeficit/deficitDays):0;
-  const fatLossKg=totalDeficit/7700;
-  const projectedWeight=Math.round((currentWeight-fatLossKg)*10)/10;
-  const rangeLow=(projectedWeight-0.3).toFixed(1);
-  const rangeHigh=(projectedWeight+0.3).toFixed(1);
-
-  // Days left until Sunday
-  const todayDow=new Date().getDay(); // 0=Sun,6=Sat
-  const daysToSunday=todayDow===0?0:(7-todayDow);
-  const sundayLabel=daysToSunday===0?'today':`this Sunday`;
-
-  // Only show if we have at least one logged day
-  if(deficitDays>0){
-    const deficitColor=totalDeficit>0?'var(--green)':'var(--red)';
-    const deficitSign=totalDeficit>=0?'-':'+';
-    html+=`
-    <div class="wk-proj-card">
-      <div class="wk-proj-top">
-        <div class="wk-proj-icon">⚖️</div>
-        <div class="wk-proj-heading">Weight Projection</div>
-        <div class="wk-proj-badge">${sundayLabel}</div>
-      </div>
-      <div class="wk-proj-weight">${projectedWeight} <span class="wk-proj-unit">kg</span></div>
-      <div class="wk-proj-range">range ${rangeLow} – ${rangeHigh} kg</div>
-      <div class="wk-proj-divider"></div>
-      <div class="wk-proj-stats">
-        <div class="wk-proj-stat">
-          <div class="wk-proj-sv" style="color:${deficitColor}">${deficitSign}${Math.abs(totalDeficit).toLocaleString()} kcal</div>
-          <div class="wk-proj-sl">weekly deficit</div>
-        </div>
-        <div class="wk-proj-stat">
-          <div class="wk-proj-sv" style="color:${deficitColor}">${deficitSign}${Math.abs(avgDailyDeficit).toLocaleString()} kcal</div>
-          <div class="wk-proj-sl">daily avg deficit</div>
-        </div>
-        <div class="wk-proj-stat">
-          <div class="wk-proj-sv" style="color:var(--muted)">${fatLossKg>=0?'−':'+'}${Math.abs(fatLossKg).toFixed(2)} kg</div>
-          <div class="wk-proj-sl">est. fat loss</div>
-        </div>
-      </div>
-      <div class="wk-proj-note">Based on ${currentWeight} kg current · ${deficitDays} logged day${deficitDays!==1?'s':''} · 7,700 kcal/kg fat</div>
-    </div>`;
-  }
-
   // Per-day detail list
   html+=`<div class="week-days">`;
   [...days].reverse().forEach(d=>{
@@ -2080,7 +2005,7 @@ Time of day: ${new Date().getHours()}:00. Goal: fat loss cut phase.`;
 
   try{
     const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:600,
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:600,
         system:'Return ONLY valid JSON, no markdown: {"suggestions":[{"name":"food name","emoji":"emoji","reason":"one line why this fits","calories":number,"protein":number,"carbs":number,"fat":number}]} — 3 suggestions, practical foods available in Dubai, prioritize whatever macro is most behind.',
         messages:[{role:'user',content:ctx}]})});
     const data=await res.json();
@@ -2581,7 +2506,7 @@ function renderLastSession(){
 // ── AI Workout Generation ──
 async function generateWorkout(){
   const btn=gv('wo-gen-btn');
-  if(btn){btn.disabled=true;btn.querySelector('.wo-gen-title').textContent='Generating\u2026';btn.querySelector('.wo-gen-icon').textContent='\u23f3';}
+  if(btn){btn.disabled=true;btn.querySelector('.wo-gen-title').textContent='Generating…';btn.querySelector('.wo-gen-icon').textContent='⏳';}
 
   const yest=getYesterdayNutrition();
   const rec=_woRecovery||'unknown';
@@ -2590,18 +2515,15 @@ async function generateWorkout(){
   const pbs=woPBs();
   const daysAgo=getDaysSinceMuscle();
 
+  // Build context string
   const histSummary=recentSessions.map(s=>`${new Date(s.date).toLocaleDateString('en-US',{weekday:'short'})}: ${s.splitName} (${(s.muscleGroups||[]).join(', ')})`).join('\n');
   const pbSummary=Object.entries(pbs).slice(0,20).map(([ex,pb])=>`${ex}: ${pb.weight}kg x${pb.reps} (1RM ~${pb.oneRM}kg)`).join('\n');
 
-  const systemBrief=`You are coaching an intermediate lifter (5 years experience, confident with machines and barbell form). Prioritise mechanical tension and progressive overload. Include intensity techniques (rest-pause, drop sets, myo-reps, supersets) when recovery >= 67 \u2014 flag them in the cue field. Suggest underrated or unconventional exercises alongside staples \u2014 e.g. for chest: incline cable fly, landmine press, cable cross-under; for back: chest-supported row, meadows row, seal row; for legs: Bulgarian split squat, hack squat, Nordic curl, goblet squat; for shoulders: cable lateral raise, prone Y-raise, Lu raises; for arms: incline curl, cross-body hammer, overhead cable tricep. Keep cues technical but concise. Alternatives must include at least one unconventional or underrated option, not just standard swaps.`;
-
-  const prompt=`${systemBrief}
-
-ATHLETE: Male, 26, 89.1kg, 173cm, 25.1% body fat. Goal: fat loss while preserving lean mass (target 64kg lean). Trains FASTED in the morning.
+  const prompt=`You are a strength & conditioning coach for a 26-year-old male, 89.1kg, 173cm, 25.1% body fat, goal is fat loss while preserving lean mass (target 64kg lean mass). He trains FASTED in the morning before his first meal.
 
 TODAY'S CONTEXT:
 - WHOOP Recovery: ${rec}%
-- Sleep: ${sleepSnap.sleep!=null?(()=>{const hh=Math.floor(sleepSnap.sleep),mm=Math.round((sleepSnap.sleep-hh)*60);return hh+'h'+(mm>0?' '+mm+'m':'');})():'unknown'}
+- Sleep duration: ${sleepSnap.sleep!=null?(()=>{const hh=Math.floor(sleepSnap.sleep),mm=Math.round((sleepSnap.sleep-hh)*60);return hh+'h'+(mm>0?' '+mm+'m':'');})():'unknown'}
 - HRV: ${sleepSnap.hrv||'unknown'}
 - Yesterday's nutrition: ${Math.round(yest.p||0)}g protein, ${Math.round(yest.cal||0)} kcal, ${Math.round(yest.c||0)}g carbs
 
@@ -2612,32 +2534,31 @@ DAYS SINCE MUSCLE GROUP TRAINED:
 ${Object.entries(daysAgo).map(([m,d])=>`${m}: ${d} days ago`).join(', ')||'No history'}
 
 PERSONAL BESTS:
-${pbSummary||'No PBs yet \u2014 first session'}
+${pbSummary||'No PBs yet — first session'}
 
 Generate a workout split for today. Return ONLY valid JSON, no markdown, no explanation.
 
 JSON format:
 {
-  "splitName": "Push \u2014 Chest & Shoulders",
+  "splitName": "Push — Chest & Shoulders",
   "muscleGroups": ["Chest","Shoulders","Triceps"],
-  "coachNote": "2-line rationale based on recovery, history, and yesterday's nutrition",
+  "coachNote": "2-line rationale based on recovery and yesterday's nutrition",
   "exercises": [
     {
-      "name": "Incline Barbell Bench Press",
-      "icon": "\ud83d\udcaa",
-      "cue": "retract scapula, drive feet into floor, 3-second eccentric",
+      "name": "Barbell Bench Press",
+      "icon": "💪",
+      "cue": "retract scapula, drive feet into floor",
       "sets": 4,
       "reps": "6-8",
       "rest": 120,
       "lastWeight": null,
       "suggestedWeight": null,
-      "formUrl": "https://www.youtube.com/results?search_query=Incline%20Barbell%20Bench%20Press%20proper%20form",
-      "alternatives": ["Landmine Press","Low-to-High Cable Fly","Dumbbell Bench Press"]
+      "alternatives": ["Dumbbell Bench Press","Machine Chest Press","Cable Chest Fly"]
     }
   ],
   "cardio": {
     "machine": "Treadmill",
-    "icon": "\ud83c\udfc3",
+    "icon": "🏃",
     "duration": 15,
     "speed": 6.5,
     "incline": 8,
@@ -2648,20 +2569,18 @@ JSON format:
 
 Rules:
 - 6-8 exercises (fewer if recovery < 40)
-- If recovery >= 67: heavy compound focus, 4-5 sets, 5-8 reps \u2014 add at least one intensity technique (rest-pause / drop set / myo-reps / superset) noted in the cue
-- If recovery 34-66: moderate volume, 3-4 sets, 8-12 reps
+- If recovery >= 67: heavy compound focus, 4-5 sets, 5-8 reps
+- If recovery 34-66: moderate volume, 3-4 sets, 8-12 reps  
 - If recovery < 34: light/technique focus, 3 sets, 12-15 reps
 - Fasted training: avoid maximal CNS-heavy lifts if recovery < 50
 - Do NOT repeat muscle groups trained in last 48 hours unless recovery > 80
-- Cardio: fasted morning = prefer steady state (incline walk, moderate bike). Only HIIT if recovery > 80
-- suggestedWeight: fill in if PB exists for that exercise (same or slight increase), else null
-- formUrl: ALWAYS set to https://www.youtube.com/results?search_query=EXERCISE_NAME_URL_ENCODED+proper+form
-- alternatives: 2-3 options, at least one must be unconventional or underrated (not the obvious swap)
+- Cardio: fasted morning = prefer steady state (incline walk, moderate bike). Only recommend HIIT if recovery > 80
+- suggestedWeight: fill in if PB exists for that exercise (suggest same or slight increase), else null
 - Return valid JSON only`;
 
   try{
     const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:2000,messages:[{role:'user',content:prompt}]})});
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:2000,messages:[{role:'user',content:prompt}]})});
     const data=await res.json();
     const text=data.content[0].text.trim().replace(/```json|```/g,'').trim();
     _woPlan=JSON.parse(text);
@@ -2686,7 +2605,7 @@ function renderWorkoutPreview(){
       <div class="wo-ex-preview">
         <div class="wo-ex-icon">${ex.icon||getExIcon(ex.name)}</div>
         <div class="wo-ex-info">
-          <div class="wo-ex-name">${(()=>{const url=ex.formUrl||`https://www.youtube.com/results?search_query=${encodeURIComponent(ex.name+' proper form')}`;return `<a class="wo-ex-name-link" href="${url}" target="_blank" rel="noopener">${ex.name} <span class="wo-ex-link-icon">🔗</span></a>`;})()}</div>
+          <div class="wo-ex-name">${ex.name}</div>
           <div class="wo-ex-meta">${ex.sets} sets · ${ex.reps} reps · ${ex.rest}s rest</div>
           <div class="wo-ex-cue">${ex.cue||''}</div>
         </div>
@@ -2785,7 +2704,7 @@ function renderExerciseCard(ex,ei){
     <div class="wo-ex-card-hdr" onclick="toggleExCollapse(${ei})">
       <div class="wo-ex-card-icon">${ex.icon||getExIcon(ex.name)}</div>
       <div class="wo-ex-card-title">
-        <div class="wo-ex-card-name">${(()=>{const n=ex.swappedTo||ex.name;const url=ex.formUrl||`https://www.youtube.com/results?search_query=${encodeURIComponent(n+' proper form')}`;return `<a class="wo-ex-name-link" href="${url}" target="_blank" rel="noopener">${n} <span class="wo-ex-link-icon">🔗</span></a>`;})()}</div>
+        <div class="wo-ex-card-name">${ex.swappedTo||ex.name}</div>
         <div class="wo-ex-card-meta">${ex.sets.length} sets · ${ex.reps||ex.sets[0]?.reps||'—'} reps · ${ex.rest}s rest</div>
       </div>
       <div class="wo-ex-card-check" id="wo-ex-check-${ei}">${ex.sets.every(s=>s.done)?'✅':'○'}</div>
