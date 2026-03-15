@@ -533,7 +533,8 @@ body {
    AI COACH
 ══════════════════════════════════════ */
 /* Coach page — full-screen chat layout */
-#pg-coach { display: flex; flex-direction: column; overflow: hidden; padding: 0; }
+#pg-coach { padding: 0; }
+#pg-coach.active, #pg-coach.page-exit-left, #pg-coach.page-exit-right { display: flex; flex-direction: column; overflow: hidden; }
 .coach-topbar { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px 12px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
 .coach-tb-left { display: flex; align-items: center; gap: 10px; }
 .coach-tb-avatar { font-size: 30px; line-height: 1; }

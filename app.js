@@ -984,7 +984,7 @@ Direct. No fluff. Reference the rolling context if there are patterns worth call
     typingDiv.className='chat-msg coach';
     typingDiv.innerHTML=text.replace(/\n/g,'<br>');
     msgEl.scrollTop=msgEl.scrollHeight;
-    generateSuggestions(text);
+    generateCoachSuggestions(text);
   }catch(err){
     typingDiv.className='chat-msg coach';
     typingDiv.textContent='Could not load debrief. Try again later.';
@@ -992,7 +992,7 @@ Direct. No fluff. Reference the rolling context if there are patterns worth call
   }
 }
 
-async function generateSuggestions(debriefText){
+async function generateCoachSuggestions(debriefText){
   try{
     const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:120,
