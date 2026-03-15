@@ -63,13 +63,13 @@ initWelcomeCard();
 function renderAll(){
   renderWhoopCard();renderSummary();renderRings();
   renderCups();renderFoodList();
-  renderProgress();buildCalendar();updateCoachStats();
+  renderProgressPage();buildCalendar();updateCoachStats();
   // refresh smart subtitle with latest stats
   const sub=gv('wc-sub');if(sub)sub.textContent=getSmartSub();
 }
 
 // NAV
-const PAGE_ORDER=['today','workout','weekly','progress'];
+const PAGE_ORDER=['today','workout','progress'];
 let _currentPage='today';
 function showPage(id,btn){
   const pages=document.querySelectorAll('.page');
@@ -94,8 +94,8 @@ function showPage(id,btn){
   incoming.scrollTop=0;
   _currentPage=id;
   _updateFab(id);
-  if(id==='weekly')renderWeekly();
-  if(id==='weekly')buildCalendar();
+  if(id==='progress')renderProgressPage();
+  if(id==='progress')buildCalendar();
   if(id==='workout')renderWorkoutPage();
 }
 
@@ -1393,39 +1393,9 @@ function saveEntry(){
   entries.push({date:new Date().toISOString(),weight:w,bf,notes:gv('e-notes').value.trim()});
   save(`${KEY}_entries`,entries);
   gv('e-w').value='';gv('e-bf').value='';gv('e-notes').value='';
-  closeEntryModal();renderProgress();
+  closeEntryModal();renderProgressPage();
 }
-function deleteEntry(i){entries.splice(i,1);save(`${KEY}_entries`,entries);renderProgress();}
-function renderProgress(){
-  const wEs=entries.filter(e=>e.weight!=null),bEs=entries.filter(e=>e.bf!=null);
-  const lw=wEs.length?wEs[wEs.length-1].weight:null,lb=bEs.length?bEs[bEs.length-1].bf:null;
-  const pw=wEs.length>1?wEs[wEs.length-2].weight:BASELINE.weight,pb=bEs.length>1?bEs[bEs.length-2].bf:BASELINE.bf;
-  gv('p-weight').textContent=lw!=null?lw.toFixed(1):BASELINE.weight.toFixed(1);
-  gv('p-bf').textContent=lb!=null?lb.toFixed(1):BASELINE.bf.toFixed(1);
-  const wd=lw!=null?(lw-pw).toFixed(1):null,bd=lb!=null?(lb-pb).toFixed(1):null;
-  if(wd)gv('p-w-delta').innerHTML=`<span class="${parseFloat(wd)<0?'dg':'db'}">${parseFloat(wd)>0?'+':''}${wd} kg</span> vs prev`;
-  if(bd)gv('p-bf-delta').innerHTML=`<span class="${parseFloat(bd)<0?'dg':'db'}">${parseFloat(bd)>0?'+':''}${bd}%</span> vs prev`;
-  const curBF=lb||BASELINE.bf,curW=lw||BASELINE.weight;
-  const curFat=(curBF/100)*curW,tgtFat=(GOAL_BF/100)*BASELINE.weight;
-  const fatLost=BASELINE.fatMass-curFat,totalLose=BASELINE.fatMass-tgtFat;
-  const pct=Math.max(0,Math.min(100,Math.round((fatLost/totalLose)*100)));
-  gv('goal-pct').textContent=pct+'%';gv('gbar-f').style.width=pct+'%';
-  gv('goal-detail').textContent=`Baseline: 22.4kg fat → Target: ${tgtFat.toFixed(1)}kg fat · ${Math.max(0,totalLose-fatLost).toFixed(1)}kg to go`;
-  renderChart('chart-w',wEs.slice(-8),'weight','kg','#388bfd',84,92);
-  renderChart('chart-bf',bEs.slice(-8),'bf','%','#2dd4c8',18,28);
-  const le=gv('entries-list');
-  if(!entries.length){le.innerHTML='<div style="text-align:center;padding:24px;color:var(--muted);font-size:12px">No entries yet.</div>';return;}
-  let html='';
-  [...entries].reverse().forEach((e,ri)=>{
-    const i=entries.length-1-ri;
-    const ds=new Date(e.date).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'});
-    html+=`<div class="ei"><div><div class="ei-date">${ds}</div>${e.notes?`<div class="ei-note">${e.notes}</div>`:''}</div>
-      <div class="ei-vals">${e.weight!=null?`<div class="ei-v"><div class="ei-vn" style="color:var(--blue2)">${e.weight}</div><div class="ei-vl">kg</div></div>`:''}
-      ${e.bf!=null?`<div class="ei-v"><div class="ei-vn" style="color:var(--cyan)">${e.bf}%</div><div class="ei-vl">BF</div></div>`:''}
-      <button class="ei-del" onclick="deleteEntry(${i})">✕</button></div></div>`;
-  });
-  le.innerHTML=html;
-}
+function deleteEntry(i){entries.splice(i,1);save(`${KEY}_entries`,entries);renderProgressPage();}
 function renderChart(id,data,field,unit,color,minV,maxV){
   const el=gv(id);
   if(!data.length){el.innerHTML=`<div style="color:var(--muted);font-size:11px;padding:8px">No data yet.</div>`;return;}
@@ -1922,25 +1892,65 @@ function calcStreak(){
   return streak;
 }
 
-function renderWeekly(){
-  const el=gv('weekly-content');if(!el)return;
+function renderProgressPage(){
+  const el=gv('progress-content');if(!el)return;
+
+  // ── Weekly data ──
   const days=getWeekData();
   const streak=calcStreak();
   const tgt=getCalTarget();
-
-  // Averages over days with data
   const logged=days.filter(d=>d.hasData);
   const avgCal=logged.length?Math.round(logged.reduce((a,d)=>a+d.t.cal,0)/logged.length):0;
   const avgP=logged.length?Math.round(logged.reduce((a,d)=>a+d.t.p,0)/logged.length):0;
   const daysOnTarget=logged.filter(d=>d.t.cal>=tgt*0.8&&d.t.cal<=tgt*1.15).length;
 
-  let html=`
+  // ── Body data ──
+  const wEs=entries.filter(e=>e.weight!=null),bEs=entries.filter(e=>e.bf!=null);
+  const lw=wEs.length?wEs[wEs.length-1].weight:null,lb=bEs.length?bEs[bEs.length-1].bf:null;
+  const pw=wEs.length>1?wEs[wEs.length-2].weight:BASELINE.weight,pb=bEs.length>1?bEs[bEs.length-2].bf:BASELINE.bf;
+  const wd=lw!=null?(lw-pw).toFixed(1):null,bd=lb!=null?(lb-pb).toFixed(1):null;
+  const dispW=lw!=null?lw.toFixed(1):BASELINE.weight.toFixed(1);
+  const dispBF=lb!=null?lb.toFixed(1):BASELINE.bf.toFixed(1);
+  const curBF=lb||BASELINE.bf,curWt=lw||BASELINE.weight;
+  const curFat=(curBF/100)*curWt,tgtFat=(GOAL_BF/100)*BASELINE.weight;
+  const fatLost=BASELINE.fatMass-curFat,totalLose=BASELINE.fatMass-tgtFat;
+  const goalPct=Math.max(0,Math.min(100,Math.round((fatLost/totalLose)*100)));
+
+  let html='';
+
+  // ── 1. Streak card ──
+  html+=`
   <div class="week-streak" onclick="openStreakModal()" style="cursor:pointer">
     <div class="streak-fire">🔥</div>
     <div class="streak-num">${streak}</div>
     <div class="streak-lbl">day streak</div>
     <div style="margin-left:auto;font-size:20px;color:var(--muted);font-weight:300">›</div>
-  </div>
+  </div>`;
+
+  // ── 2. Body stats ──
+  html+=`
+  <div class="prog-hdr"><div class="prog-title">Body Stats</div><button class="add-btn" onclick="openEntryModal()">+ Log</button></div>
+  <div class="stats-grid">
+    <div class="sc"><div class="sc-lbl">Weight</div><div class="sc-val" style="color:var(--blue2)">${dispW}</div><div class="sc-unit">kg</div>
+      ${wd?`<div class="sc-delta"><span class="${parseFloat(wd)<0?'dg':'db'}">${parseFloat(wd)>0?'+':''}${wd} kg</span> vs prev</div>`:'<div class="sc-delta"></div>'}
+    </div>
+    <div class="sc"><div class="sc-lbl">Body Fat</div><div class="sc-val" style="color:var(--cyan)">${dispBF}</div><div class="sc-unit">%</div>
+      ${bd?`<div class="sc-delta"><span class="${parseFloat(bd)<0?'dg':'db'}">${parseFloat(bd)>0?'+':''}${bd}%</span> vs prev</div>`:'<div class="sc-delta"></div>'}
+    </div>
+  </div>`;
+
+  // ── 3. Goal card ──
+  html+=`
+  <div class="goal-card">
+    <div class="goal-top"><div class="goal-lbl">Fat Loss Goal</div><div class="goal-pct">${goalPct}%</div></div>
+    <div class="gbar"><div class="gbar-f" style="width:${goalPct}%"></div></div>
+    <div class="goal-detail">Baseline: 22.4kg fat → Target: ${tgtFat.toFixed(1)}kg fat · ${Math.max(0,totalLose-fatLost).toFixed(1)}kg to go</div>
+    <div class="goal-dates"><span>Started: Mar 4, 2026</span><span>Target: Apr 27, 2026</span></div>
+  </div>`;
+
+  // ── 4. This Week ──
+  html+=`
+  <div class="sec-lbl" style="padding-left:0;padding-top:12px">This Week</div>
   <div class="week-stats-row">
     <div class="wk-s"><div class="wk-v" style="color:var(--blue2)">${avgCal||'—'}</div><div class="wk-l">avg kcal/day</div></div>
     <div class="wk-s"><div class="wk-v" style="color:var(--pc)">${avgP||'—'}g</div><div class="wk-l">avg protein</div></div>
@@ -2008,7 +2018,14 @@ function renderWeekly(){
     </div>
   </div>`;
 
-  // Per-day detail list
+  // ── 5. Trend charts ──
+  html+=`
+  <div class="sec-lbl" style="padding-left:0;padding-top:8px">Trends</div>
+  <div class="chart-card"><div class="chart-title">Weight (kg)</div><div class="chart-area" id="chart-w"></div></div>
+  <div class="chart-card"><div class="chart-title">Body Fat %</div><div class="chart-area" id="chart-bf"></div></div>`;
+
+  // ── 6. Per-day breakdown ──
+  html+=`<div class="sec-lbl" style="padding-left:0;padding-top:8px">Daily Breakdown</div>`;
   html+=`<div class="week-days">`;
   [...days].reverse().forEach(d=>{
     if(!d.hasData&&!d.isToday)return;
@@ -2027,7 +2044,25 @@ function renderWeekly(){
   });
   html+=`</div>`;
 
+  // ── 7. History ──
+  if(entries.length){
+    html+=`<div class="sec-lbl" style="padding-left:0;padding-top:8px">History</div><div class="entries-list">`;
+    [...entries].reverse().forEach((e,ri)=>{
+      const i=entries.length-1-ri;
+      const ds=new Date(e.date).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'});
+      html+=`<div class="ei"><div><div class="ei-date">${ds}</div>${e.notes?`<div class="ei-note">${e.notes}</div>`:''}</div>
+        <div class="ei-vals">${e.weight!=null?`<div class="ei-v"><div class="ei-vn" style="color:var(--blue2)">${e.weight}</div><div class="ei-vl">kg</div></div>`:''}
+        ${e.bf!=null?`<div class="ei-v"><div class="ei-vn" style="color:var(--cyan)">${e.bf}%</div><div class="ei-vl">BF</div></div>`:''}
+        <button class="ei-del" onclick="deleteEntry(${i})">✕</button></div></div>`;
+    });
+    html+=`</div>`;
+  }
+
   el.innerHTML=html;
+
+  // Render charts after DOM is set
+  renderChart('chart-w',wEs.slice(-8),'weight','kg','#388bfd',84,92);
+  renderChart('chart-bf',bEs.slice(-8),'bf','%','#2dd4c8',18,28);
 }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -2099,12 +2134,11 @@ const _origRenderAll=renderAll;
 window.renderAll=function(){
   _origRenderAll();
   renderNutrients();
-  renderWeekly();
   renderStreakMini();
 };
 // Call it once now to init
 renderNutrients();
-renderWeekly();
+renderProgressPage();
 renderStreakMini();
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -3154,5 +3188,5 @@ function switchWeeklyTab(tab){
   gv('wk-tab-content-weekly').style.display=tab==='weekly'?'block':'none';
   gv('wk-tab-content-calendar').style.display=tab==='calendar'?'block':'none';
   if(tab==='calendar')buildCalendar();
-  if(tab==='weekly')renderWeekly();
+  if(tab==='weekly')renderProgressPage();
 }

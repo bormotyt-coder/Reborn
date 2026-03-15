@@ -244,20 +244,20 @@
 </div>
 
 <!-- ═══ WEEKLY + CALENDAR (merged) ═══ -->
-<div id="pg-weekly" class="page">
+<div id="pg-progress" class="page">
   <div class="hdr">
     <div class="logo-wrap">
       <div class="logo-icon"><span style="font-family:var(--font);font-size:15px;font-weight:800;color:#fff;letter-spacing:-1px">rB</span></div>
-      <div><div class="logo-main">Weekly</div><div class="logo-sub">Last 7 days</div></div>
+      <div><div class="logo-main">Progress</div><div class="logo-sub">Your journey</div></div>
     </div>
   </div>
   <!-- Tab toggle -->
   <div class="wk-tab-bar">
-    <button class="wk-tab active" id="wk-tab-weekly" onclick="switchWeeklyTab('weekly')">Weekly</button>
+    <button class="wk-tab active" id="wk-tab-weekly" onclick="switchWeeklyTab('weekly')">Overview</button>
     <button class="wk-tab" id="wk-tab-calendar" onclick="switchWeeklyTab('calendar')">Calendar</button>
   </div>
   <div id="wk-tab-content-weekly" class="week-pg">
-    <div id="weekly-content"></div>
+    <div id="progress-content"></div>
   </div>
   <div id="wk-tab-content-calendar" style="display:none">
     <div class="cal-pg">
@@ -316,32 +316,6 @@
   </div>
 </div>
 
-<!-- ═══ PROGRESS ═══ -->
-<div id="pg-progress" class="page">
-  <div class="hdr">
-    <div class="logo-wrap">
-      <div class="logo-icon"><span style="font-family:var(--font);font-size:15px;font-weight:800;color:#fff;letter-spacing:-1px">rB</span></div>
-      <div><div class="logo-main">Progress</div></div>
-    </div>
-  </div>
-  <div class="prog-pg">
-    <div class="prog-hdr"><div class="prog-title">Body Tracker</div><button class="add-btn" onclick="openEntryModal()">+ Log Entry</button></div>
-    <div class="stats-grid">
-      <div class="sc"><div class="sc-lbl">Weight</div><div class="sc-val" id="p-weight" style="color:var(--blue2)">89.1</div><div class="sc-unit">kg</div><div class="sc-delta" id="p-w-delta"></div></div>
-      <div class="sc"><div class="sc-lbl">Body Fat</div><div class="sc-val" id="p-bf" style="color:var(--cyan)">25.1</div><div class="sc-unit">%</div><div class="sc-delta" id="p-bf-delta"></div></div>
-    </div>
-    <div class="goal-card">
-      <div class="goal-top"><div class="goal-lbl">Fat Loss Goal</div><div class="goal-pct" id="goal-pct">0%</div></div>
-      <div class="gbar"><div class="gbar-f" id="gbar-f" style="width:0%"></div></div>
-      <div class="goal-detail" id="goal-detail">Baseline: 22.4kg fat → Target: 16.8kg fat (20.1% BF)</div>
-      <div class="goal-dates"><span>Started: Mar 4, 2026</span><span>Target: Apr 27, 2026</span></div>
-    </div>
-    <div class="chart-card"><div class="chart-title">Weight (kg)</div><div class="chart-area" id="chart-w"><div style="color:var(--muted);font-size:11px;padding:8px">No entries yet.</div></div></div>
-    <div class="chart-card"><div class="chart-title">Body Fat %</div><div class="chart-area" id="chart-bf"><div style="color:var(--muted);font-size:11px;padding:8px">No entries yet.</div></div></div>
-    <div class="sec-lbl" style="padding-left:0;padding-top:4px">History</div>
-    <div class="entries-list" id="entries-list"><div style="text-align:center;padding:24px;color:var(--muted);font-size:12px">No entries yet.</div></div>
-  </div>
-</div>
 
 </div><!-- #app -->
 
@@ -356,12 +330,8 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6.5 6.5h11M6.5 17.5h11M4 12h16M2 9l2 3-2 3M22 9l-2 3 2 3"/></svg>
       <span>Workout</span>
     </button>
-    <button class="nb" onclick="showPage('weekly',this)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-      <span>Weekly</span>
-    </button>
     <button class="nb" onclick="showPage('progress',this)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
       <span>Progress</span>
     </button>
   </div>
