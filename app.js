@@ -1369,7 +1369,7 @@ function buildCalendar(){
   const fd=new Date(y,m,1).getDay(),days=new Date(y,m+1,0).getDate(),ts=todayKey();
   let html='';
   for(let i=0;i<fd;i++)html+=`<div class="cc empty"></div>`;
-  const woSessions=woHistory();
+  const woSessions=load(`${KEY}_wo_history`,[]);
   for(let d=1;d<=days;d++){
     const ds=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     const hm=load(`${KEY}_meals_${ds}`,[]).length>0;
