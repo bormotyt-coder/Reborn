@@ -997,7 +997,7 @@ async function generateCoachSuggestions(debriefText){
     const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:120,
         system:'You are a nutrition and performance coach.',
-        messages:[{role:'user',content:`Based on this daily debrief, suggest 3 short follow-up questions I might want to ask. Return ONLY 3 lines, one question per line, no numbering, under 10 words each.\n\n${debriefText}`}]})});
+        messages:[{role:'user',content:`Based on this daily debrief, write 3 short questions that the athlete would ask their coach — things like "how can I fix my protein intake?", "what should I eat tonight?", "is my deficit too aggressive?". First-person from the athlete's perspective. Return ONLY 3 lines, one question per line, no numbering, under 10 words each.\n\n${debriefText}`}]})});
     const data=await res.json();
     const chips=data.content.map(b=>b.text||'').join('').trim().split('\n').map(s=>s.trim()).filter(Boolean).slice(0,3);
     const el=gv('coach-suggestions');
