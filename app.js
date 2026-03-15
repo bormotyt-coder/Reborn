@@ -1369,11 +1369,14 @@ function buildCalendar(){
   const fd=new Date(y,m,1).getDay(),days=new Date(y,m+1,0).getDate(),ts=todayKey();
   let html='';
   for(let i=0;i<fd;i++)html+=`<div class="cc empty"></div>`;
+  const woSessions=woHistory();
   for(let d=1;d<=days;d++){
     const ds=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     const hm=load(`${KEY}_meals_${ds}`,[]).length>0;
-    const hw=load(`${KEY}_whoopsnaps_${ds}`,[null,null,null]).some(s=>s!==null);
-    html+=`<div class="cc${ds===ts?' today':''}${ds===calSelKey?' sel':''}${(hm||hw)?' has-data':''}" onclick="selectDay('${ds}')"><div class="cc-num">${d}</div></div>`;
+    const hw=woSessions.some(s=>s.date&&s.date.slice(0,10)===ds);
+    const dots=(hm?`<div style="width:5px;height:5px;border-radius:50%;background:#4ade80;flex-shrink:0"></div>`:'')+
+               (hw?`<div style="width:5px;height:5px;border-radius:50%;background:var(--blue2);flex-shrink:0"></div>`:'');
+    html+=`<div class="cc${ds===ts?' today':''}${ds===calSelKey?' sel':''}${(hm||hw)?' has-data':''}" onclick="selectDay('${ds}')"><div class="cc-num">${d}</div>${dots?`<div style="display:flex;gap:2px;justify-content:center;margin-top:2px">${dots}</div>`:''}</div>`;
   }
   ce.innerHTML=html;
   renderDayDetail(calSelKey);
