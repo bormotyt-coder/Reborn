@@ -3071,6 +3071,7 @@ function showWorkoutSummary(session){
       <div class="wo-sum-muscles">${(session.muscleGroups||[]).map(m=>`<span class="wo-muscle-chip">${m}</span>`).join('')}</div>
       ${pbHtml?`<div class="wo-sum-pbs">${pbHtml}</div>`:''}
       <button class="wo-sum-close" onclick="closeWorkoutSummary()">Done</button>
+      <button class="wo-sum-save-routine" onclick="saveAsRoutine()">💾 Save as Routine</button>
     </div>
   </div>`;
 
@@ -3086,6 +3087,65 @@ function closeWorkoutSummary(){
   gv('wo-generate-view').style.display='block';
   renderLastSession();
   renderWorkoutPage();
+}
+
+const WO_ROUTINES_KEY=`${KEY}_routines`;
+function saveAsRoutine(){
+  const session=woHistory().slice(-1)[0];
+  if(!session){alert('No session found.');return;}
+  const name=window.prompt('Name this routine:',session.splitName||'My Routine');
+  if(!name||!name.trim())return;
+  const routines=load(WO_ROUTINES_KEY,[]);
+  routines.push({
+    id:Date.now().toString(36),
+    name:name.trim(),
+    splitName:session.splitName||'',
+    muscleGroups:session.muscleGroups||[],
+    exercises:(session.exercises||[]).map(({name,sets,reps,rest,cue,icon,alternatives})=>({name,sets,reps,rest,cue,icon,alternatives})),
+    cardio:session.cardio?{type:session.cardio.type,duration:session.cardio.duration,intensity:session.cardio.intensity}:null,
+    savedAt:new Date().toISOString()
+  });
+  save(WO_ROUTINES_KEY,routines);
+  const btn=document.querySelector('.wo-sum-save-routine');
+  if(btn){btn.textContent='✓ Saved';btn.disabled=true;}
+}
+
+function showRoutinesModal(){
+  const routines=load(WO_ROUTINES_KEY,[]);
+  const rows=routines.length
+    ?[...routines].reverse().map(r=>`
+        <div class="wo-routine-row" onclick="loadRoutine('${r.id}')">
+          <div class="wo-routine-name">${r.name}</div>
+          <div class="wo-routine-split">${r.splitName}</div>
+          <div class="wo-routine-chips">${(r.muscleGroups||[]).map(m=>`<span class="wo-muscle-chip">${m}</span>`).join('')}</div>
+        </div>`).join('')
+    :`<div class="wo-hist-empty">No saved routines yet.<br>Finish a workout and tap "Save as Routine".</div>`;
+  const modal=document.createElement('div');
+  modal.id='wo-routines-modal';
+  modal.className='wo-hist-modal';
+  modal.innerHTML=`
+    <div class="wo-hist-inner">
+      <div class="wo-hist-topbar">
+        <div class="wo-hist-title">My Routines</div>
+        <button class="wo-hist-close" onclick="document.getElementById('wo-routines-modal').remove()">✕</button>
+      </div>
+      <div class="wo-hist-content-scroll">${rows}</div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+function loadRoutine(id){
+  const r=load(WO_ROUTINES_KEY,[]).find(x=>x.id===id);
+  if(!r)return;
+  _woPlan={
+    splitName:r.splitName,
+    muscleGroups:r.muscleGroups||[],
+    coachNote:'Loaded from saved routine.',
+    exercises:r.exercises||[],
+    cardio:r.cardio||null
+  };
+  const m=gv('wo-routines-modal');if(m)m.remove();
+  renderWorkoutPreview();
 }
 
 // ══════════════════════════════════════════════════════════════════════════

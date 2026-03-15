@@ -152,9 +152,14 @@
       <div class="logo-icon"><span style="font-family:var(--font);font-size:15px;font-weight:800;color:#fff;letter-spacing:-1px">rB</span></div>
       <div><div class="logo-main">Workout</div><div class="logo-sub" id="wo-hdr-sub">Train Smart</div></div>
     </div>
-    <button class="wo-history-btn" onclick="showWorkoutHistory()">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-    </button>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="wo-history-btn" onclick="showRoutinesModal()" title="My Routines">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 10h16M4 14h10M4 18h10"/></svg>
+      </button>
+      <button class="wo-history-btn" onclick="showWorkoutHistory()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      </button>
+    </div>
   </div>
 
   <!-- READINESS CARD -->
