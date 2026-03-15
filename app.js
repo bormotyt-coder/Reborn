@@ -386,17 +386,44 @@ function renderFoodList(){
   const el=gv('food-list');
   if(!meals.length){el.innerHTML='<div class="empty-st"><span class="empty-icon">🍽️</span>No meals logged yet.<br>Tap Log a Meal or Quick Add.</div>';return;}
   el.innerHTML='';
-  for(let i=0;i<meals.length;i++){
-    const m=meals[i];const div=document.createElement('div');div.className='fi';
-    const th=m.thumb?`<img class="fi-thumb" src="${m.thumb}" style="width:46px;height:46px;border-radius:11px;object-fit:cover;flex-shrink:0"/>`:`<div class="fi-thumb">${m.emoji||'🍽️'}</div>`;
-    const pPct=Math.min(Math.round(m.protein/TARGETS.p*100),100);
-    const cPct=Math.min(Math.round(m.carbs/TARGETS.c*100),100);
-    const fPct=Math.min(Math.round(m.fat/TARGETS.f*100),100);
-    div.innerHTML=`<div class="fi-top">${th}<div class="fi-info"><div class="fi-name">${m.name}</div><div class="fi-tags"><span class="ft ftcal">${Math.round(m.calories)} kcal</span><span class="ft ftp">${Math.round(m.protein)}g P</span><span class="ft ftc">${Math.round(m.carbs)}g C</span><span class="ft ftf">${Math.round(m.fat)}g F</span></div></div><button class="fi-del">✕</button></div><div class="fi-bars"><div class="fi-bar-row"><span class="fi-bar-lbl">P</span><div class="fi-bar-track"><div class="fi-bar-fill" style="width:${pPct}%;background:var(--pc)"></div></div><span class="fi-bar-val" style="color:var(--pc)">${Math.round(m.protein)}g</span></div><div class="fi-bar-row"><span class="fi-bar-lbl">C</span><div class="fi-bar-track"><div class="fi-bar-fill" style="width:${cPct}%;background:var(--cc)"></div></div><span class="fi-bar-val" style="color:var(--cc)">${Math.round(m.carbs)}g</span></div><div class="fi-bar-row"><span class="fi-bar-lbl">F</span><div class="fi-bar-track"><div class="fi-bar-fill" style="width:${fPct}%;background:var(--fc)"></div></div><span class="fi-bar-val" style="color:var(--fc)">${Math.round(m.fat)}g</span></div></div>`;
-    div.querySelector('.fi-del').addEventListener('click',(e)=>{e.stopPropagation();deleteMeal(i);});
-    div.addEventListener('click',()=>openMealDetail(i));
-    el.appendChild(div);
-  }
+  // Group by time of day
+  const groups=[
+    {label:'Breakfast',entries:[]},
+    {label:'Lunch',entries:[]},
+    {label:'Snacks',entries:[]},
+    {label:'Dinner',entries:[]},
+    {label:'Uncategorised',entries:[]},
+  ];
+  meals.forEach((m,i)=>{
+    let g=4; // Uncategorised
+    if(m.loggedAt){
+      const d=new Date(m.loggedAt);const mins=d.getHours()*60+d.getMinutes();
+      if(mins<630)g=0;           // <10:30am → Breakfast
+      else if(mins<870)g=1;      // <2:30pm  → Lunch
+      else if(mins<1080)g=2;     // <6pm     → Snacks
+      else g=3;                  // ≥6pm     → Dinner
+    }
+    groups[g].entries.push({m,i});
+  });
+  groups.forEach(({label,entries})=>{
+    if(!entries.length)return;
+    const groupCal=entries.reduce((s,{m})=>s+Math.round(m.calories),0);
+    const hdr=document.createElement('div');
+    hdr.className='meal-group-lbl';
+    hdr.innerHTML=`<span>${label}</span><span>${groupCal} kcal</span>`;
+    el.appendChild(hdr);
+    entries.forEach(({m,i})=>{
+      const div=document.createElement('div');div.className='fi';
+      const th=m.thumb?`<img class="fi-thumb" src="${m.thumb}" style="width:46px;height:46px;border-radius:11px;object-fit:cover;flex-shrink:0"/>`:`<div class="fi-thumb">${m.emoji||'🍽️'}</div>`;
+      const pPct=Math.min(Math.round(m.protein/TARGETS.p*100),100);
+      const cPct=Math.min(Math.round(m.carbs/TARGETS.c*100),100);
+      const fPct=Math.min(Math.round(m.fat/TARGETS.f*100),100);
+      div.innerHTML=`<div class="fi-top">${th}<div class="fi-info"><div class="fi-name">${m.name}</div><div class="fi-tags"><span class="ft ftcal">${Math.round(m.calories)} kcal</span><span class="ft ftp">${Math.round(m.protein)}g P</span><span class="ft ftc">${Math.round(m.carbs)}g C</span><span class="ft ftf">${Math.round(m.fat)}g F</span></div></div><button class="fi-del">✕</button></div><div class="fi-bars"><div class="fi-bar-row"><span class="fi-bar-lbl">P</span><div class="fi-bar-track"><div class="fi-bar-fill" style="width:${pPct}%;background:var(--pc)"></div></div><span class="fi-bar-val" style="color:var(--pc)">${Math.round(m.protein)}g</span></div><div class="fi-bar-row"><span class="fi-bar-lbl">C</span><div class="fi-bar-track"><div class="fi-bar-fill" style="width:${cPct}%;background:var(--cc)"></div></div><span class="fi-bar-val" style="color:var(--cc)">${Math.round(m.carbs)}g</span></div><div class="fi-bar-row"><span class="fi-bar-lbl">F</span><div class="fi-bar-track"><div class="fi-bar-fill" style="width:${fPct}%;background:var(--fc)"></div></div><span class="fi-bar-val" style="color:var(--fc)">${Math.round(m.fat)}g</span></div></div>`;
+      div.querySelector('.fi-del').addEventListener('click',(e)=>{e.stopPropagation();deleteMeal(i);});
+      div.addEventListener('click',()=>openMealDetail(i));
+      el.appendChild(div);
+    });
+  });
 }
 function deleteMeal(i){meals.splice(i,1);save(`${KEY}_meals_${todayKey()}`,meals);renderAll();}
 

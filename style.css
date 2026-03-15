@@ -483,6 +483,7 @@ body {
    New: macro mini-bars per item
 ══════════════════════════════════════ */
 .food-list { padding: 0 14px; display: flex; flex-direction: column; gap: 7px; padding-bottom: 6px; }
+.meal-group-lbl { font-family: var(--font); font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; padding: 12px 14px 4px; display: flex; justify-content: space-between; }
 .fi {
   background: var(--glass); border: 1px solid var(--border);
   border-radius: var(--r-md); padding: 14px 14px 12px;
