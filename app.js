@@ -2642,14 +2642,14 @@ async function generateWorkout(){
    - Lengthened partials: after hitting failure on full reps, keep going with partial reps in the bottom (stretched) portion only. Emerging research shows massive hypertrophy stimulus from this technique
 
 4. UNDERRATED EXERCISES — vary the selection, don't default to the same basics every session:
-   Chest: low-to-high cable fly, chest-focused dip (lean forward), svend press, slight-decline DB press
-   Back: chest-supported T-bar row, meadows row, straight-arm cable pulldown, seal row, single-arm lat pulldown
-   Shoulders: cable Y-raise, Lu raise (front raise to press), prone incline lateral raise, behind-the-neck press (light)
-   Biceps: incline DB curl, spider curl, bayesian cable curl, preacher curl EZ-bar (wide grip for short head)
-   Triceps: overhead cable extension (rope), JM press, cross-body cable pushdown, skull crusher (to forehead)
-   Quads: heel-elevated goblet squat, sissy squat, leg press feet low & narrow, pendulum squat, Spanish squat
-   Hamstrings: Nordic curl, seated leg curl (most lengthened position), single-leg RDL, slider hamstring curl
-   Glutes: barbell hip thrust, 45° back extension, cable pull-through, B-stance RDL, step-up with forward lean
+   Chest: low-to-high cable fly, chest-focused dip (lean forward), svend press, slight-decline DB press, hammer strength incline press, pec deck fly, machine chest press, Smith flat/incline press
+   Back: chest-supported T-bar row, meadows row, straight-arm cable pulldown, seal row, single-arm lat pulldown, plate-loaded row machine, hammer strength pulldown, machine low row, assisted pull-up machine (slow negatives)
+   Shoulders: cable Y-raise, Lu raise (front raise to press), prone incline lateral raise, behind-the-neck press (light), machine lateral raise, reverse pec deck (rear delts), Smith overhead press, machine shoulder press
+   Biceps: incline DB curl, spider curl, bayesian cable curl, preacher curl EZ-bar (wide grip for short head), machine preacher curl, cable hammer curl (rope)
+   Triceps: overhead cable extension (rope), JM press, cross-body cable pushdown, skull crusher (to forehead), machine tricep dip, tricep press machine, Smith close-grip bench
+   Quads: heel-elevated goblet squat, sissy squat, leg press feet low & narrow, pendulum squat, Spanish squat, hack squat machine, Smith squat (heels elevated), leg extension (lengthened partials), belt squat machine
+   Hamstrings: Nordic curl, seated leg curl (most lengthened position), single-leg RDL, slider hamstring curl, lying leg curl machine, glute-ham raise machine, Smith RDL
+   Glutes: barbell hip thrust, 45° back extension, cable pull-through, B-stance RDL, step-up with forward lean, Smith hip thrust, glute drive machine, hip abduction machine (lean forward)
 
 5. SESSION STRUCTURE:
    - Start with 1-2 heavy compounds (mechanical tension focus, straight sets)
