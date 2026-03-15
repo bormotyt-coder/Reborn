@@ -2519,12 +2519,13 @@ function getDaysSinceMuscle(){
 
 // ── Render workout page (readiness) ──
 function renderWorkoutPage(){
-  // Restore recovery from WHOOP morning snapshot if available
   const morning=whoopSnaps[0];
-  if(morning&&morning.recovery&&!_woRecovery){
+  if(morning?.recovery){
     _woRecovery=morning.recovery;
     const inp=gv('wo-rec-val');
     if(inp)inp.value=_woRecovery;
+    const lbl=gv('wo-rec-autofill');
+    if(lbl)lbl.style.display='';
   }
   updateReadiness();
   // Restore active session if app was closed mid-workout

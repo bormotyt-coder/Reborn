@@ -185,13 +185,14 @@
   <div class="wo-recovery-input-card">
     <div class="wo-ri-label">⚡ WHOOP Recovery % this morning</div>
     <div class="wo-ri-row">
-      <input type="number" id="wo-rec-val" class="wo-rec-input" placeholder="74" min="0" max="100" oninput="updateReadiness()">
+      <input type="number" id="wo-rec-val" class="wo-rec-input" placeholder="74" min="0" max="100" oninput="updateReadiness();gv('wo-rec-autofill').style.display='none'">
       <div class="wo-rec-btns">
         <button class="wo-rec-preset" onclick="setRecovery(25)" style="color:var(--red)">🔴 &lt;34</button>
         <button class="wo-rec-preset" onclick="setRecovery(55)" style="color:var(--amber)">🟡 34–66</button>
         <button class="wo-rec-preset" onclick="setRecovery(80)" style="color:var(--green)">🟢 67+</button>
       </div>
     </div>
+    <div id="wo-rec-autofill" style="display:none;margin-top:6px;font-family:var(--font);font-size:11px;font-weight:600;color:var(--green)">Auto-filled from WHOOP ✓</div>
   </div>
 
   <!-- GENERATE VIEW -->
