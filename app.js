@@ -1966,7 +1966,7 @@ function renderWeekly(){
   const weekKeys2=new Set(days.map(d=>d.key));
   let weekDeficit=0,projLogged=0;
   days.forEach(d=>{if(d.hasData){weekDeficit+=tgt-d.t.cal;projLogged++;}});
-  const woBurned=woHistory()
+  const woBurned=load(`${KEY}_wo_history`,[])
     .filter(s=>weekKeys2.has((s.date||'').slice(0,10)))
     .reduce((a,s)=>a+(s.calories||Math.round((s.duration||0)*5)),0);
   const effDef=weekDeficit+woBurned;
