@@ -1746,7 +1746,12 @@ async function lookupBarcode(code,b64=null){
     renderBarcodeProduct(prod);
   }catch(e){
     _barcodeScanning=false;
-    setBarcodeStatus('error','Lookup failed — product may not be in database.');
+    if(b64){
+      setBarcodeStatus('idle','Database unavailable — identifying from photo…');
+      setTimeout(()=>{closeBarcodeModal();identifyProductFromImage(b64);},600);
+    }else{
+      setBarcodeStatus('error','Lookup failed — database may be down.');
+    }
     console.error(e);
   }
 }
