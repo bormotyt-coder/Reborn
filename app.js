@@ -1668,14 +1668,14 @@ async function snapAndReadBarcode(){
     }
     gv('barcode-manual').value=digits;
     setBarcodeStatus('looking');
-    lookupBarcode(digits);
+    lookupBarcode(digits,b64);
   }catch(e){
     _barcodeScanning=false;
     setBarcodeStatus('error','Read failed — try again.');
   }
 }
 
-async function lookupBarcode(code){
+async function lookupBarcode(code,b64=null){
   if(!code||code.trim()===''){alert('Enter a barcode number.');return;}
   gv('barcode-status').textContent='Looking up…';
   gv('barcode-result').style.display='none';
@@ -1684,8 +1684,8 @@ async function lookupBarcode(code){
     const data=await res.json();
     if(data.status!==1||!data.product){
       _barcodeScanning=false;
-      setBarcodeStatus('idle','Not found — switching to AI log');
-      setTimeout(()=>{closeBarcodeModal();openLogModal();const d=gv('meal-desc');if(d)d.value=`Barcode: ${code.trim()} — please identify this product and provide macros`;analyzeMeal();},800);
+      setBarcodeStatus('idle',b64?'Not in database — identifying from photo…':'Not found — switching to AI log');
+      setTimeout(()=>{closeBarcodeModal();b64?identifyProductFromImage(b64):openLogModal();},600);
       return;
     }
     const p=data.product;
@@ -1737,6 +1737,33 @@ async function lookupBarcode(code){
     setBarcodeStatus('error','Lookup failed — product may not be in database.');
     console.error(e);
   }
+}
+
+// When OFf has no match, use the original scan photo to identify the product
+async function identifyProductFromImage(b64){
+  openLogModal();
+  const descEl=gv('meal-desc');
+  if(descEl)descEl.value='Identifying product from packaging…';
+  try{
+    const res=await fetch(PROXY,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-haiku-4-5-20251001',
+        max_tokens:80,
+        messages:[{role:'user',content:[
+          {type:'image',source:{type:'base64',media_type:'image/jpeg',data:b64}},
+          {type:'text',text:'What food product is shown? Reply with only the brand and product name (e.g. "Danone Activia Strawberry Yogurt 125g"). Nothing else.'}
+        ]}]
+      })
+    });
+    const data=await res.json();
+    const name=(data.content||[]).map(c=>c.text||'').join('').trim().replace(/^["']+|["']+$/g,'');
+    if(descEl)descEl.value=name||'Scanned product';
+  }catch(e){
+    if(descEl)descEl.value='Scanned product';
+  }
+  analyzeMeal();
 }
 
 let _barcodeLock=false;
