@@ -84,7 +84,7 @@ body {
 
 /* ── Page system ── */
 #app { position: relative; min-height: 100vh; }
-.page { display: none; flex: 1; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; padding-bottom: 110px; }
+.page { display: none; flex: 1; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; padding-bottom: calc(160px + env(safe-area-inset-bottom, 0px)); }
 .page.active { display: flex; flex-direction: column; }
 
 /* Direction-aware page transitions */
@@ -631,7 +631,7 @@ body {
 /* ══════════════════════════════════════
    WEEKLY
 ══════════════════════════════════════ */
-.week-pg { padding: 16px 14px; padding-bottom: 110px; }
+.week-pg { padding: 16px 14px; padding-bottom: calc(160px + env(safe-area-inset-bottom, 0px)); }
 .week-streak { display: flex; align-items: center; gap: 14px; background: var(--glass); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 18px 20px; margin-bottom: 12px; }
 .streak-fire { font-size: 32px; line-height: 1; }
 .streak-num { font-family: var(--font); font-size: 52px; font-weight: 800; color: var(--blue2); line-height: 1; }
