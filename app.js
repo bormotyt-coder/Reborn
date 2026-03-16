@@ -1675,8 +1675,36 @@ async function snapAndReadBarcode(){
   }
 }
 
+function renderBarcodeProduct(prod){
+  // prod = {name, servingG, servingLabel, per100, serving}
+  window._barcodeEntry={name:prod.name,emoji:'🏷️',...prod.serving,thumb:null};
+  window._barcodePer100=prod.per100;
+  window._barcodeServingG=prod.servingG;
+  window._barcodeName=prod.name;
+  gv('bc-name').textContent=prod.name;
+  gv('bc-serving').textContent=`Per serving (${prod.servingLabel})`;
+  gv('bc-cal').textContent=prod.serving.calories+' kcal';
+  gv('bc-p').textContent=prod.serving.protein+'g P';
+  gv('bc-c').textContent=prod.serving.carbs+'g C';
+  gv('bc-f').textContent=prod.serving.fat+'g F';
+  gv('bc-fibre').textContent=prod.serving.fibre+'g fibre';
+  gv('bc-sugar').textContent=prod.serving.sugar+'g sugar';
+  gv('bc-sodium').textContent=prod.serving.sodium+'mg sodium';
+  gv('barcode-qty').value='1';
+  gv('barcode-result').style.display='block';
+  _barcodeScanning=false;
+  stopBarcodeCamera();
+  setBarcodeStatus('found');
+}
+
 async function lookupBarcode(code,b64=null){
   if(!code||code.trim()===''){alert('Enter a barcode number.');return;}
+  const cacheKey=`${KEY}_bc_${code.trim()}`;
+
+  // 1. Check local cache first — works even when OFf is down
+  const cached=load(cacheKey,null);
+  if(cached){renderBarcodeProduct(cached);return;}
+
   gv('barcode-status').textContent='Looking up…';
   gv('barcode-result').style.display='none';
   try{
@@ -1690,7 +1718,6 @@ async function lookupBarcode(code,b64=null){
     }
     const p=data.product;
     const n=p.nutriments||{};
-    // Per 100g values
     const per100={
       calories:Math.round(n['energy-kcal_100g']||n['energy_100g']/4.184||0),
       protein:Math.round((n['proteins_100g']||0)*10)/10,
@@ -1713,25 +1740,10 @@ async function lookupBarcode(code,b64=null){
     };
     const name=`${p.brands?p.brands.split(',')[0].trim()+' ':''}${p.product_name||'Unknown'}`;
     const servingLabel=p.serving_size||`${servingG}g`;
-    // Store for add
-    window._barcodeEntry={name,emoji:'🏷️',...serving,thumb:null};
-    window._barcodePer100=per100;
-    window._barcodeServingG=servingG;
-    window._barcodeName=name;
-    gv('bc-name').textContent=name;
-    gv('bc-serving').textContent=`Per serving (${servingLabel})`;
-    gv('bc-cal').textContent=serving.calories+' kcal';
-    gv('bc-p').textContent=serving.protein+'g P';
-    gv('bc-c').textContent=serving.carbs+'g C';
-    gv('bc-f').textContent=serving.fat+'g F';
-    gv('bc-fibre').textContent=serving.fibre+'g fibre';
-    gv('bc-sugar').textContent=serving.sugar+'g sugar';
-    gv('bc-sodium').textContent=serving.sodium+'mg sodium';
-    gv('barcode-qty').value='1';
-    gv('barcode-result').style.display='block';
-    _barcodeScanning=false;
-    stopBarcodeCamera();
-    setBarcodeStatus('found');
+    const prod={name,servingG,servingLabel,per100,serving};
+    // 2. Save to cache so future scans work even offline/OFf down
+    localStorage.setItem(cacheKey,JSON.stringify(prod));
+    renderBarcodeProduct(prod);
   }catch(e){
     _barcodeScanning=false;
     setBarcodeStatus('error','Lookup failed — product may not be in database.');
