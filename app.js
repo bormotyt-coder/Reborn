@@ -1602,7 +1602,14 @@ async function startBarcodeCamera(){
       video:{facingMode:'environment',width:{ideal:1920},height:{ideal:1080}}
     });
     video.srcObject=barcodeStream;
-    video.play();
+    await video.play();
+    // Wait for metadata so videoWidth/videoHeight are valid before allowing snap
+    if(!video.videoWidth){
+      await new Promise(res=>{
+        video.addEventListener('loadedmetadata',res,{once:true});
+        setTimeout(res,2000); // max 2s safety timeout
+      });
+    }
     setBarcodeStatus('idle');
   }catch(e){
     setBarcodeStatus('error','Camera unavailable. Type barcode number below.');
@@ -1620,30 +1627,41 @@ async function snapAndReadBarcode(){
     else setBarcodeStatus('error','No camera. Type the barcode number below.');
     return;
   }
+  // Guard: video must have valid dimensions (not a blank/unready frame)
+  if(!video.videoWidth||!video.videoHeight){
+    setBarcodeStatus('error','Camera not ready — wait a moment then try again.');
+    return;
+  }
   _barcodeScanning=true;
   setBarcodeStatus('reading');
 
   // Draw current video frame to canvas
   const canvas=document.createElement('canvas');
-  canvas.width=video.videoWidth||1280;
-  canvas.height=video.videoHeight||720;
+  canvas.width=video.videoWidth;
+  canvas.height=video.videoHeight;
   const ctx=canvas.getContext('2d');
   ctx.drawImage(video,0,0,canvas.width,canvas.height);
   const b64=canvas.toDataURL('image/jpeg',0.92).split(',')[1];
 
   try{
     const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:100,
+      body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:100,
         system:'You are a barcode reader. Look at the image and find the barcode number (EAN-13, EAN-8, UPC-A etc). Return ONLY the digits, nothing else. If you cannot find a barcode, return the word NONE.',
         messages:[{role:'user',content:[
           {type:'image',source:{type:'base64',media_type:'image/jpeg',data:b64}},
           {type:'text',text:'What is the barcode number in this image? Return only the digits.'}
         ]}]})});
     const data=await res.json();
+    if(data.error||data.type==='error'){
+      _barcodeScanning=false;
+      setBarcodeStatus('error','AI read failed — type barcode number below.');
+      console.error('Barcode API error:',data.error||data);
+      return;
+    }
     const raw=(data.content||[]).map(b=>b.text||'').join('').trim().replace(/\s/g,'');
     // Extract only digits
     const digits=raw.replace(/[^0-9]/g,'');
-    if(!digits||raw==='NONE'||digits.length<6){
+    if(!digits||raw.toUpperCase()==='NONE'||digits.length<6){
       _barcodeScanning=false;
       setBarcodeStatus('error','Could not read barcode — reposition and try again, or type it below.');
       return;
@@ -1957,6 +1975,13 @@ function renderProgressPage(){
   let html='';
   let statsHtml='';
 
+  // ── ISO week key for AI cache ──
+  const _wkDate=new Date();const _wkD=new Date(Date.UTC(_wkDate.getFullYear(),_wkDate.getMonth(),_wkDate.getDate()));
+  const _wkDay=_wkD.getUTCDay()||7;_wkD.setUTCDate(_wkD.getUTCDate()+4-_wkDay);
+  const _wkYS=new Date(Date.UTC(_wkD.getUTCFullYear(),0,1));
+  const weekK=`${_wkD.getUTCFullYear()}-W${String(Math.ceil((((_wkD-_wkYS)/86400000)+1)/7)).padStart(2,'0')}`;
+  const _waiCache=localStorage.getItem(`${KEY}_weekly_ai_${weekK}`);
+
   // ── 1. Streak card ──
   html+=`
   <div class="week-streak" onclick="openStreakModal()" style="cursor:pointer">
@@ -1964,6 +1989,16 @@ function renderProgressPage(){
     <div class="streak-num">${streak}</div>
     <div class="streak-lbl">day streak</div>
     <div style="margin-left:auto;font-size:20px;color:var(--muted);font-weight:300">›</div>
+  </div>`;
+
+  // ── 1b. Weekly AI pattern card ──
+  html+=`
+  <div id="weekly-ai-summary" class="wk-ai-card">
+    <div class="wk-ai-head">
+      <span class="wk-ai-title">✦ Weekly Pattern</span>
+      <button class="wk-ai-btn" onclick="generateWeeklySummary('${weekK}')">${_waiCache?'↺ Refresh':'Generate'}</button>
+    </div>
+    <div id="wk-ai-response" class="wk-ai-response"></div>
   </div>`;
 
   // ── 2. Body stats (Stats tab) ──
@@ -2100,6 +2135,10 @@ function renderProgressPage(){
   statsHtml+=`<button onclick="openEntryModal()" style="width:100%;margin-top:10px;background:rgba(56,139,253,0.08);border:1.5px dashed rgba(56,139,253,0.3);border-radius:12px;padding:13px;font-family:var(--font);font-size:15px;font-weight:700;color:var(--blue2);cursor:pointer;letter-spacing:.05em">+ Log Entry</button>`;
 
   el.innerHTML=html;
+  // Restore cached AI response (use textContent to avoid XSS)
+  const _waiEl=gv('wk-ai-response');
+  if(_waiEl&&_waiCache)_waiEl.textContent=_waiCache;
+
   const statsEl=gv('progress-stats-content');
   if(statsEl)statsEl.innerHTML=statsHtml;
 
@@ -3336,5 +3375,53 @@ function switchWeeklyTab(tab){
   gv('wk-tab-content-stats').style.display=tab==='stats'?'block':'none';
   if(tab==='calendar')buildCalendar();
   if(tab==='weekly'||tab==='stats')renderProgressPage();
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// WEEKLY AI PATTERN SUMMARY
+// ══════════════════════════════════════════════════════════════════════════
+async function generateWeeklySummary(weekK){
+  const card=gv('weekly-ai-summary');
+  if(!card)return;
+  const btn=card.querySelector('.wk-ai-btn');
+  const responseEl=gv('wk-ai-response');
+  if(btn){btn.disabled=true;btn.textContent='...';}
+
+  // Gather 7-day data
+  const days=getWeekData();
+  const tgt=getCalTarget();
+  const woSessions=load(`${KEY}_wo_history`,[]);
+  const weekDayKeys=new Set(days.map(d=>d.key));
+  const weekWo=woSessions.filter(s=>weekDayKeys.has((s.date||'').slice(0,10)));
+
+  const dayLines=days.map(d=>{
+    if(!d.hasData&&!d.isToday)return `${d.label}: no data`;
+    const hit=d.t.cal>=tgt*0.8&&d.t.cal<=tgt*1.15?'✓':'✗';
+    const wo=weekWo.filter(s=>(s.date||'').slice(0,10)===d.key).map(s=>s.splitName||'workout').join(', ');
+    return `${d.label}: ${Math.round(d.t.cal)}kcal, ${Math.round(d.t.p)}g P, target ${hit}${wo?`, wo: ${wo}`:''}`;
+  }).join('\n');
+
+  const userMsg=`Week ${weekK}. Daily target: ${tgt}kcal.\n${dayLines}`;
+
+  try{
+    const res=await fetch(PROXY,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-haiku-4-5-20251001',
+        max_tokens:120,
+        system:"You are a concise performance coach. Analyse this week's data and give 2-3 bullet observations about patterns — e.g. consistently under on protein, stronger workout days after better sleep, calories spiking on weekends. Be specific, use the actual numbers, max 60 words total.",
+        messages:[{role:'user',content:userMsg}]
+      })
+    });
+    const data=await res.json();
+    const text=data.content?.[0]?.text||'No response received.';
+    localStorage.setItem(`${KEY}_weekly_ai_${weekK}`,text);
+    if(responseEl)responseEl.textContent=text;
+    if(btn){btn.disabled=false;btn.textContent='↺ Refresh';}
+  }catch(e){
+    if(btn){btn.disabled=false;btn.textContent='Generate';}
+    if(responseEl)responseEl.textContent='Failed — check connection.';
+  }
 }
 

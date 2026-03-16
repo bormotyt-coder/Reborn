@@ -1683,3 +1683,35 @@ input:focus, textarea:focus, select:focus { border-color: var(--blue); }
   font-family: var(--font-body);
 }
 .wo-coach-arrow { width: 18px; height: 18px; color: rgba(196,181,253,0.5); flex-shrink: 0; }
+
+/* ── WEEKLY AI PATTERN CARD ── */
+.wk-ai-card {
+  position: relative; overflow: hidden; margin-bottom: 12px;
+  background: var(--glass); border-radius: var(--r-lg);
+  border: 1px solid rgba(74,222,128,0.22);
+  padding: 15px 16px;
+}
+.wk-ai-card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, #4ade80, #22d3ee, transparent);
+}
+.wk-ai-head {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;
+}
+.wk-ai-title {
+  font-family: var(--font); font-size: 10px; font-weight: 700;
+  color: rgba(255,255,255,0.28); text-transform: uppercase; letter-spacing: .11em;
+}
+.wk-ai-btn {
+  background: rgba(74,222,128,0.12); border: 1px solid rgba(74,222,128,0.3);
+  border-radius: 20px; padding: 5px 14px;
+  font-family: var(--font); font-size: 12px; font-weight: 700; color: #4ade80;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+  transition: background .15s;
+}
+.wk-ai-btn:active { background: rgba(74,222,128,0.22); }
+.wk-ai-btn:disabled { opacity: 0.5; cursor: default; }
+.wk-ai-response {
+  font-family: var(--font-body); font-size: 13px; color: var(--text2);
+  line-height: 1.65; white-space: pre-wrap;
+}
