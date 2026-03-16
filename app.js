@@ -1685,7 +1685,7 @@ async function lookupBarcode(code){
     if(data.status!==1||!data.product){
       _barcodeScanning=false;
       setBarcodeStatus('idle','Not found — switching to AI log');
-      setTimeout(()=>{closeBarcodeModal();openLogModal();const d=gv('meal-desc');if(d)d.value=`Barcode: ${code.trim()} — please identify this product and provide macros`;},800);
+      setTimeout(()=>{closeBarcodeModal();openLogModal();const d=gv('meal-desc');if(d)d.value=`Barcode: ${code.trim()} — please identify this product and provide macros`;analyzeMeal();},800);
       return;
     }
     const p=data.product;
