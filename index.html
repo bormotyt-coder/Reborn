@@ -58,8 +58,8 @@
     <div class="gc-in">
       <div class="cal-top">
         <div>
-          <div class="cal-big" id="cal-num">0<sup>kcal</sup></div>
-          <div style="font-size:11px;color:var(--muted);margin-top:5px;font-family:var(--font-body)">consumed today</div>
+          <div class="cal-big" id="cal-num"><span class="cal-count-n">0</span></div>
+          <div class="cal-unit-lbl">kcal consumed</div>
         </div>
         <div class="cal-right">
           <div class="cal-rem" id="cal-rem">— left</div>
@@ -167,24 +167,26 @@
   <!-- READINESS CARD -->
   <div class="wo-readiness-card">
     <div class="wo-ready-left">
-      <div class="wo-ready-ring">
-        <svg viewBox="0 0 80 80" width="80" height="80">
-          <circle cx="40" cy="40" r="33" fill="none" stroke="rgba(0,0,0,0.06)" stroke-width="5"/>
-          <circle id="wo-ready-arc" cx="40" cy="40" r="33" fill="none" stroke="#3dd68c" stroke-width="5"
-            stroke-dasharray="207.3" stroke-dashoffset="207.3" stroke-linecap="round"
-            transform="rotate(-90 40 40)"/>
-        </svg>
-        <div class="wo-ready-pct" id="wo-ready-pct">—</div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0">
+        <div class="wo-ready-ring">
+          <svg viewBox="0 0 70 70" width="70" height="70">
+            <circle cx="35" cy="35" r="29" fill="none" stroke="rgba(0,0,0,0.06)" stroke-width="5"/>
+            <circle id="wo-ready-arc" cx="35" cy="35" r="29" fill="none" stroke="#3dd68c" stroke-width="5"
+              stroke-dasharray="182.2" stroke-dashoffset="182.2" stroke-linecap="round"
+              transform="rotate(-90 35 35)"/>
+          </svg>
+          <div class="wo-ready-pct" id="wo-ready-pct">—</div>
+        </div>
+        <div class="wo-ready-label">Recovery</div>
       </div>
-      <div class="wo-ready-label">Recovery</div>
+      <div class="wo-ready-verdict" id="wo-ready-verdict" style="flex:1;font-size:13px;color:var(--text2);line-height:1.5">Enter your WHOOP recovery to begin</div>
     </div>
     <div class="wo-ready-right">
       <div class="wo-ready-stats">
-        <div class="wo-rs"><span class="wo-rs-v" id="wr-sleep">—</span><span class="wo-rs-l">sleep hrs</span></div>
-        <div class="wo-rs"><span class="wo-rs-v" id="wr-protein">—</span><span class="wo-rs-l">yday protein</span></div>
-        <div class="wo-rs"><span class="wo-rs-v" id="wr-last">—</span><span class="wo-rs-l">last session</span></div>
+        <div class="wo-rs"><span class="wo-rs-v" id="wr-sleep">—</span><span class="wo-rs-l">Sleep</span></div>
+        <div class="wo-rs"><span class="wo-rs-v" id="wr-protein">—</span><span class="wo-rs-l">Protein</span></div>
+        <div class="wo-rs"><span class="wo-rs-v" id="wr-last">—</span><span class="wo-rs-l">Last session</span></div>
       </div>
-      <div class="wo-ready-verdict" id="wo-ready-verdict">Enter recovery % to begin</div>
     </div>
   </div>
 

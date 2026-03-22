@@ -219,11 +219,7 @@ function renderSummary(){
   const calEl=gv('cal-num');
   const prevCal=calEl._countTo||0;
   const targetCal=Math.round(t.cal);
-  // Use innerHTML for the kcal sup — animate a child span
-  if(!calEl.querySelector('.cal-count-n')){
-    calEl.innerHTML='<span class="cal-count-n">0</span><sup>kcal</sup>';
-  }
-  const numSpan=calEl.querySelector('.cal-count-n');
+  const numSpan=calEl.querySelector('.cal-count-n')||calEl;
   numSpan._countTo=numSpan._countTo||0;
   const oldTarget=numSpan._countTo;
   numSpan._countTo=targetCal;
@@ -372,7 +368,7 @@ function saveQAItem(){
 // FOOD LIST
 function renderFoodList(){
   const el=gv('food-list');
-  if(!meals.length){el.innerHTML='<div class="empty-st"><span class="empty-icon">🍽️</span>No meals logged yet.<br>Tap Log a Meal or Quick Add.</div>';return;}
+  if(!meals.length){el.innerHTML='<div class="empty-st"><div class="empty-icon">🍽️</div><div>No meals logged yet.<br>Tap Log a Meal or Quick Add.</div></div>';return;}
   el.innerHTML='';
   // Group by time of day
   const groups=[
@@ -2719,9 +2715,9 @@ function updateReadiness(){
   const arcEl=gv('wo-ready-arc');
   const verdictEl=gv('wo-ready-verdict');
 
-  // Recovery ring (r=33, circ=2*PI*33=207.3)
+  // Recovery ring (r=29, circ=2*PI*29=182.2)
   if(rec!=null&&pctEl&&arcEl){
-    const circ=207.3;
+    const circ=182.2;
     const offset=circ-(circ*rec/100);
     arcEl.style.strokeDashoffset=offset;
     const col=rec>=67?'var(--green)':rec>=34?'var(--amber)':'var(--red)';
@@ -2741,7 +2737,7 @@ function updateReadiness(){
   const sleepEl=gv('wr-sleep');const protEl=gv('wr-protein');const lastEl=gv('wr-last');
   if(sleepEl)sleepEl.textContent=sleepHrs;
   if(protEl)protEl.textContent=yest.p?Math.round(yest.p)+'g':'—';
-  if(lastEl){lastEl.textContent=lastLabel;lastEl.style.fontSize='10px';}
+  if(lastEl)lastEl.textContent=lastLabel;
 
   // Verdict
   if(verdictEl){
@@ -2885,13 +2881,24 @@ Rules:
   try{
     const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:2000,messages:[{role:'user',content:prompt}]})});
+    if(!res.ok){const errBody=await res.text().catch(()=>'');throw new Error(`HTTP ${res.status}: ${errBody.slice(0,120)}`);}
     const data=await res.json();
-    const text=data.content[0].text.trim().replace(/```json|```/g,'').trim();
-    _woPlan=JSON.parse(text);
+    if(data.error){throw new Error(data.error.message||JSON.stringify(data.error));}
+    const rawText=(data.content&&data.content[0]&&data.content[0].text)||'';
+    if(!rawText)throw new Error('Empty response from API');
+    // Extract JSON — strip any markdown fences and find the first {...}
+    const jsonMatch=rawText.replace(/```json|```/g,'').trim().match(/\{[\s\S]*\}/);
+    if(!jsonMatch)throw new Error('No JSON found in response');
+    _woPlan=JSON.parse(jsonMatch[0]);
     renderWorkoutPreview();
   }catch(e){
     console.error('Workout gen error',e);
-    alert('Could not generate workout. Check your connection.');
+    const msg=e.message||String(e);
+    const el=gv('wo-plan-preview');
+    if(el){
+      el.style.display='block';
+      el.innerHTML=`<div style="margin:16px;padding:14px 16px;background:rgba(196,91,82,0.06);border:1px solid rgba(196,91,82,0.16);border-radius:16px;font-size:13px;color:var(--red);line-height:1.6"><strong>Workout generation failed</strong><br>${msg}</div>`;
+    }
   }finally{
     if(loader)loader.style.display='none';
   }
