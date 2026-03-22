@@ -1312,10 +1312,10 @@ function setBgForTime(h,weatherCode){
   canvas.style.height=ph+'px';
   const tod=getTimeOfDay(h);
   const bgs={
-    morning:  'linear-gradient(135deg,#0c2240,#1a3520)',
-    afternoon:'linear-gradient(135deg,#08172e,#0c2818)',
-    evening:  'linear-gradient(135deg,#1c0a30,#280e0e)',
-    night:    'linear-gradient(135deg,#04060e,#080816)',
+    morning:  'linear-gradient(135deg,#1a4070,#2a5540)',
+    afternoon:'linear-gradient(135deg,#1a3860,#1a4530)',
+    evening:  'linear-gradient(135deg,#2e1450,#401818)',
+    night:    'linear-gradient(135deg,#0a1020,#101828)',
   };
   bg.style.background=bgs[tod];
   _wcScene=_wcInitScene(tod,pw,ph);
@@ -1358,7 +1358,47 @@ async function initWelcomeCard(){
   }
 }
 
-
+// DAY CALENDAR STRIP (Whoop-style horizontal day picker)
+let _dayCalSelected=todayKey();
+const SHORT_DOWS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const SHORT_MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function buildDayCalStrip(){
+  const el=gv('day-cal-strip');if(!el)return;
+  const today=new Date();
+  const days=[];
+  for(let i=13;i>=0;i--){
+    const d=new Date(today);
+    d.setDate(d.getDate()-i);
+    days.push(d);
+  }
+  el.innerHTML='';
+  days.forEach(d=>{
+    const ds=d.toISOString().slice(0,10);
+    const hasData=load(`${KEY}_meals_${ds}`,[]).length>0;
+    const isActive=ds===_dayCalSelected;
+    const isToday=ds===todayKey();
+    const dow=isToday?'Today':SHORT_DOWS[d.getDay()];
+    const item=document.createElement('div');
+    item.className='day-cal-item'+(isActive?' active':'')+(hasData?' has-data':'');
+    item.innerHTML=`<span class="dc-dow">${dow}</span><span class="dc-day">${d.getDate()}</span><span class="dc-month">${SHORT_MONTHS[d.getMonth()]}</span>`;
+    item.addEventListener('click',()=>selectDayCalDay(ds));
+    el.appendChild(item);
+  });
+  // Scroll to active day
+  const activeItem=el.querySelector('.day-cal-item.active');
+  if(activeItem)activeItem.scrollIntoView({behavior:'smooth',inline:'center',block:'nearest'});
+}
+function selectDayCalDay(ds){
+  _dayCalSelected=ds;
+  // Reload meals and whoop data for selected day
+  meals=load(`${KEY}_meals_${ds}`,[]);
+  whoopSnaps=load(`${KEY}_whoopsnaps_${ds}`,[null,null,null]);
+  cups=parseInt(localStorage.getItem(`${KEY}_cups_${ds}`)||'0');
+  renderAll();
+  buildDayCalStrip();
+}
+// Build strip on boot
+buildDayCalStrip();
 
 // CALENDAR
 function buildCalendar(){
@@ -2679,9 +2719,9 @@ function updateReadiness(){
   const arcEl=gv('wo-ready-arc');
   const verdictEl=gv('wo-ready-verdict');
 
-  // Recovery ring
+  // Recovery ring (r=33, circ=2*PI*33=207.3)
   if(rec!=null&&pctEl&&arcEl){
-    const circ=157;
+    const circ=207.3;
     const offset=circ-(circ*rec/100);
     arcEl.style.strokeDashoffset=offset;
     const col=rec>=67?'var(--green)':rec>=34?'var(--amber)':'var(--red)';
