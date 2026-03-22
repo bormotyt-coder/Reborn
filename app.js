@@ -53,6 +53,25 @@ let mealB64    =null;
 let ingredients=[];
 let activeTab  =0;
 
+// FASTING STATE (must be declared before BOOT runs to avoid TDZ crashes)
+const FAST_LOG_KEY   = 'fasting_log';
+const FAST_STATE_KEY = `${KEY}_fast_state`;
+const FAST_AI_KEY    = `${KEY}_fast_ai_rec`;
+const FAST_CIRC      = 729.1;
+const FAST_PHASES    = [
+  {hours:0, name:'Digestion',          icon:'🍽️', desc:'Your body is processing your last meal'},
+  {hours:4, name:'Glycogen Depletion', icon:'⚡',  desc:'Liver glycogen stores are being depleted'},
+  {hours:8, name:'Fat Burning Begins', icon:'🔥',  desc:'Fat oxidation is ramping up'},
+  {hours:12,name:'Deep Fat Burning',   icon:'💪',  desc:'Body is in full fat-burning mode'},
+  {hours:16,name:'Autophagy Zone',     icon:'🧬',  desc:'Cellular repair and renewal underway'},
+];
+const FAST_PROTO_HRS = {'16:8':16,'18:6':18,'20:4':20,'custom':0};
+let fastState    = load(FAST_STATE_KEY, null);
+let fastLog      = load(FAST_LOG_KEY, []);
+let fastTimer    = null;
+let fastProtocol = '16:8';
+let fastCustomHrs= 0;
+
 // BOOT
 const _n=new Date();
 const _hdrDate=gv('hdr-date');if(_hdrDate)_hdrDate.innerHTML=_n.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})+'<br>'+_n.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
@@ -64,7 +83,6 @@ function renderAll(){
   renderWhoopCard();renderSummary();renderRings();
   renderCups();renderFoodList();
   renderProgressPage();buildCalendar();updateCoachStats();
-  if(typeof renderWorkoutFastBanner==='function')renderWorkoutFastBanner();
   // refresh smart subtitle with latest stats
   const sub=gv('wc-sub');if(sub)sub.textContent=getSmartSub();
 }
@@ -3525,36 +3543,12 @@ async function generateWeeklySummary(weekK){
 
 
 // ══════════════════════════════════════════════════════
-// FASTING MODULE
+// FASTING MODULE (state vars declared at top of file)
 // ══════════════════════════════════════════════════════
 
-const FAST_LOG_KEY   = 'fasting_log';
-const FAST_STATE_KEY = `${KEY}_fast_state`;
-const FAST_AI_KEY    = `${KEY}_fast_ai_rec`;
-const FAST_CIRC      = 729.1; // 2*pi*116
-
-const FAST_PHASES = [
-  { hours:  0, name:'Digestion',          icon:'🍽️', desc:'Your body is processing your last meal' },
-  { hours:  4, name:'Glycogen Depletion', icon:'⚡', desc:'Liver glycogen stores are being depleted' },
-  { hours:  8, name:'Fat Burning Begins', icon:'🔥', desc:'Fat oxidation is ramping up' },
-  { hours: 12, name:'Deep Fat Burning',   icon:'💪', desc:'Body is in full fat-burning mode' },
-  { hours: 16, name:'Autophagy Zone',     icon:'🧬', desc:'Cellular repair and renewal underway' },
-];
-
-const FAST_PROTO_HRS = {'16:8':16,'18:6':18,'20:4':20,'custom':0};
-
-let fastState    = load(FAST_STATE_KEY, null);
-let fastLog      = load(FAST_LOG_KEY, []);
-let fastTimer    = null;
-let fastProtocol = '16:8';
-let fastCustomHrs= 0;
-
-// Boot: resume timer if fasting is active
-(function initFasting(){
-  if(fastState&&!fastState.end){_startFastTimer();}
-  // Defer nav indicator update until DOM is ready
-  setTimeout(()=>{ if(typeof _updateFastNavIndicator==='function')_updateFastNavIndicator(); },100);
-})();
+// Resume fasting timer if a fast was active on last session
+if(fastState&&!fastState.end)_startFastTimer();
+setTimeout(()=>_updateFastNavIndicator(),200);
 
 function getFastTargetHours(){
   return fastProtocol==='custom'?(fastCustomHrs||16):(FAST_PROTO_HRS[fastProtocol]||16);
