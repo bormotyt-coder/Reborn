@@ -352,9 +352,8 @@ body {
 .fab-dim.show { display: block; }
 
 .fab-wrap {
-  position: relative;
-  display: flex; flex-direction: column; align-items: flex-end; gap: 10px;
-  flex-shrink: 0; z-index: 49;
+  position: fixed; bottom: calc(74px + env(safe-area-inset-bottom)); right: 18px;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 10px; z-index: 49;
   pointer-events: none;
 }
 .fab-main {
@@ -1060,11 +1059,7 @@ input:focus, textarea:focus, select:focus { border-color: var(--blue); }
   box-shadow: 0 4px 24px rgba(0,0,0,0.18), 0 1px 4px rgba(0,0,0,0.10);
 }
 .coach-fab {
-  position: fixed;
-  bottom: calc(90px + env(safe-area-inset-bottom));
-  right: 18px;
-  z-index: 49;
-  width: 52px; height: 52px;
+  width: 52px; height: 52px; flex-shrink: 0;
   border-radius: 15px;
   background: linear-gradient(145deg, #1C1F26, #2D3142);
   border: 1.5px solid rgba(139,109,176,0.35);
@@ -1072,6 +1067,7 @@ input:focus, textarea:focus, select:focus { border-color: var(--blue); }
   cursor: pointer;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
   transition: all .2s;
+  margin-bottom: 8px;
 }
 .coach-fab .coach-fab-emoji { font-size: 22px; line-height: 1; }
 .coach-fab .coach-fab-lbl { font-family: var(--font); font-size: 8px; font-weight: 700; color: rgba(255,255,255,0.5); letter-spacing: .04em; }
