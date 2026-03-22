@@ -64,18 +64,18 @@ function renderAll(){
   renderWhoopCard();renderSummary();renderRings();
   renderCups();renderFoodList();
   renderProgressPage();buildCalendar();updateCoachStats();
+  if(typeof renderWorkoutFastBanner==='function')renderWorkoutFastBanner();
   // refresh smart subtitle with latest stats
   const sub=gv('wc-sub');if(sub)sub.textContent=getSmartSub();
 }
 
 // NAV
-const PAGE_ORDER=['today','workout','coach','progress'];
+const PAGE_ORDER=['today','workout','fast','coach','progress'];
 let _currentPage='today';
 function showPage(id,btn){
-  const pages=document.querySelectorAll('.page');
   const fromIdx=PAGE_ORDER.indexOf(_currentPage);
   const toIdx=PAGE_ORDER.indexOf(id);
-  const dir=toIdx>=fromIdx?1:-1; // 1=going right, -1=going left
+  const dir=toIdx>=fromIdx?1:-1;
   const outgoing=gv('pg-'+_currentPage);
   const incoming=gv('pg-'+id);
   if(outgoing&&outgoing!==incoming){
@@ -84,19 +84,24 @@ function showPage(id,btn){
       outgoing.classList.remove('active','page-exit-left','page-exit-right');
     },{once:true});
   }
+  // Clear active states
   document.querySelectorAll('.nb').forEach(b=>b.classList.remove('active'));
+  const cfab=gv('coach-fab');if(cfab)cfab.classList.remove('active');
+  // Set active on correct button
+  if(btn&&btn.classList.contains('nb'))btn.classList.add('active');
+  else if(btn&&btn.id==='coach-fab'&&cfab)cfab.classList.add('active');
+  // else: progress pill — no nav button highlighted
   incoming.classList.remove('page-exit-left','page-exit-right');
   incoming.classList.add('active',dir===1?'page-enter-right':'page-enter-left');
   incoming.addEventListener('animationend',()=>{
     incoming.classList.remove('page-enter-right','page-enter-left');
   },{once:true});
-  btn.classList.add('active');
   incoming.scrollTop=0;
   _currentPage=id;
   _updateFab(id);
-  if(id==='progress')renderProgressPage();
-  if(id==='progress')buildCalendar();
-  if(id==='workout')renderWorkoutPage();
+  if(id==='progress'){renderProgressPage();buildCalendar();}
+  if(id==='workout'){renderWorkoutPage();renderWorkoutFastBanner();}
+  if(id==='fast')renderFastPage();
   if(id==='coach'){updateCoachStats();if(!chatHistory.length)generateCoachReport();}
 }
 
@@ -889,7 +894,8 @@ function getDayContext(){
   const ws=whoopSnaps;
   const mealSum=meals.map(m=>`${m.name}: ${Math.round(m.calories)} kcal, ${Math.round(m.protein)}g P, ${Math.round(m.carbs)}g C, ${Math.round(m.fat)}g F`).join('\n');
   const whoopSum=`Wake: Sleep ${ws[0]?.sleep??'—'}h, Recovery ${ws[0]?.recovery??'—'}%\n1PM: Strain ${ws[1]?.strain??'—'}, Burned ${ws[1]?.burned??'—'} kcal, Steps ${ws[1]?.steps??'—'}\nEOD: Strain ${ws[2]?.strain??'—'}, Burned ${ws[2]?.burned??'—'} kcal, Steps ${ws[2]?.steps??'—'}`;
-  return `BORNA'S DATA TODAY:\nMEALS:\n${mealSum||'None logged'}\nTOTALS: ${Math.round(t.cal)} kcal, ${Math.round(t.p)}g P, ${Math.round(t.c)}g C, ${Math.round(t.f)}g F\nTARGET: ${getCalTarget()} kcal (cut phase)\nMACRO TARGETS: 128g P, 200g C, 65g F\nWHOOP:\n${whoopSum}\nWATER: ${cups} cups (${cups*ML_PER_CUP}ml) / 8 cups\nPROFILE: Male, 26, 89.1kg, 25.1% BF, goal 20.1% BF by Apr 27 2026`;
+  const fastCtx=typeof getFastContext==='function'?getFastContext():'FASTING: no data';
+  return `BORNA'S DATA TODAY:\nMEALS:\n${mealSum||'None logged'}\nTOTALS: ${Math.round(t.cal)} kcal, ${Math.round(t.p)}g P, ${Math.round(t.c)}g C, ${Math.round(t.f)}g F\nTARGET: ${getCalTarget()} kcal (cut phase)\nMACRO TARGETS: 128g P, 200g C, 65g F\nWHOOP:\n${whoopSum}\nWATER: ${cups} cups (${cups*ML_PER_CUP}ml) / 8 cups\n${fastCtx}\nPROFILE: Male, 26, 89.1kg, 25.1% BF, goal 20.1% BF by Apr 27 2026`;
 }
 
 // Build the enriched coach context — called only by generateCoachReport
@@ -3516,3 +3522,256 @@ async function generateWeeklySummary(weekK){
   }
 }
 
+
+// ══════════════════════════════════════════════════════
+// FASTING MODULE
+// ══════════════════════════════════════════════════════
+
+const FAST_LOG_KEY   = 'fasting_log';
+const FAST_STATE_KEY = `${KEY}_fast_state`;
+const FAST_AI_KEY    = `${KEY}_fast_ai_rec`;
+const FAST_CIRC      = 729.1; // 2*pi*116
+
+const FAST_PHASES = [
+  { hours:  0, name:'Digestion',          icon:'🍽️', desc:'Your body is processing your last meal' },
+  { hours:  4, name:'Glycogen Depletion', icon:'⚡', desc:'Liver glycogen stores are being depleted' },
+  { hours:  8, name:'Fat Burning Begins', icon:'🔥', desc:'Fat oxidation is ramping up' },
+  { hours: 12, name:'Deep Fat Burning',   icon:'💪', desc:'Body is in full fat-burning mode' },
+  { hours: 16, name:'Autophagy Zone',     icon:'🧬', desc:'Cellular repair and renewal underway' },
+];
+
+const FAST_PROTO_HRS = {'16:8':16,'18:6':18,'20:4':20,'custom':0};
+
+let fastState    = load(FAST_STATE_KEY, null);
+let fastLog      = load(FAST_LOG_KEY, []);
+let fastTimer    = null;
+let fastProtocol = '16:8';
+let fastCustomHrs= 0;
+
+// Boot: resume timer if fasting is active
+(function initFasting(){
+  if(fastState&&!fastState.end){_startFastTimer();}
+  // Defer nav indicator update until DOM is ready
+  setTimeout(()=>{ if(typeof _updateFastNavIndicator==='function')_updateFastNavIndicator(); },100);
+})();
+
+function getFastTargetHours(){
+  return fastProtocol==='custom'?(fastCustomHrs||16):(FAST_PROTO_HRS[fastProtocol]||16);
+}
+
+function selectFastProtocol(proto,btn){
+  fastProtocol=proto;
+  document.querySelectorAll('.fast-proto-btn').forEach(b=>b.classList.remove('active'));
+  if(btn)btn.classList.add('active');
+  const cr=gv('fast-custom-row');
+  if(cr)cr.style.display=proto==='custom'?'block':'none';
+  _updateFastIdleDisplay();
+}
+
+function updateCustomFastProtocol(){
+  fastCustomHrs=parseInt(gv('fast-custom-h')?.value||0)||0;
+  _updateFastIdleDisplay();
+}
+
+function _updateFastIdleDisplay(){
+  const el=gv('fast-proto-display');
+  if(el)el.textContent=getFastTargetHours()+' hours';
+}
+
+function getFastPhase(elapsedHours){
+  let phase=FAST_PHASES[0];
+  for(const p of FAST_PHASES){if(elapsedHours>=p.hours)phase=p;else break;}
+  return phase;
+}
+
+function toggleFast(){
+  if(fastState&&!fastState.end)endFast();
+  else startFast();
+}
+
+function startFast(){
+  fastState={start:new Date().toISOString(),protocol:fastProtocol,targetHours:getFastTargetHours(),end:null};
+  save(FAST_STATE_KEY,fastState);
+  _startFastTimer();
+  renderFastPage();
+  renderWorkoutFastBanner();
+  _updateFastNavIndicator();
+}
+
+function endFast(){
+  if(!fastState)return;
+  fastState.end=new Date().toISOString();
+  const actualHours=(new Date(fastState.end)-new Date(fastState.start))/3600000;
+  fastLog.unshift({start:fastState.start,end:fastState.end,protocol:fastState.protocol,targetHours:fastState.targetHours,actualHours:Math.round(actualHours*10)/10});
+  save(FAST_LOG_KEY,fastLog);
+  _stopFastTimer();
+  fastState=null;
+  save(FAST_STATE_KEY,null);
+  renderFastPage();
+  renderWorkoutFastBanner();
+  _updateFastNavIndicator();
+}
+
+function _startFastTimer(){
+  _stopFastTimer();
+  fastTimer=setInterval(_tickFastTimer,1000);
+  _tickFastTimer();
+}
+function _stopFastTimer(){if(fastTimer){clearInterval(fastTimer);fastTimer=null;}}
+
+function _tickFastTimer(){
+  if(!fastState||fastState.end){_stopFastTimer();return;}
+  const now=new Date();
+  const elapsedMs=now-new Date(fastState.start);
+  const elapsedSec=Math.floor(elapsedMs/1000);
+  const elapsedHours=elapsedMs/3600000;
+  const targetMs=fastState.targetHours*3600000;
+  const remainingMs=Math.max(0,targetMs-elapsedMs);
+  const pct=Math.min(100,(elapsedMs/targetMs)*100);
+
+  // Elapsed timer HH:MM:SS
+  const h=Math.floor(elapsedSec/3600),m=Math.floor((elapsedSec%3600)/60),s=elapsedSec%60;
+  const timerStr=`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  const etEl=gv('fast-elapsed-timer');if(etEl)etEl.textContent=timerStr;
+  const pctEl=gv('fast-pct-label');if(pctEl)pctEl.textContent=`ELAPSED (${Math.round(pct)}%)`;
+
+  // Ring arc
+  const arc=gv('fast-ring-arc');
+  if(arc)arc.style.strokeDashoffset=String(FAST_CIRC*(1-pct/100));
+
+  // Phase
+  const pl=gv('fast-phase-label');if(pl)pl.textContent=getFastPhase(elapsedHours).name.toUpperCase();
+  const pn=gv('fast-phase-name');if(pn)pn.textContent=getFastPhase(elapsedHours).name;
+  const pd=gv('fast-phase-desc');if(pd)pd.textContent=getFastPhase(elapsedHours).desc;
+  const pi=gv('fast-phase-icon');if(pi)pi.textContent=getFastPhase(elapsedHours).icon;
+
+  // Remaining
+  const remH=Math.floor(remainingMs/3600000),remM=Math.floor((remainingMs%3600000)/60000);
+  const remEl=gv('fast-remaining-timer');if(remEl)remEl.textContent=`${remH}h ${String(remM).padStart(2,'0')}m`;
+
+  // Phase dots
+  const dotsEl=gv('fast-phase-dots');
+  if(dotsEl){
+    dotsEl.innerHTML=FAST_PHASES.map(p=>{
+      const done=elapsedHours>=p.hours+4;
+      const curr=!done&&elapsedHours>=p.hours;
+      return`<div class="fast-phase-dot${done?' done':curr?' current':''}"></div>`;
+    }).join('');
+  }
+}
+
+function renderFastPage(){
+  const isActive=fastState&&!fastState.end;
+  const ps=gv('fast-protocol-section');if(ps)ps.style.display=isActive?'none':'block';
+  const idle=gv('fast-idle-content'),actc=gv('fast-active-content');
+  if(idle)idle.style.display=isActive?'none':'block';
+  if(actc)actc.style.display=isActive?'block':'none';
+  const arc=gv('fast-ring-arc');
+  if(arc){arc.classList.toggle('fasting',!!isActive);if(!isActive)arc.style.strokeDashoffset=String(FAST_CIRC);}
+  const ai=gv('fast-active-info');if(ai)ai.style.display=isActive?'block':'none';
+  const btn=gv('fast-main-btn');
+  if(btn){btn.textContent=isActive?'End Fast':'Start Fasting';btn.classList.toggle('ending',!!isActive);}
+  if(isActive&&fastState){
+    const startDt=new Date(fastState.start);
+    const endDt=new Date(startDt.getTime()+fastState.targetHours*3600000);
+    const fmt=d=>d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})+', '+d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+    const sl=gv('fast-start-lbl');if(sl)sl.textContent=fmt(startDt);
+    const el=gv('fast-end-lbl');if(el)el.textContent=fmt(endDt);
+    const gl=gv('fast-goal-label');if(gl)gl.textContent=fastState.targetHours+'H GOAL';
+    const gd=gv('fast-goal-disp');if(gd)gd.textContent=fastState.targetHours+'h';
+    _tickFastTimer();
+  }
+  if(!isActive)_updateFastIdleDisplay();
+  const fsn=gv('fast-streak-num');if(fsn)fsn.textContent=calcStreak();
+  _renderFastLog();
+}
+
+function _renderFastLog(){
+  const c=gv('fast-log-list');if(!c)return;
+  if(!fastLog.length){c.innerHTML='<div style="padding:0 14px 8px;font-size:13px;color:var(--muted)">No fasts logged yet — start your first fast above!</div>';return;}
+  c.innerHTML=fastLog.slice(0,7).map(f=>{
+    const dateStr=new Date(f.start).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+    const dur=f.actualHours!=null?`${f.actualHours}h`:`${f.targetHours}h`;
+    const completed=f.actualHours>=f.targetHours;
+    return`<div class="fast-log-item">
+      <div class="fli-top"><span class="fli-proto">${f.protocol}${completed?' ✓':''}</span><span class="fli-date">${dateStr}</span></div>
+      <div class="fli-dur">${dur}${completed?' · Goal reached! 🎉':f.actualHours!=null&&f.actualHours<f.targetHours?' · Ended early':''}</div>
+    </div>`;
+  }).join('');
+}
+
+function getFastContext(){
+  const isActive=fastState&&!fastState.end;
+  if(isActive){
+    const elapsed=(new Date()-new Date(fastState.start))/3600000;
+    const phase=getFastPhase(elapsed);
+    return`FASTING: Currently fasting (${fastState.protocol}, ${Math.floor(elapsed)}h elapsed, goal ${fastState.targetHours}h) · Phase: ${phase.name}`;
+  }
+  if(fastLog.length){
+    const last=fastLog[0];
+    const ago=new Date(last.start).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+    return`FASTING: Last fast on ${ago} — ${last.protocol}, ${last.actualHours}h (target ${last.targetHours}h)`;
+  }
+  return'FASTING: No fasts logged yet';
+}
+
+async function loadFastingRecommendation(forceRefresh=false){
+  const cached=localStorage.getItem(FAST_AI_KEY);
+  const cacheDate=localStorage.getItem(FAST_AI_KEY+'_date');
+  if(!forceRefresh&&cached&&cacheDate===todayKey()){
+    const el=gv('fast-ai-content');
+    if(el){el.innerHTML=cached.replace(/\n/g,'<br>');el.style.display='block';}
+    return;
+  }
+  const loading=gv('fast-ai-loading'),content=gv('fast-ai-content');
+  if(loading)loading.style.display='block';
+  if(content)content.style.display='none';
+  const recentFasts=fastLog.slice(0,7);
+  const avgDur=recentFasts.length?(recentFasts.reduce((s,f)=>s+(f.actualHours||f.targetHours),0)/recentFasts.length).toFixed(1):'none';
+  const ctx=`${getDayContext()}\n${getFastContext()}\nFasting preference: ${fastProtocol}\nAvg recent fast: ${avgDur}h over ${recentFasts.length} fasts\n${_buildCoachContext().workoutCtx}`;
+  try{
+    const resp=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      model:'claude-sonnet-4-6',max_tokens:450,
+      system:'You are a concise intermittent fasting and nutrition coach for Borna (26M, 89.1kg, 25.1% BF, goal 20.1% BF by Apr 27 2026). Give specific, actionable fasting advice. Be brief and direct. No markdown headers, just 3-4 short paragraphs.',
+      messages:[{role:'user',content:`Based on my data, recommend:\n1. Best fasting protocol (16:8, 18:6, or 20:4) for my fat loss goal and why\n2. Optimal eating window start/end times\n3. Which days this week to fast considering my workout schedule\n4. One key tip for right now\n\n${ctx}`}]
+    })});
+    const data=await resp.json();
+    const text=data.content?.[0]?.text||'Could not generate recommendation.';
+    localStorage.setItem(FAST_AI_KEY,text);
+    localStorage.setItem(FAST_AI_KEY+'_date',todayKey());
+    if(content){content.innerHTML=text.replace(/\n/g,'<br>');content.style.display='block';}
+  }catch(e){
+    if(content){content.textContent='Failed to load — check your connection.';content.style.display='block';}
+  }finally{
+    if(loading)loading.style.display='none';
+  }
+}
+
+// Workout page: fasting status banner
+function renderWorkoutFastBanner(){
+  const banner=gv('wo-fast-banner');if(!banner)return;
+  const isActive=fastState&&!fastState.end;
+  if(isActive){
+    const elapsed=(new Date()-new Date(fastState.start))/3600000;
+    const phase=getFastPhase(elapsed);
+    const startTime=new Date(fastState.start).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+    banner.style.display='flex';
+    banner.innerHTML=`<div class="fwb-icon">${phase.icon}</div><div class="fwb-text"><div class="fwb-title">Currently fasting \u00b7 ${phase.name}</div><div class="fwb-sub">Started ${startTime} \u00b7 ${Math.floor(elapsed)}h elapsed \u00b7 ${fastState.targetHours}h goal</div></div>`;
+  }else{
+    banner.style.display='none';
+  }
+}
+
+// Update the Fast nav button indicator dot when fasting state changes
+function _updateFastNavIndicator(){
+  const btn=gv('nb-fast');if(!btn)return;
+  const isActive=fastState&&!fastState.end;
+  let dot=btn.querySelector('.fast-nav-dot');
+  if(isActive&&!dot){
+    dot=document.createElement('div');
+    dot.className='fast-nav-dot';
+    btn.appendChild(dot);
+  } else if(!isActive&&dot){
+    dot.remove();
+  }
+}

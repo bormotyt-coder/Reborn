@@ -23,7 +23,13 @@
       <div class="logo-icon"><span style="font-family:var(--font);font-size:15px;font-weight:800;color:#fff;letter-spacing:-1px">rB</span></div>
       <div><div class="logo-main">reBorn</div></div>
     </div>
-    <button class="hdr-streak-btn" id="hdr-streak-btn" onclick="openStreakModal()">🔥 <span id="smc-num">0</span></button>
+    <div class="hdr-right-pills">
+      <button class="hdr-progress-pill" onclick="showPage('progress',this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Progress
+      </button>
+      <button class="hdr-streak-btn" id="hdr-streak-btn" onclick="openStreakModal()">🔥 <span id="smc-num">0</span></button>
+    </div>
   </div>
   <!-- DAY CALENDAR NAV -->
   <div class="day-cal-strip" id="day-cal-strip"></div>
@@ -163,6 +169,9 @@
       </button>
     </div>
   </div>
+
+  <!-- FASTING BANNER (shown when fasting is active) -->
+  <div id="wo-fast-banner" class="fast-workout-banner" style="display:none"></div>
 
   <!-- READINESS CARD -->
   <div class="wo-readiness-card">
@@ -311,28 +320,147 @@
 </div>
 
 
+<!-- ═══ FASTING PAGE ═══ -->
+<div id="pg-fast" class="page">
+  <div class="hdr">
+    <div class="logo-wrap">
+      <div class="logo-icon" style="background:linear-gradient(145deg,#8B6DB0,#6B4D90)"><span style="font-family:var(--font);font-size:18px;font-weight:800;color:#fff">⏱</span></div>
+      <div><div class="logo-main">Fasting</div><div class="logo-sub">Intermittent protocol</div></div>
+    </div>
+    <div class="hdr-right-pills">
+      <button class="hdr-progress-pill" onclick="showPage('progress',this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Progress
+      </button>
+      <button class="hdr-streak-btn" onclick="openStreakModal()">🔥 <span id="fast-streak-num">0</span></button>
+    </div>
+  </div>
+
+  <!-- PROTOCOL SELECTOR -->
+  <div id="fast-protocol-section" class="fast-section">
+    <div class="fast-protocol-label">Choose Protocol</div>
+    <div class="fast-proto-row">
+      <button class="fast-proto-btn active" onclick="selectFastProtocol('16:8',this)">
+        <span class="fpp-h">16:8</span><span class="fpp-s">16h fast</span>
+      </button>
+      <button class="fast-proto-btn" onclick="selectFastProtocol('18:6',this)">
+        <span class="fpp-h">18:6</span><span class="fpp-s">18h fast</span>
+      </button>
+      <button class="fast-proto-btn" onclick="selectFastProtocol('20:4',this)">
+        <span class="fpp-h">20:4</span><span class="fpp-s">20h fast</span>
+      </button>
+      <button class="fast-proto-btn" onclick="selectFastProtocol('custom',this)">
+        <span class="fpp-h">Custom</span><span class="fpp-s">Set own</span>
+      </button>
+    </div>
+    <div id="fast-custom-row" style="display:none;padding:8px 0 0">
+      <div class="frow"><div>
+        <label class="flbl">Custom Duration (hours)</label>
+        <input type="number" id="fast-custom-h" placeholder="e.g. 14" min="1" max="72" step="1" oninput="updateCustomFastProtocol()"/>
+      </div></div>
+    </div>
+  </div>
+
+  <!-- CIRCULAR PROGRESS RING -->
+  <div class="fast-ring-wrap">
+    <svg class="fast-ring-svg" viewBox="0 0 280 280" width="260" height="260">
+      <circle class="fast-ring-bg" cx="140" cy="140" r="116"/>
+      <circle class="fast-ring-fill" id="fast-ring-arc" cx="140" cy="140" r="116" stroke-dasharray="729.1" stroke-dashoffset="729.1"/>
+    </svg>
+    <div class="fast-ring-content">
+      <div id="fast-idle-content">
+        <div class="fast-ring-label">UPCOMING FAST</div>
+        <div class="fast-ring-duration" id="fast-proto-display">16 hours</div>
+        <div class="fast-ring-sub" id="fast-edit-hint">Tap to start</div>
+      </div>
+      <div id="fast-active-content" style="display:none">
+        <div class="fast-ring-label" id="fast-phase-label">DIGESTION</div>
+        <div class="fast-ring-timer" id="fast-elapsed-timer">00:00:00</div>
+        <div class="fast-ring-sub" id="fast-pct-label">ELAPSED (0%)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- START / END BUTTON -->
+  <div style="padding:0 14px 10px">
+    <button class="fast-main-btn" id="fast-main-btn" onclick="toggleFast()">Start Fasting</button>
+  </div>
+
+  <!-- ACTIVE FAST INFO ROW -->
+  <div id="fast-active-info" style="display:none;padding:0 14px 10px">
+    <div class="fast-info-row">
+      <div class="fast-info-cell">
+        <div class="fast-info-label">STARTED</div>
+        <div class="fast-info-val" id="fast-start-lbl">—</div>
+      </div>
+      <div class="fast-info-cell" style="text-align:center;display:flex;align-items:center;justify-content:center">
+        <div class="fast-phase-dots" id="fast-phase-dots"></div>
+      </div>
+      <div class="fast-info-cell" style="text-align:right">
+        <div class="fast-info-label" id="fast-goal-label">16H GOAL</div>
+        <div class="fast-info-val" id="fast-end-lbl">—</div>
+      </div>
+    </div>
+    <div style="margin-top:8px">
+      <div class="fast-phase-banner" id="fast-phase-banner">
+        <div class="fast-phase-icon" id="fast-phase-icon">🍽️</div>
+        <div>
+          <div class="fast-phase-name" id="fast-phase-name">Digestion</div>
+          <div class="fast-phase-desc" id="fast-phase-desc">Your body is processing your last meal</div>
+        </div>
+      </div>
+    </div>
+    <div class="fast-remaining-card" style="margin-top:8px">
+      <div>
+        <div class="fast-rem-label">Time Remaining</div>
+        <div class="fast-rem-time" id="fast-remaining-timer">—</div>
+      </div>
+      <div style="text-align:right">
+        <div class="fast-rem-label">Goal</div>
+        <div class="fast-rem-time" id="fast-goal-disp" style="color:var(--fc)">16h</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI RECOMMENDATION -->
+  <div class="fast-ai-section">
+    <div class="fast-ai-header">
+      <div class="fast-ai-title">🤖 AI Fasting Recommendation</div>
+      <button class="fast-ai-refresh" onclick="loadFastingRecommendation(true)">↻ Refresh</button>
+    </div>
+    <div id="fast-ai-loading" style="display:none" class="loading"><div class="spin"></div><br>Analyzing your data…</div>
+    <div id="fast-ai-content" class="fast-ai-content">Tap Refresh to get a personalized fasting recommendation based on your goals and data.</div>
+  </div>
+
+  <!-- RECENT FASTS LOG -->
+  <div style="padding:0 0 8px">
+    <div class="sec-lbl" style="padding:0 14px 8px">Recent Fasts</div>
+    <div id="fast-log-list"></div>
+  </div>
+</div>
+
 </div><!-- #app -->
 
 <!-- BOTTOM NAV -->
 <nav class="bnav">
   <div class="bnav-inner">
-    <button class="nb active" onclick="showPage('today',this)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-      <span>Today</span>
+    <button class="nb active" id="nb-today" onclick="showPage('today',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+      <span>Log Meal</span>
     </button>
-    <button class="nb" onclick="showPage('workout',this)">
+    <button class="nb" id="nb-workout" onclick="showPage('workout',this)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6.5 6.5h11M6.5 17.5h11M4 12h16M2 9l2 3-2 3M22 9l-2 3 2 3"/></svg>
       <span>Workout</span>
     </button>
-    <button class="nb" onclick="showPage('coach',this)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2a10 10 0 110 20A10 10 0 0112 2z"/><path d="M12 16v-4M12 8h.01"/></svg>
-      <span>Coach</span>
-    </button>
-    <button class="nb" onclick="showPage('progress',this)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-      <span>Progress</span>
+    <button class="nb" id="nb-fast" onclick="showPage('fast',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+      <span>Fast</span>
     </button>
   </div>
+  <button class="coach-fab" id="coach-fab" onclick="showPage('coach',this)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22"><path d="M12 2a10 10 0 110 20A10 10 0 0112 2z"/><path d="M12 16v-4M12 8h.01"/></svg>
+    <span>AI</span>
+  </button>
 </nav>
 
 <!-- MODAL: LOG MEAL -->
