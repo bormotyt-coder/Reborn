@@ -83,8 +83,8 @@ body {
 .nb {
   flex: 1; background: none; border: none;
   color: var(--muted); display: flex; flex-direction: column;
-  align-items: center; gap: 2px; cursor: pointer;
-  padding: 8px 4px; border-radius: 14px; transition: all .2s ease;
+  align-items: center; justify-content: center; gap: 2px; cursor: pointer;
+  padding: 6px 4px; border-radius: 24px; transition: all .2s ease;
 }
 .nb svg { width: 22px; height: 22px; stroke-width: 1.8; }
 .nb span { font-family: var(--font); font-size: 10px; font-weight: 500; letter-spacing: .02em; }
@@ -352,9 +352,10 @@ body {
 .fab-dim.show { display: block; }
 
 .fab-wrap {
-  position: fixed; bottom: calc(74px + env(safe-area-inset-bottom)); right: 18px;
-  display: flex; flex-direction: column; align-items: flex-end; gap: 10px; z-index: 49;
-  pointer-events: none;
+  position: relative;
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  z-index: 49; pointer-events: none;
 }
 .fab-main {
   width: 56px; height: 56px; border-radius: 50%;
@@ -371,6 +372,7 @@ body {
 #fab-icon { width: 22px; height: 22px; }
 
 .fab-sub-btns {
+  position: absolute; bottom: calc(100% + 10px); right: 0;
   display: flex; flex-direction: column; align-items: flex-end; gap: 9px;
   pointer-events: none;
 }
@@ -402,7 +404,7 @@ body {
 .fab-wo-pill { display: none; }
 
 .fab-recent-panel {
-  position: absolute; bottom: 72px; right: 0; z-index: 1; width: 284px;
+  position: absolute; bottom: calc(100% + 10px); right: 0; z-index: 1; width: 284px;
   background: #fff; border: 1px solid var(--border);
   border-radius: 20px; overflow: hidden; box-shadow: var(--sh-lg);
   opacity: 0; pointer-events: none; transform: translateY(8px) scale(0.95);
@@ -1053,10 +1055,11 @@ input:focus, textarea:focus, select:focus { border-color: var(--blue); }
   backdrop-filter: blur(40px) saturate(180%);
   -webkit-backdrop-filter: blur(40px) saturate(180%);
   border: 1px solid rgba(0,0,0,0.10);
-  border-radius: 22px;
+  border-radius: 28px;
   display: flex;
-  padding: 6px 6px;
+  padding: 4px 4px;
   box-shadow: 0 4px 24px rgba(0,0,0,0.18), 0 1px 4px rgba(0,0,0,0.10);
+  height: 56px; align-items: stretch;
 }
 .coach-fab {
   width: 52px; height: 52px; flex-shrink: 0;
