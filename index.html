@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="reBorn">
-<meta name="theme-color" content="#090b10">
+<meta name="theme-color" content="#F5F2EC">
 <title>Project reBorn</title>
 <link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxODAgMTgwIj48cmVjdCB3aWR0aD0iMTgwIiBoZWlnaHQ9IjE4MCIgcng9IjQwIiBmaWxsPSIjMDkwYjEwIi8+PHRleHQgeD0iNTAlIiB5PSI1NCUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJHZW9yZ2lhLHNlcmlmIiBmb250LXNpemU9IjkwIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0iI2Q0ZjUzYyI+ckI8L3RleHQ+PC9zdmc+">
 <!-- fonts loaded via style.css @import -->
@@ -28,7 +28,7 @@
   <div class="scan-banner">
     <div class="sb-label">🔬 Styku · Mar 4, 2026</div>
     <div class="sb-row">
-      <div class="sb-s"><div class="sb-v" style="color:var(--blue2)">25.1%</div><div class="sb-l">Body Fat</div></div>
+      <div class="sb-s"><div class="sb-v" style="color:var(--blue)">25.1%</div><div class="sb-l">Body Fat</div></div>
       <div class="sb-s"><div class="sb-v">64.0</div><div class="sb-l">Lean kg</div></div>
       <div class="sb-s"><div class="sb-v">1,965</div><div class="sb-l">BMR</div></div>
       <div class="sb-s"><div class="sb-v" style="color:var(--cyan)">2,340</div><div class="sb-l">Target kcal</div></div>
@@ -90,6 +90,8 @@
       </div>
     </div>
   </div>
+  <div class="sec-lbl">Today's Meals</div>
+  <div id="food-list" class="food-list"></div>
   <!-- NUTRIENT BREAKDOWN -->
   <div class="gc">
     <div class="gc-in">
@@ -135,13 +137,11 @@
     <div class="gc-in">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
         <div class="sec-lbl" style="padding:0;font-size:10px">What to eat next</div>
-        <button id="suggest-btn" onclick="generateSuggestions()" style="background:rgba(200,241,53,0.1);border:1px solid rgba(200,241,53,0.25);border-radius:8px;padding:5px 12px;font-family:var(--font);font-size:12px;font-weight:700;color:var(--blue2);cursor:pointer">✦ Suggest</button>
+        <button id="suggest-btn" onclick="generateSuggestions()" style="background:rgba(74,124,126,0.07);border:1px solid rgba(74,124,126,0.14);border-radius:10px;padding:5px 12px;font-family:var(--font);font-size:12px;font-weight:700;color:var(--blue);cursor:pointer">✦ Suggest</button>
       </div>
-      <div id="suggest-results"><div style="color:var(--muted);font-size:12px;line-height:1.6">Tap <strong style="color:var(--blue2)">Suggest</strong> to get 3 AI-picked foods that fill your remaining macros for the day.</div></div>
+      <div id="suggest-results"><div style="color:var(--muted);font-size:12px;line-height:1.6">Tap <strong style="color:var(--blue)">Suggest</strong> to get 3 AI-picked foods that fill your remaining macros for the day.</div></div>
     </div>
   </div>
-  <div class="sec-lbl">Today's Meals</div>
-  <div id="food-list" class="food-list"></div>
 </div>
 
 <!-- ═══ WEEKLY ═══ -->
@@ -152,9 +152,14 @@
       <div class="logo-icon"><span style="font-family:var(--font);font-size:15px;font-weight:800;color:#fff;letter-spacing:-1px">rB</span></div>
       <div><div class="logo-main">Workout</div><div class="logo-sub" id="wo-hdr-sub">Train Smart</div></div>
     </div>
-    <button class="wo-history-btn" onclick="showWorkoutHistory()">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-    </button>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="wo-history-btn" onclick="showRoutinesModal()" title="My Routines">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 10h16M4 14h10M4 18h10"/></svg>
+      </button>
+      <button class="wo-history-btn" onclick="showWorkoutHistory()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      </button>
+    </div>
   </div>
 
   <!-- READINESS CARD -->
@@ -162,7 +167,7 @@
     <div class="wo-ready-left">
       <div class="wo-ready-ring">
         <svg viewBox="0 0 60 60" width="60" height="60">
-          <circle cx="30" cy="30" r="25" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="5"/>
+          <circle cx="30" cy="30" r="25" fill="none" stroke="rgba(0,0,0,0.06)" stroke-width="5"/>
           <circle id="wo-ready-arc" cx="30" cy="30" r="25" fill="none" stroke="#3dd68c" stroke-width="5"
             stroke-dasharray="157" stroke-dashoffset="157" stroke-linecap="round"
             transform="rotate(-90 30 30)"/>
@@ -185,31 +190,23 @@
   <div class="wo-recovery-input-card">
     <div class="wo-ri-label">⚡ WHOOP Recovery % this morning</div>
     <div class="wo-ri-row">
-      <input type="number" id="wo-rec-val" class="wo-rec-input" placeholder="74" min="0" max="100" oninput="updateReadiness()">
+      <input type="number" id="wo-rec-val" class="wo-rec-input" placeholder="74" min="0" max="100" oninput="updateReadiness();gv('wo-rec-autofill').style.display='none'">
       <div class="wo-rec-btns">
         <button class="wo-rec-preset" onclick="setRecovery(25)" style="color:var(--red)">🔴 &lt;34</button>
         <button class="wo-rec-preset" onclick="setRecovery(55)" style="color:var(--amber)">🟡 34–66</button>
         <button class="wo-rec-preset" onclick="setRecovery(80)" style="color:var(--green)">🟢 67+</button>
       </div>
     </div>
+    <div id="wo-rec-autofill" style="display:none;margin-top:6px;font-family:var(--font);font-size:11px;font-weight:600;color:var(--green)">Auto-filled from WHOOP ✓</div>
   </div>
 
   <!-- GENERATE VIEW -->
   <div id="wo-generate-view">
     <div id="wo-last-session"></div>
-    <button class="wo-coach-btn" onclick="openCoachModal()">
-      <span class="wo-coach-icon">🧠</span>
-      <div class="wo-coach-text">
-        <div class="wo-coach-title">Daily Coach</div>
-        <div class="wo-coach-sub">Debrief · macros · recovery · chat</div>
-      </div>
-      <svg class="wo-coach-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
-    </button>
-    <button class="wo-gen-btn" id="wo-gen-btn" onclick="generateWorkout()">
-      <div class="wo-gen-icon">⚡</div>
-      <div class="wo-gen-title">Generate Today's Split</div>
-      <div class="wo-gen-sub">AI analyses your recovery, yesterday's nutrition &amp; training history</div>
-    </button>
+    <div id="wo-generating" class="wo-generating" style="display:none">
+      <div class="coach-spin"></div>
+      <span>Generating your split…</span>
+    </div>
     <div id="wo-plan-preview" style="display:none">
       <div class="wo-plan-header">
         <div style="flex:1">
@@ -244,20 +241,21 @@
 </div>
 
 <!-- ═══ WEEKLY + CALENDAR (merged) ═══ -->
-<div id="pg-weekly" class="page">
+<div id="pg-progress" class="page">
   <div class="hdr">
     <div class="logo-wrap">
       <div class="logo-icon"><span style="font-family:var(--font);font-size:15px;font-weight:800;color:#fff;letter-spacing:-1px">rB</span></div>
-      <div><div class="logo-main">Weekly</div><div class="logo-sub">Last 7 days</div></div>
+      <div><div class="logo-main">Progress</div><div class="logo-sub">Your journey</div></div>
     </div>
   </div>
   <!-- Tab toggle -->
   <div class="wk-tab-bar">
-    <button class="wk-tab active" id="wk-tab-weekly" onclick="switchWeeklyTab('weekly')">Weekly</button>
+    <button class="wk-tab active" id="wk-tab-weekly" onclick="switchWeeklyTab('weekly')">Overview</button>
     <button class="wk-tab" id="wk-tab-calendar" onclick="switchWeeklyTab('calendar')">Calendar</button>
+    <button class="wk-tab" id="wk-tab-stats" onclick="switchWeeklyTab('stats')">Stats</button>
   </div>
   <div id="wk-tab-content-weekly" class="week-pg">
-    <div id="weekly-content"></div>
+    <div id="progress-content"></div>
   </div>
   <div id="wk-tab-content-calendar" style="display:none">
     <div class="cal-pg">
@@ -266,82 +264,48 @@
         <div class="cal-month" id="cal-month-lbl"></div>
         <button class="cal-navbtn" onclick="changeMonth(1)">›</button>
       </div>
+      <div style="display:flex;gap:14px;padding:0 4px 8px;align-items:center">
+        <div style="display:flex;align-items:center;gap:5px"><div style="width:5px;height:5px;border-radius:50%;background:#4ade80"></div><span style="font-family:var(--font-body);font-size:11px;color:var(--muted)">Meals logged</span></div>
+        <div style="display:flex;align-items:center;gap:5px"><div style="width:5px;height:5px;border-radius:50%;background:var(--blue2)"></div><span style="font-family:var(--font-body);font-size:11px;color:var(--muted)">Workout done</span></div>
+      </div>
       <div class="cal-dow-row" id="cal-dow"></div>
       <div class="cal-grid" id="cal-grid"></div>
       <div class="day-detail" id="day-detail"></div>
     </div>
   </div>
+  <div id="wk-tab-content-stats" class="week-pg" style="display:none">
+    <div id="progress-stats-content"></div>
+  </div>
 </div>
 
-<!-- ═══ AI COACH ═══ -->
-<!-- COACH MODAL OVERLAY (bottom sheet) -->
-<div id="coach-modal-overlay" class="coach-modal-overlay">
-  <div class="coach-modal-sheet">
-    <div class="coach-modal-topbar">
-      <div class="coach-modal-handle"></div>
-      <button class="coach-modal-close" onclick="closeCoachModal()">✕</button>
-    </div>
-    <div class="coach-modal-scroll">
-      <div class="coach-pg">
-        <div class="coach-hdr">
-          <div class="coach-title">Today's Report</div>
-          <div class="coach-date" id="coach-date"></div>
-        </div>
-        <div class="coach-stats">
-          <div class="cs-card"><div class="cs-v" id="cs-cal" style="color:var(--blue2)">—</div><div class="cs-l">kcal eaten</div></div>
-          <div class="cs-card"><div class="cs-v" id="cs-protein" style="color:var(--pc)">—</div><div class="cs-l">protein g</div></div>
-          <div class="cs-card"><div class="cs-v" id="cs-water" style="color:var(--wc)">—</div><div class="cs-l">water mL</div></div>
-        </div>
-        <button class="coach-generate" onclick="generateCoachReport()">
-          <div class="cg-icon">🧠</div>
-          <div class="cg-title">Generate Daily Debrief</div>
-          <div class="cg-sub">Claude analyses your meals, macros, Whoop data and hydration — and gives you a direct, honest breakdown.</div>
-        </button>
-        <div class="coach-loading" id="coach-loading">
-          <div class="coach-spin"></div><br>Analysing your day…
-        </div>
-        <div class="coach-response" id="coach-response"></div>
-        <div class="coach-chat" id="coach-chat">
-          <div style="font-family:var(--font);font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px">Ask Your Coach</div>
-          <div class="chat-messages" id="chat-messages"></div>
-          <div class="chat-input-row">
-            <textarea class="chat-input" id="chat-input" rows="1" placeholder="Ask anything about today…" onkeydown="handleChatKey(event)" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,100)+'px'"></textarea>
-            <button class="chat-send" onclick="sendChatMessage()">
-              <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-            </button>
-          </div>
-        </div>
+<!-- ═══ AI COACH PAGE ═══ -->
+<div id="pg-coach" class="page">
+  <div class="coach-topbar">
+    <div class="coach-tb-left">
+      <div class="coach-tb-avatar">🧠</div>
+      <div class="coach-tb-info">
+        <div class="coach-tb-name">Coach</div>
+        <div class="coach-tb-date" id="coach-date"></div>
       </div>
     </div>
+    <div class="coach-tb-stats">
+      <div><span id="cs-cal" style="color:var(--blue)">—</span><span class="coach-tb-unit"> kcal</span></div>
+      <div><span id="cs-protein" style="color:var(--pc)">—</span><span class="coach-tb-unit">g P</span></div>
+      <div><span id="cs-water" style="color:var(--wc)">—</span><span class="coach-tb-unit"> mL</span></div>
+    </div>
+  </div>
+  <div class="coach-chat-area" id="chat-messages"></div>
+  <div class="coach-bottom">
+    <div class="coach-suggestions" id="coach-suggestions"></div>
+    <div class="chat-input-row">
+      <textarea class="chat-input" id="chat-input" rows="1" placeholder="Ask anything about today…" onkeydown="handleChatKey(event)" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,100)+'px'"></textarea>
+      <button class="chat-send" onclick="sendChatMessage()">
+        <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      </button>
+    </div>
   </div>
 </div>
 
-<!-- ═══ PROGRESS ═══ -->
-<div id="pg-progress" class="page">
-  <div class="hdr">
-    <div class="logo-wrap">
-      <div class="logo-icon"><span style="font-family:var(--font);font-size:15px;font-weight:800;color:#fff;letter-spacing:-1px">rB</span></div>
-      <div><div class="logo-main">Progress</div></div>
-    </div>
-  </div>
-  <div class="prog-pg">
-    <div class="prog-hdr"><div class="prog-title">Body Tracker</div><button class="add-btn" onclick="openEntryModal()">+ Log Entry</button></div>
-    <div class="stats-grid">
-      <div class="sc"><div class="sc-lbl">Weight</div><div class="sc-val" id="p-weight" style="color:var(--blue2)">89.1</div><div class="sc-unit">kg</div><div class="sc-delta" id="p-w-delta"></div></div>
-      <div class="sc"><div class="sc-lbl">Body Fat</div><div class="sc-val" id="p-bf" style="color:var(--cyan)">25.1</div><div class="sc-unit">%</div><div class="sc-delta" id="p-bf-delta"></div></div>
-    </div>
-    <div class="goal-card">
-      <div class="goal-top"><div class="goal-lbl">Fat Loss Goal</div><div class="goal-pct" id="goal-pct">0%</div></div>
-      <div class="gbar"><div class="gbar-f" id="gbar-f" style="width:0%"></div></div>
-      <div class="goal-detail" id="goal-detail">Baseline: 22.4kg fat → Target: 16.8kg fat (20.1% BF)</div>
-      <div class="goal-dates"><span>Started: Mar 4, 2026</span><span>Target: Apr 27, 2026</span></div>
-    </div>
-    <div class="chart-card"><div class="chart-title">Weight (kg)</div><div class="chart-area" id="chart-w"><div style="color:var(--muted);font-size:11px;padding:8px">No entries yet.</div></div></div>
-    <div class="chart-card"><div class="chart-title">Body Fat %</div><div class="chart-area" id="chart-bf"><div style="color:var(--muted);font-size:11px;padding:8px">No entries yet.</div></div></div>
-    <div class="sec-lbl" style="padding-left:0;padding-top:4px">History</div>
-    <div class="entries-list" id="entries-list"><div style="text-align:center;padding:24px;color:var(--muted);font-size:12px">No entries yet.</div></div>
-  </div>
-</div>
 
 </div><!-- #app -->
 
@@ -356,12 +320,12 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6.5 6.5h11M6.5 17.5h11M4 12h16M2 9l2 3-2 3M22 9l-2 3 2 3"/></svg>
       <span>Workout</span>
     </button>
-    <button class="nb" onclick="showPage('weekly',this)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-      <span>Weekly</span>
+    <button class="nb" onclick="showPage('coach',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2a10 10 0 110 20A10 10 0 0112 2z"/><path d="M12 16v-4M12 8h.01"/></svg>
+      <span>Coach</span>
     </button>
     <button class="nb" onclick="showPage('progress',this)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
       <span>Progress</span>
     </button>
   </div>
@@ -374,7 +338,7 @@
     <div class="m-title">Log a Meal</div>
     <div class="m-sub">Photo or describe your meal. Claude identifies each ingredient separately so you can select exactly what's on your plate.</div>
     <div class="photo-zone" id="photo-zone" onclick="document.getElementById('file-meal').click()">
-      <div id="ph-ph"><span class="ph-icon">📷</span>Tap to take photo or upload<br><span style="font-size:10px;color:rgba(255,255,255,0.25)">optional — description alone works</span></div>
+      <div id="ph-ph"><span class="ph-icon">📷</span>Tap to take photo or upload<br><span style="font-size:10px;color:var(--muted)">optional — description alone works</span></div>
       <img id="preview" style="display:none"/>
     </div>
     <input type="file" id="file-meal" accept="image/*" capture="environment" onchange="handleMealPhoto(event)" style="display:none"/>
@@ -393,11 +357,11 @@
 
       <!-- Add missing ingredient -->
       <div style="margin:4px 0 8px">
-        <button onclick="toggleAddIngForm()" style="width:100%;background:rgba(245,166,35,0.06);border:1.5px dashed rgba(245,166,35,0.25);border-radius:12px;padding:11px;font-family:var(--font);font-size:15px;font-weight:700;color:var(--amber);cursor:pointer;letter-spacing:.05em">+ Add Missing Ingredient</button>
-        <div id="add-ing-form" style="display:none;background:rgba(245,166,35,0.05);border:1px solid rgba(245,166,35,0.18);border-radius:14px;padding:14px;margin-top:8px">
+        <button onclick="toggleAddIngForm()" style="width:100%;background:rgba(200,148,68,0.05);border:1.5px dashed rgba(200,148,68,0.20);border-radius:12px;padding:11px;font-family:var(--font);font-size:15px;font-weight:700;color:var(--amber);cursor:pointer;letter-spacing:.05em">+ Add Missing Ingredient</button>
+        <div id="add-ing-form" style="display:none;background:rgba(200,148,68,0.04);border:1px solid rgba(200,148,68,0.14);border-radius:14px;padding:14px;margin-top:8px">
           <div style="font-family:var(--font);font-size:15px;font-weight:700;color:var(--amber);margin-bottom:4px">Add Ingredient</div>
           <input type="text" id="add-ing-name" placeholder="e.g. Olive oil 1 tbsp, Feta 30g" style="margin-bottom:8px"/>
-          <button onclick="aiLookupIngredient()" style="width:100%;background:rgba(245,166,35,0.1);border:1px solid rgba(245,166,35,0.3);border-radius:10px;padding:9px;font-family:var(--font);font-size:14px;font-weight:700;color:var(--amber);cursor:pointer;margin-bottom:4px">🔍 AI Lookup</button>
+          <button onclick="aiLookupIngredient()" style="width:100%;background:rgba(200,148,68,0.07);border:1px solid rgba(200,148,68,0.18);border-radius:10px;padding:9px;font-family:var(--font);font-size:14px;font-weight:700;color:var(--amber);cursor:pointer;margin-bottom:4px">🔍 AI Lookup</button>
           <div class="loading" id="ing-lookup-loading" style="color:var(--amber)"><div class="spin" style="border-top-color:var(--amber)"></div><br>Looking up…</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px">
             <div><label class="flbl" style="margin-top:0">Emoji</label><input type="text" id="add-ing-emoji" placeholder="🫒" maxlength="2"/></div>
@@ -407,22 +371,22 @@
             <div><label class="flbl" style="margin-top:0">Fat (g)</label><input type="number" id="add-ing-f" placeholder="g"/></div>
             <div><label class="flbl" style="margin-top:0">Portion</label><input type="text" id="add-ing-portion" placeholder="e.g. 1 tbsp"/></div>
           </div>
-          <button onclick="addManualIngredient()" style="width:100%;background:linear-gradient(135deg,var(--amber),rgba(245,166,35,0.7));color:#080a0a;border:none;border-radius:12px;padding:13px;font-family:var(--font);font-size:18px;font-weight:800;cursor:pointer;margin-top:10px">ADD INGREDIENT</button>
+          <button onclick="addManualIngredient()" style="width:100%;background:linear-gradient(145deg,var(--amber),#D4A855);color:#fff;border:none;border-radius:12px;padding:13px;font-family:var(--font);font-size:18px;font-weight:800;cursor:pointer;margin-top:10px">ADD INGREDIENT</button>
         </div>
       </div>
 
       <!-- Total row — tap pencil to edit totals and redistribute to ingredients -->
-      <div id="sel-totals-view" style="background:rgba(255,255,255,0.04);border-radius:12px;padding:11px 14px;margin-bottom:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <div id="sel-totals-view" style="background:var(--bg);border-radius:12px;padding:11px 14px;margin-bottom:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
         <span style="font-family:var(--font);font-size:14px;font-weight:700;color:var(--text2)">Total:</span>
-        <span id="sel-cal" style="color:var(--blue2);font-family:var(--font);font-weight:700;font-size:14px">0 kcal</span>
+        <span id="sel-cal" style="color:var(--blue);font-family:var(--font);font-weight:700;font-size:14px">0 kcal</span>
         <span id="sel-p" style="color:var(--pc);font-family:var(--font);font-weight:700;font-size:14px">0g P</span>
         <span id="sel-c" style="color:var(--cc);font-family:var(--font);font-weight:700;font-size:14px">0g C</span>
         <span id="sel-f" style="color:var(--fc);font-family:var(--font);font-weight:700;font-size:14px">0g F</span>
         <button class="tot-edit-btn" onclick="openTotalEdit()" title="Override totals">✏️</button>
       </div>
       <!-- Total edit panel -->
-      <div id="sel-totals-edit" style="display:none;background:rgba(56,139,253,0.06);border:1px solid rgba(56,139,253,0.25);border-radius:12px;padding:12px 14px;margin-bottom:8px">
-        <div style="font-family:var(--font);font-size:11px;font-weight:700;color:var(--blue2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Override totals — ingredients will be rescaled to match</div>
+      <div id="sel-totals-edit" style="display:none;background:rgba(74,124,126,0.05);border:1px solid rgba(74,124,126,0.14);border-radius:12px;padding:12px 14px;margin-bottom:8px">
+        <div style="font-family:var(--font);font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Override totals — ingredients will be rescaled to match</div>
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:10px">
           <div class="ing-edit-col"><label class="ing-edit-lbl">kcal</label><input class="ing-edit-in" id="tot-cal" type="number" min="0" step="1" inputmode="decimal"/></div>
           <div class="ing-edit-col"><label class="ing-edit-lbl">Protein g</label><input class="ing-edit-in" id="tot-p" type="number" min="0" step="0.1" inputmode="decimal"/></div>
@@ -442,7 +406,7 @@
         </div>
         <div id="li-needs" style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px"></div>
         <div id="li-bars" style="display:flex;flex-direction:column;gap:7px;margin-bottom:10px"></div>
-        <div id="li-verdict" style="font-size:12px;color:var(--text2);line-height:1.7;padding:9px 12px;background:rgba(255,255,255,0.04);border-radius:10px"></div>
+        <div id="li-verdict" style="font-size:12px;color:var(--text2);line-height:1.7;padding:9px 12px;background:var(--bg);border-radius:10px"></div>
       </div>
       <button class="btn-confirm" onclick="confirmMeal()">+ ADD TO TODAY'S LOG</button>
     </div>
@@ -459,7 +423,7 @@
     <div class="m-title" style="color:var(--whoop-green)" id="whoop-modal-title">WHOOP · Wake Up</div>
     <div class="m-sub" id="whoop-modal-sub">Log your sleep and recovery from this morning.</div>
     <div id="whoop-modal-fields"></div>
-    <button class="btn-p" style="background:linear-gradient(135deg,var(--whoop-green),rgba(0,229,190,0.7));color:#04100e" onclick="saveWhoop()">SAVE</button>
+    <button class="btn-p" style="background:linear-gradient(145deg,var(--whoop-green),#3DB8A8);color:#fff" onclick="saveWhoop()">SAVE</button>
     <button class="btn-s" onclick="closeWhoopModal()">Cancel</button>
   </div>
 </div>
@@ -519,7 +483,7 @@
       </div>
     </div>
     <!-- Big scan button -->
-    <button id="barcode-snap-btn" onclick="snapAndReadBarcode()" style="width:100%;margin-top:10px;background:linear-gradient(135deg,var(--blue),rgba(56,139,253,0.75));color:#fff;border:none;border-radius:14px;padding:14px;font-family:var(--font);font-size:19px;font-weight:800;cursor:pointer;letter-spacing:.5px">📷 Read Barcode</button>
+    <button id="barcode-snap-btn" onclick="snapAndReadBarcode()" style="width:100%;margin-top:10px;background:linear-gradient(145deg,#4A7C7E,#6BA3A0);color:#fff;border:none;border-radius:14px;padding:14px;font-family:var(--font);font-size:19px;font-weight:800;cursor:pointer;letter-spacing:.5px">📷 Read Barcode</button>
     <div style="display:flex;align-items:center;gap:8px;margin-top:10px">
       <div style="flex:1;height:1px;background:var(--border)"></div>
       <span style="font-size:10px;color:var(--muted);flex-shrink:0">OR TYPE MANUALLY</span>
@@ -527,13 +491,13 @@
     </div>
     <div style="display:flex;gap:8px;margin-top:8px">
       <input type="text" id="barcode-manual" placeholder="e.g. 6294003614888" inputmode="numeric" style="flex:1"/>
-      <button onclick="lookupBarcode(gv('barcode-manual').value)" style="background:rgba(255,255,255,0.08);border:1px solid var(--border);border-radius:10px;padding:0 16px;font-family:var(--font);font-size:14px;font-weight:800;color:var(--text2);cursor:pointer;flex-shrink:0">GO</button>
+      <button onclick="lookupBarcode(gv('barcode-manual').value)" style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:0 16px;font-family:var(--font);font-size:14px;font-weight:800;color:var(--text2);cursor:pointer;flex-shrink:0">GO</button>
     </div>
     <div id="barcode-result" style="display:none;margin-top:14px;background:var(--glass);border:1px solid var(--border);border-radius:16px;padding:14px">
       <div class="bc-name" id="bc-name" style="font-family:var(--font);font-size:18px;font-weight:800;margin-bottom:6px"></div>
       <div id="bc-serving" style="font-size:11px;color:var(--muted);margin-bottom:10px"></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
-        <span id="bc-cal" style="color:var(--blue2);font-family:var(--font);font-weight:700;font-size:14px"></span>
+        <span id="bc-cal" style="color:var(--blue);font-family:var(--font);font-weight:700;font-size:14px"></span>
         <span id="bc-p" style="color:var(--pc);font-family:var(--font);font-weight:700;font-size:14px"></span>
         <span id="bc-c" style="color:var(--cc);font-family:var(--font);font-weight:700;font-size:14px"></span>
         <span id="bc-f" style="color:var(--fc);font-family:var(--font);font-weight:700;font-size:14px"></span>
@@ -547,7 +511,7 @@
         <label class="flbl" style="margin:0;flex-shrink:0">Servings:</label>
         <input type="number" id="barcode-qty" value="1" min="0.5" step="0.5" style="width:70px"/>
       </div>
-      <button onclick="addBarcodeItem()" style="width:100%;background:linear-gradient(135deg,var(--blue),rgba(56,139,253,0.75));color:#fff;border:none;border-radius:14px;padding:14px;font-family:var(--font);font-size:20px;font-weight:800;cursor:pointer">+ ADD TO LOG</button>
+      <button onclick="addBarcodeItem()" style="width:100%;background:linear-gradient(145deg,#4A7C7E,#6BA3A0);color:#fff;border:none;border-radius:14px;padding:14px;font-family:var(--font);font-size:20px;font-weight:800;cursor:pointer">+ ADD TO LOG</button>
     </div>
     <button class="btn-s" style="margin-top:10px" onclick="closeBarcodeModal()">Cancel</button>
   </div>
@@ -558,11 +522,11 @@
 <div class="overlay" id="impact-modal">
   <div class="modal">
     <div class="m-handle"></div>
-    <div style="font-family:var(--font);font-size:22px;font-weight:800;color:var(--blue2);margin-bottom:6px">🎯 Macro Impact</div>
+    <div style="font-family:var(--font);font-size:22px;font-weight:800;color:var(--blue);margin-bottom:6px">🎯 Macro Impact</div>
     <div style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.6">Scan or describe a food to see exactly how it fits your remaining targets.</div>
     <div class="impact-needs" id="impact-needs" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px"></div>
     <div class="photo-zone" id="impact-photo-zone" onclick="document.getElementById('file-impact').click()">
-      <div id="impact-ph-ph"><span class="ph-icon">📷</span>Tap to photo food<br><span style="font-size:10px;color:rgba(255,255,255,0.25)">or describe below</span></div>
+      <div id="impact-ph-ph"><span class="ph-icon">📷</span>Tap to photo food<br><span style="font-size:10px;color:var(--muted)">or describe below</span></div>
       <img id="impact-preview" style="display:none;max-width:100%;max-height:130px;border-radius:10px;object-fit:cover"/>
     </div>
     <input type="file" id="file-impact" accept="image/*" capture="environment" onchange="handleImpactPhoto(event)" style="display:none"/>
@@ -573,8 +537,8 @@
       <div style="font-family:var(--font);font-size:20px;font-weight:800;margin:12px 0 6px" id="impact-item-name"></div>
       <div id="impact-score" style="display:inline-flex;align-items:center;padding:5px 14px;border-radius:20px;font-family:var(--font);font-size:14px;font-weight:800;margin-bottom:12px"></div>
       <div id="impact-bars" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px"></div>
-      <div id="impact-verdict" style="font-size:12px;color:var(--text2);line-height:1.7;padding:10px 12px;background:rgba(255,255,255,0.04);border-radius:10px;margin-bottom:12px"></div>
-      <button onclick="addImpactMeal()" style="width:100%;background:linear-gradient(135deg,var(--blue),rgba(56,139,253,0.75));color:#fff;border:none;border-radius:14px;padding:14px;font-family:var(--font);font-size:20px;font-weight:800;cursor:pointer">+ ADD TO TODAY'S LOG</button>
+      <div id="impact-verdict" style="font-size:12px;color:var(--text2);line-height:1.7;padding:10px 12px;background:var(--bg);border-radius:10px;margin-bottom:12px"></div>
+      <button onclick="addImpactMeal()" style="width:100%;background:linear-gradient(145deg,#4A7C7E,#6BA3A0);color:#fff;border:none;border-radius:14px;padding:14px;font-family:var(--font);font-size:20px;font-weight:800;cursor:pointer">+ ADD TO TODAY'S LOG</button>
     </div>
     <button class="btn-p" id="impact-scan-btn" onclick="runImpactScan()" style="margin-top:10px">ANALYSE IMPACT</button>
     <button class="btn-s" onclick="closeImpactModal()">Close</button>
@@ -605,8 +569,8 @@
       <button class="mdd-edit-btn" id="mdd-edit-btn" onclick="openMealEdit()" title="Edit macros">✏️ Edit</button>
     </div>
     <!-- Inline macro edit panel -->
-    <div id="mdd-edit-panel" style="display:none;background:rgba(56,139,253,0.06);border:1px solid rgba(56,139,253,0.25);border-radius:12px;padding:12px 14px;margin-bottom:4px">
-      <div style="font-family:var(--font);font-size:10px;font-weight:700;color:var(--blue2);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px">Edit Macros</div>
+    <div id="mdd-edit-panel" style="display:none;background:rgba(74,124,126,0.05);border:1px solid rgba(74,124,126,0.14);border-radius:12px;padding:12px 14px;margin-bottom:4px">
+      <div style="font-family:var(--font);font-size:10px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px">Edit Macros</div>
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:10px">
         <div class="ing-edit-col"><label class="ing-edit-lbl">kcal</label><input class="ing-edit-in" id="mdd-in-cal" type="number" min="0" step="1" inputmode="decimal"/></div>
         <div class="ing-edit-col"><label class="ing-edit-lbl">Protein g</label><input class="ing-edit-in" id="mdd-in-p" type="number" min="0" step="0.1" inputmode="decimal"/></div>
@@ -682,7 +646,36 @@
 <!-- FAB: floating action button -->
 <div id="fab-wrap" class="fab-wrap">
 
-  <!-- Recent meals panel (slides in above pills when Recent tapped) -->
+  <!-- Today pill rows -->
+  <div id="fab-sub-btns" class="fab-sub-btns">
+    <div class="fab-pill fab-today-pill" style="--i:3" onclick="fabPillRecent()">
+      <span class="fab-pill-lbl">Recent</span>
+      <span class="fab-pill-ico">🕐</span>
+    </div>
+    <div class="fab-pill fab-today-pill" style="--i:2" onclick="fabClose();openQAModal()">
+      <span class="fab-pill-lbl">Quick Add</span>
+      <span class="fab-pill-ico">⚡</span>
+    </div>
+    <div class="fab-pill fab-today-pill" style="--i:1" onclick="fabClose();openBarcodeModal()">
+      <span class="fab-pill-lbl">Scan Barcode</span>
+      <span class="fab-pill-ico">📊</span>
+    </div>
+    <div class="fab-pill fab-today-pill" style="--i:0" onclick="fabClose();openLogModal()">
+      <span class="fab-pill-lbl">Photo or Description</span>
+      <span class="fab-pill-ico">📷</span>
+    </div>
+    <!-- Workout pill rows (hidden by default, shown via fab-wo-mode) -->
+    <div class="fab-pill fab-wo-pill" style="--i:1" onclick="fabClose();generateWorkout()">
+      <span class="fab-pill-lbl">Generate Split</span>
+      <span class="fab-pill-ico">⚡</span>
+    </div>
+  </div>
+
+  <button id="fab-main" class="fab-main" onclick="fabToggle()">
+    <svg id="fab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+  </button>
+
+  <!-- Recent meals panel — kept last so it paints above pills -->
   <div id="fab-recent-panel" class="fab-recent-panel">
     <div class="fab-rp-header">
       <span class="fab-rp-title">Recent Meals</span>
@@ -691,29 +684,6 @@
     <div id="fab-recent-list" class="fab-rp-list"></div>
   </div>
 
-  <!-- Four pill rows, fanning upward -->
-  <div id="fab-sub-btns" class="fab-sub-btns">
-    <div class="fab-pill" style="--i:3" onclick="fabPillRecent()">
-      <span class="fab-pill-lbl">Recent</span>
-      <span class="fab-pill-ico">🕐</span>
-    </div>
-    <div class="fab-pill" style="--i:2" onclick="fabClose();openQAModal()">
-      <span class="fab-pill-lbl">Quick Add</span>
-      <span class="fab-pill-ico">⚡</span>
-    </div>
-    <div class="fab-pill" style="--i:1" onclick="fabClose();openBarcodeModal()">
-      <span class="fab-pill-lbl">Scan Barcode</span>
-      <span class="fab-pill-ico">📊</span>
-    </div>
-    <div class="fab-pill" style="--i:0" onclick="fabClose();openLogModal()">
-      <span class="fab-pill-lbl">Log Meal</span>
-      <span class="fab-pill-ico">📷</span>
-    </div>
-  </div>
-
-  <button id="fab-main" class="fab-main" onclick="fabToggle()">
-    <svg id="fab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-  </button>
 </div>
 
 <div class="overlay" id="streak-modal" onclick="closeStreakModal()">
@@ -721,30 +691,49 @@
     <div class="m-handle"></div>
     <button class="sm-close-btn" onclick="closeStreakModal()">✕</button>
 
-    <!-- Flame canvas -->
-    <canvas id="streak-flame-canvas" class="sm-flame-canvas"></canvas>
-
-    <!-- Hero number + headline -->
-    <div class="sm-hero">
-      <div class="sm-hero-num-wrap">
-        <span class="sm-num" id="sm-num">0</span>
-        <span class="sm-num-unit">days</span>
+    <!-- Flame + Hero section -->
+    <div class="sm-hero-section">
+      <div class="sm-flame-glow"></div>
+      <canvas id="streak-flame-canvas" class="sm-flame-canvas"></canvas>
+      <div class="sm-hero">
+        <div class="sm-hero-num-wrap">
+          <span class="sm-num" id="sm-num">0</span>
+          <span class="sm-num-unit">days</span>
+        </div>
+        <div class="sm-headline" id="sm-headline">Loading…</div>
       </div>
-      <div class="sm-headline" id="sm-headline">Loading…</div>
     </div>
 
-    <!-- Grade + stats row -->
-    <div class="sm-grade-row">
-      <div class="sm-grade-card">
-        <div class="sm-grade-val" id="sm-grade">—</div>
+    <!-- Grade award card -->
+    <div class="sm-grade-award">
+      <div class="sm-grade-ring-wrap">
+        <div class="sm-grade-ring">
+          <div class="sm-grade-val" id="sm-grade">—</div>
+        </div>
         <div class="sm-grade-lbl">Consistency</div>
       </div>
-      <div class="sm-grade-divider"></div>
-      <div class="sm-kpi-grid">
-        <div class="sm-kpi"><span class="sm-kpi-v" id="sm-avg-protein">—</span><span class="sm-kpi-l">avg protein</span></div>
-        <div class="sm-kpi"><span class="sm-kpi-v" id="sm-on-target">—</span><span class="sm-kpi-l">on target</span></div>
-        <div class="sm-kpi"><span class="sm-kpi-v" id="sm-current">—</span><span class="sm-kpi-l">current</span></div>
-        <div class="sm-kpi"><span class="sm-kpi-v" id="sm-best">—</span><span class="sm-kpi-l">best ever</span></div>
+      <div class="sm-grade-kpis">
+        <div class="sm-kpi">
+          <span class="sm-kpi-l">Avg protein</span>
+          <span class="sm-kpi-v" id="sm-avg-protein">—</span>
+        </div>
+        <div class="sm-kpi">
+          <span class="sm-kpi-l">On-target days</span>
+          <span class="sm-kpi-v" id="sm-on-target">—</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Current vs Best streak -->
+    <div class="sm-streaks-row">
+      <div class="sm-streak-tile">
+        <span class="sm-streak-tile-val" id="sm-current">—</span>
+        <span class="sm-streak-tile-lbl">current streak</span>
+      </div>
+      <div class="sm-streak-tile-sep">vs</div>
+      <div class="sm-streak-tile sm-streak-tile-best">
+        <span class="sm-streak-tile-val" id="sm-best">—</span>
+        <span class="sm-streak-tile-lbl">personal best</span>
       </div>
     </div>
 
@@ -793,6 +782,7 @@
 
   </div>
 </div>
+
 
 <script src="data.js"></script>
 <script src="app.js"></script>

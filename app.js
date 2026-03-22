@@ -63,13 +63,13 @@ initWelcomeCard();
 function renderAll(){
   renderWhoopCard();renderSummary();renderRings();
   renderCups();renderFoodList();
-  renderProgress();buildCalendar();updateCoachStats();
+  renderProgressPage();buildCalendar();updateCoachStats();
   // refresh smart subtitle with latest stats
   const sub=gv('wc-sub');if(sub)sub.textContent=getSmartSub();
 }
 
 // NAV
-const PAGE_ORDER=['today','workout','weekly','progress'];
+const PAGE_ORDER=['today','workout','coach','progress'];
 let _currentPage='today';
 function showPage(id,btn){
   const pages=document.querySelectorAll('.page');
@@ -93,24 +93,13 @@ function showPage(id,btn){
   btn.classList.add('active');
   incoming.scrollTop=0;
   _currentPage=id;
-  if(id==='weekly')renderWeekly();
-  if(id==='weekly')buildCalendar();
+  _updateFab(id);
+  if(id==='progress')renderProgressPage();
+  if(id==='progress')buildCalendar();
   if(id==='workout')renderWorkoutPage();
+  if(id==='coach'){updateCoachStats();if(!chatHistory.length)generateCoachReport();}
 }
 
-function openCoachModal(){
-  updateCoachStats();
-  const el=gv('coach-modal-overlay');
-  if(!el)return;
-  el.classList.add('open');
-  document.body.style.overflow='hidden';
-}
-function closeCoachModal(){
-  const el=gv('coach-modal-overlay');
-  if(!el)return;
-  el.classList.remove('open');
-  document.body.style.overflow='';
-}
 
 // ── WHOOP 3-SNAPSHOT ──
 function selectWhoopTab(i){
@@ -359,7 +348,7 @@ async function aiLookupQA(){
   gv('qa-loading').classList.add('show');
   try{
     const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:300,
+      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:300,
         system:'Return ONLY valid JSON, no markdown: {"emoji":"single emoji","calories":number,"protein":number,"carbs":number,"fat":number}',
         messages:[{role:'user',content:`Nutrition facts for: ${name}. Use official label if branded.`}]})});
     const data=await res.json();
@@ -385,17 +374,44 @@ function renderFoodList(){
   const el=gv('food-list');
   if(!meals.length){el.innerHTML='<div class="empty-st"><span class="empty-icon">🍽️</span>No meals logged yet.<br>Tap Log a Meal or Quick Add.</div>';return;}
   el.innerHTML='';
-  for(let i=0;i<meals.length;i++){
-    const m=meals[i];const div=document.createElement('div');div.className='fi';
-    const th=m.thumb?`<img class="fi-thumb" src="${m.thumb}" style="width:46px;height:46px;border-radius:11px;object-fit:cover;flex-shrink:0"/>`:`<div class="fi-thumb">${m.emoji||'🍽️'}</div>`;
-    const pPct=Math.min(Math.round(m.protein/TARGETS.p*100),100);
-    const cPct=Math.min(Math.round(m.carbs/TARGETS.c*100),100);
-    const fPct=Math.min(Math.round(m.fat/TARGETS.f*100),100);
-    div.innerHTML=`<div class="fi-top">${th}<div class="fi-info"><div class="fi-name">${m.name}</div><div class="fi-tags"><span class="ft ftcal">${Math.round(m.calories)} kcal</span><span class="ft ftp">${Math.round(m.protein)}g P</span><span class="ft ftc">${Math.round(m.carbs)}g C</span><span class="ft ftf">${Math.round(m.fat)}g F</span></div></div><button class="fi-del">✕</button></div><div class="fi-bars"><div class="fi-bar-row"><span class="fi-bar-lbl">P</span><div class="fi-bar-track"><div class="fi-bar-fill" style="width:${pPct}%;background:var(--pc)"></div></div><span class="fi-bar-val" style="color:var(--pc)">${Math.round(m.protein)}g</span></div><div class="fi-bar-row"><span class="fi-bar-lbl">C</span><div class="fi-bar-track"><div class="fi-bar-fill" style="width:${cPct}%;background:var(--cc)"></div></div><span class="fi-bar-val" style="color:var(--cc)">${Math.round(m.carbs)}g</span></div><div class="fi-bar-row"><span class="fi-bar-lbl">F</span><div class="fi-bar-track"><div class="fi-bar-fill" style="width:${fPct}%;background:var(--fc)"></div></div><span class="fi-bar-val" style="color:var(--fc)">${Math.round(m.fat)}g</span></div></div>`;
-    div.querySelector('.fi-del').addEventListener('click',(e)=>{e.stopPropagation();deleteMeal(i);});
-    div.addEventListener('click',()=>openMealDetail(i));
-    el.appendChild(div);
-  }
+  // Group by time of day
+  const groups=[
+    {label:'Breakfast',entries:[]},
+    {label:'Lunch',entries:[]},
+    {label:'Snacks',entries:[]},
+    {label:'Dinner',entries:[]},
+    {label:'Uncategorised',entries:[]},
+  ];
+  meals.forEach((m,i)=>{
+    let g=4; // Uncategorised
+    if(m.loggedAt){
+      const d=new Date(m.loggedAt);const mins=d.getHours()*60+d.getMinutes();
+      if(mins<630)g=0;           // <10:30am → Breakfast
+      else if(mins<870)g=1;      // <2:30pm  → Lunch
+      else if(mins<1080)g=2;     // <6pm     → Snacks
+      else g=3;                  // ≥6pm     → Dinner
+    }
+    groups[g].entries.push({m,i});
+  });
+  groups.forEach(({label,entries})=>{
+    if(!entries.length)return;
+    const groupCal=entries.reduce((s,{m})=>s+Math.round(m.calories),0);
+    const hdr=document.createElement('div');
+    hdr.className='meal-group-lbl';
+    hdr.innerHTML=`<span>${label}</span><span>${groupCal} kcal</span>`;
+    el.appendChild(hdr);
+    entries.forEach(({m,i})=>{
+      const div=document.createElement('div');div.className='fi';
+      const th=m.thumb?`<img class="fi-thumb" src="${m.thumb}" style="width:46px;height:46px;border-radius:11px;object-fit:cover;flex-shrink:0"/>`:`<div class="fi-thumb">${m.emoji||'🍽️'}</div>`;
+      const pPct=Math.min(Math.round(m.protein/TARGETS.p*100),100);
+      const cPct=Math.min(Math.round(m.carbs/TARGETS.c*100),100);
+      const fPct=Math.min(Math.round(m.fat/TARGETS.f*100),100);
+      div.innerHTML=`<div class="fi-top">${th}<div class="fi-info"><div class="fi-name">${m.name}</div><div class="fi-tags"><span class="ft ftcal">${Math.round(m.calories)} kcal</span><span class="ft ftp">${Math.round(m.protein)}g P</span><span class="ft ftc">${Math.round(m.carbs)}g C</span><span class="ft ftf">${Math.round(m.fat)}g F</span></div></div><button class="fi-del">✕</button></div><div class="fi-bars"><div class="fi-bar-row"><span class="fi-bar-lbl">P</span><div class="fi-bar-track"><div class="fi-bar-fill" style="width:${pPct}%;background:var(--pc)"></div></div><span class="fi-bar-val" style="color:var(--pc)">${Math.round(m.protein)}g</span></div><div class="fi-bar-row"><span class="fi-bar-lbl">C</span><div class="fi-bar-track"><div class="fi-bar-fill" style="width:${cPct}%;background:var(--cc)"></div></div><span class="fi-bar-val" style="color:var(--cc)">${Math.round(m.carbs)}g</span></div><div class="fi-bar-row"><span class="fi-bar-lbl">F</span><div class="fi-bar-track"><div class="fi-bar-fill" style="width:${fPct}%;background:var(--fc)"></div></div><span class="fi-bar-val" style="color:var(--fc)">${Math.round(m.fat)}g</span></div></div>`;
+      div.querySelector('.fi-del').addEventListener('click',(e)=>{e.stopPropagation();deleteMeal(i);});
+      div.addEventListener('click',()=>openMealDetail(i));
+      el.appendChild(div);
+    });
+  });
 }
 function deleteMeal(i){meals.splice(i,1);save(`${KEY}_meals_${todayKey()}`,meals);renderAll();}
 
@@ -526,7 +542,7 @@ After this meal, remaining for the day: ${remaining.cal} kcal, ${remaining.p}g P
 Give a 2-3 sentence honest assessment: how well this meal fits his cut goals, what it does well or poorly, and one actionable tip. Be direct, no fluff.`;
   try{
     const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:200,
+      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:200,
         messages:[{role:'user',content:prompt}]})});
     const data=await res.json();
     const text=data.content.map(b=>b.text||'').join('').trim();
@@ -570,7 +586,7 @@ async function analyzeMeal(){
   content.push({type:'text',text:prompt});
   try{
     const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1500,
+      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1500,
         system:`Precise nutrition expert. Identify each ingredient separately.
 Return ONLY valid JSON, no markdown:
 {"confidence":"high"|"medium"|"low","confidence_tip":"one sentence or empty","ingredients":[{"name":"name","emoji":"emoji","portion":"e.g. 80g","calories":number,"protein":number,"carbs":number,"fat":number,"fibre":number,"sugar":number,"sodium":number}]}
@@ -796,7 +812,7 @@ async function aiLookupIngredient(){
   gv('ing-lookup-loading').classList.add('show');
   try{
     const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:300,
+      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:300,
         system:'Return ONLY valid JSON, no markdown: {"emoji":"emoji","portion":"portion description","calories":number,"protein":number,"carbs":number,"fat":number}',
         messages:[{role:'user',content:`Nutrition facts for: ${name}`}]})});
     const data=await res.json();
@@ -920,24 +936,25 @@ function _buildCoachContext(){
 let chatHistory=[];
 
 async function generateCoachReport(){
-  if(!meals.length&&!whoopSnaps.some(s=>s!==null)){alert('Log some meals or Whoop data first.');return;}
-  gv('coach-loading').classList.add('show');gv('coach-response').classList.remove('show');
-  gv('coach-chat').classList.remove('show');
-  chatHistory=[];
+  if(chatHistory.length)return;
+  const msgEl=gv('chat-messages');
+
+  // Typing bubble
+  const typingDiv=document.createElement('div');
+  typingDiv.className='chat-msg coach coach-typing';
+  typingDiv.innerHTML='<span></span><span></span><span></span>';
+  msgEl.appendChild(typingDiv);
+  msgEl.scrollTop=msgEl.scrollHeight;
 
   const ctx=getDayContext();
   const {timeLabel,rolling3,yesterdaySummary,workoutCtx,hour}=_buildCoachContext();
-
-  // Time-appropriate tone and scoring instruction
   const isMorning=hour<14;
   const toneInstruction=isMorning
     ?`It is currently ${timeLabel}. The day is still in progress — do NOT score the day as complete or call it a failure based on what hasn't been logged yet. Focus on what's been done so far and how to finish the day strong.`
     :`It is currently ${timeLabel}. Give a full honest assessment of the complete day.`;
-
   const scoringInstruction=isMorning
     ?`For OVERALL SCORE: rate effort and trajectory so far (e.g. "7/10 — strong start, protein on track, finish with a solid dinner"). Do NOT penalise for meals not yet eaten.`
     :`For OVERALL SCORE: rate the full day 1-10 with one punchy honest line.`;
-
   const prompt=`${ctx}
 
 ROLLING CONTEXT:
@@ -957,27 +974,43 @@ Direct. No fluff. Reference the rolling context if there are patterns worth call
 
   try{
     const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:900,
+      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:900,
         system:'You are a direct, no-nonsense performance and nutrition coach for Borna. Honest, specific, actionable. No filler. When you spot multi-day patterns (e.g. 3rd day under on protein), call them out explicitly.',
         messages:[{role:'user',content:prompt}]})});
     const data=await res.json();
     const text=data.content.map(b=>b.text||'').join('').trim();
-
-    // ── Persist report for tomorrow's context ──
-    // Store first 300 chars as a one-sentence summary seed
     localStorage.setItem(`${KEY}_last_coach_report`,text);
+    chatHistory=[{role:'user',content:prompt},{role:'assistant',content:text}];
+    typingDiv.className='chat-msg coach';
+    typingDiv.innerHTML=text.replace(/\n/g,'<br>');
+    msgEl.scrollTop=msgEl.scrollHeight;
+    generateCoachSuggestions(text);
+  }catch(err){
+    typingDiv.className='chat-msg coach';
+    typingDiv.textContent='Could not load debrief. Try again later.';
+    console.error(err);
+  }
+}
 
-    const re=gv('coach-response');
-    re.innerHTML=`<div class="cr-header"><div class="cr-icon">🧠</div><div><div class="cr-title">Daily Debrief</div><div class="cr-time">${new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'})}</div></div></div><div class="cr-body">${text.replace(/\n/g,'<br>')}</div>`;
-    re.classList.add('show');
-    chatHistory=[
-      {role:'user',content:prompt},
-      {role:'assistant',content:text}
-    ];
-    gv('chat-messages').innerHTML='';
-    gv('coach-chat').classList.add('show');
-  }catch(err){alert('Report failed.');console.error(err);}
-  finally{gv('coach-loading').classList.remove('show');}
+async function generateCoachSuggestions(debriefText){
+  try{
+    const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:120,
+        system:'You are a nutrition and performance coach.',
+        messages:[{role:'user',content:`Based on this daily debrief, write 3 short questions that the athlete would ask their coach — things like "how can I fix my protein intake?", "what should I eat tonight?", "is my deficit too aggressive?". First-person from the athlete's perspective. Return ONLY 3 lines, one question per line, no numbering, under 10 words each.\n\n${debriefText}`}]})});
+    const data=await res.json();
+    const chips=data.content.map(b=>b.text||'').join('').trim().split('\n').map(s=>s.trim()).filter(Boolean).slice(0,3);
+    const el=gv('coach-suggestions');
+    if(!el||!chips.length)return;
+    el.innerHTML='';
+    chips.forEach(q=>{
+      const btn=document.createElement('button');
+      btn.className='coach-sug-chip';
+      btn.textContent=q;
+      btn.onclick=()=>{gv('chat-input').value=q;el.innerHTML='';sendChatMessage();};
+      el.appendChild(btn);
+    });
+  }catch(e){console.error('suggestions failed',e);}
 }
 
 function handleChatKey(e){
@@ -988,6 +1021,7 @@ async function sendChatMessage(){
   const inp=gv('chat-input');
   const msg=inp.value.trim();if(!msg)return;
   inp.value='';inp.style.height='auto';
+  const sugEl=gv('coach-suggestions');if(sugEl)sugEl.innerHTML='';
 
   const msgEl=gv('chat-messages');
   // Add user bubble
@@ -1006,7 +1040,7 @@ async function sendChatMessage(){
 
   try{
     const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:600,
+      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:600,
         system:`You are a direct, no-nonsense performance and nutrition coach for Borna. You have full context of his day. Be specific, honest, and actionable. Keep replies concise.\n\n${getDayContext()}`,
         messages:chatHistory})});
     const data=await res.json();
@@ -1335,11 +1369,14 @@ function buildCalendar(){
   const fd=new Date(y,m,1).getDay(),days=new Date(y,m+1,0).getDate(),ts=todayKey();
   let html='';
   for(let i=0;i<fd;i++)html+=`<div class="cc empty"></div>`;
+  const woSessions=load(`${KEY}_wo_history`,[]);
   for(let d=1;d<=days;d++){
     const ds=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     const hm=load(`${KEY}_meals_${ds}`,[]).length>0;
-    const hw=load(`${KEY}_whoopsnaps_${ds}`,[null,null,null]).some(s=>s!==null);
-    html+=`<div class="cc${ds===ts?' today':''}${ds===calSelKey?' sel':''}${(hm||hw)?' has-data':''}" onclick="selectDay('${ds}')"><div class="cc-num">${d}</div></div>`;
+    const hw=woSessions.some(s=>s.date&&s.date.slice(0,10)===ds);
+    const dots=(hm?`<div style="width:5px;height:5px;border-radius:50%;background:#4ade80;flex-shrink:0"></div>`:'')+
+               (hw?`<div style="width:5px;height:5px;border-radius:50%;background:var(--blue2);flex-shrink:0"></div>`:'');
+    html+=`<div class="cc${ds===ts?' today':''}${ds===calSelKey?' sel':''}${(hm||hw)?' has-data':''}" onclick="selectDay('${ds}')"><div class="cc-num">${d}</div>${dots?`<div style="display:flex;gap:2px;justify-content:center;margin-top:2px">${dots}</div>`:''}</div>`;
   }
   ce.innerHTML=html;
   renderDayDetail(calSelKey);
@@ -1392,39 +1429,9 @@ function saveEntry(){
   entries.push({date:new Date().toISOString(),weight:w,bf,notes:gv('e-notes').value.trim()});
   save(`${KEY}_entries`,entries);
   gv('e-w').value='';gv('e-bf').value='';gv('e-notes').value='';
-  closeEntryModal();renderProgress();
+  closeEntryModal();renderProgressPage();
 }
-function deleteEntry(i){entries.splice(i,1);save(`${KEY}_entries`,entries);renderProgress();}
-function renderProgress(){
-  const wEs=entries.filter(e=>e.weight!=null),bEs=entries.filter(e=>e.bf!=null);
-  const lw=wEs.length?wEs[wEs.length-1].weight:null,lb=bEs.length?bEs[bEs.length-1].bf:null;
-  const pw=wEs.length>1?wEs[wEs.length-2].weight:BASELINE.weight,pb=bEs.length>1?bEs[bEs.length-2].bf:BASELINE.bf;
-  gv('p-weight').textContent=lw!=null?lw.toFixed(1):BASELINE.weight.toFixed(1);
-  gv('p-bf').textContent=lb!=null?lb.toFixed(1):BASELINE.bf.toFixed(1);
-  const wd=lw!=null?(lw-pw).toFixed(1):null,bd=lb!=null?(lb-pb).toFixed(1):null;
-  if(wd)gv('p-w-delta').innerHTML=`<span class="${parseFloat(wd)<0?'dg':'db'}">${parseFloat(wd)>0?'+':''}${wd} kg</span> vs prev`;
-  if(bd)gv('p-bf-delta').innerHTML=`<span class="${parseFloat(bd)<0?'dg':'db'}">${parseFloat(bd)>0?'+':''}${bd}%</span> vs prev`;
-  const curBF=lb||BASELINE.bf,curW=lw||BASELINE.weight;
-  const curFat=(curBF/100)*curW,tgtFat=(GOAL_BF/100)*BASELINE.weight;
-  const fatLost=BASELINE.fatMass-curFat,totalLose=BASELINE.fatMass-tgtFat;
-  const pct=Math.max(0,Math.min(100,Math.round((fatLost/totalLose)*100)));
-  gv('goal-pct').textContent=pct+'%';gv('gbar-f').style.width=pct+'%';
-  gv('goal-detail').textContent=`Baseline: 22.4kg fat → Target: ${tgtFat.toFixed(1)}kg fat · ${Math.max(0,totalLose-fatLost).toFixed(1)}kg to go`;
-  renderChart('chart-w',wEs.slice(-8),'weight','kg','#388bfd',84,92);
-  renderChart('chart-bf',bEs.slice(-8),'bf','%','#2dd4c8',18,28);
-  const le=gv('entries-list');
-  if(!entries.length){le.innerHTML='<div style="text-align:center;padding:24px;color:var(--muted);font-size:12px">No entries yet.</div>';return;}
-  let html='';
-  [...entries].reverse().forEach((e,ri)=>{
-    const i=entries.length-1-ri;
-    const ds=new Date(e.date).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'});
-    html+=`<div class="ei"><div><div class="ei-date">${ds}</div>${e.notes?`<div class="ei-note">${e.notes}</div>`:''}</div>
-      <div class="ei-vals">${e.weight!=null?`<div class="ei-v"><div class="ei-vn" style="color:var(--blue2)">${e.weight}</div><div class="ei-vl">kg</div></div>`:''}
-      ${e.bf!=null?`<div class="ei-v"><div class="ei-vn" style="color:var(--cyan)">${e.bf}%</div><div class="ei-vl">BF</div></div>`:''}
-      <button class="ei-del" onclick="deleteEntry(${i})">✕</button></div></div>`;
-  });
-  le.innerHTML=html;
-}
+function deleteEntry(i){entries.splice(i,1);save(`${KEY}_entries`,entries);renderProgressPage();}
 function renderChart(id,data,field,unit,color,minV,maxV){
   const el=gv(id);
   if(!data.length){el.innerHTML=`<div style="color:var(--muted);font-size:11px;padding:8px">No data yet.</div>`;return;}
@@ -1595,7 +1602,14 @@ async function startBarcodeCamera(){
       video:{facingMode:'environment',width:{ideal:1920},height:{ideal:1080}}
     });
     video.srcObject=barcodeStream;
-    video.play();
+    await video.play();
+    // Wait for metadata so videoWidth/videoHeight are valid before allowing snap
+    if(!video.videoWidth){
+      await new Promise(res=>{
+        video.addEventListener('loadedmetadata',res,{once:true});
+        setTimeout(res,2000); // max 2s safety timeout
+      });
+    }
     setBarcodeStatus('idle');
   }catch(e){
     setBarcodeStatus('error','Camera unavailable. Type barcode number below.');
@@ -1613,57 +1627,97 @@ async function snapAndReadBarcode(){
     else setBarcodeStatus('error','No camera. Type the barcode number below.');
     return;
   }
+  // Guard: video must have valid dimensions (not a blank/unready frame)
+  if(!video.videoWidth||!video.videoHeight){
+    setBarcodeStatus('error','Camera not ready — wait a moment then try again.');
+    return;
+  }
   _barcodeScanning=true;
   setBarcodeStatus('reading');
 
   // Draw current video frame to canvas
   const canvas=document.createElement('canvas');
-  canvas.width=video.videoWidth||1280;
-  canvas.height=video.videoHeight||720;
+  canvas.width=video.videoWidth;
+  canvas.height=video.videoHeight;
   const ctx=canvas.getContext('2d');
   ctx.drawImage(video,0,0,canvas.width,canvas.height);
   const b64=canvas.toDataURL('image/jpeg',0.92).split(',')[1];
 
   try{
     const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:100,
+      body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:100,
         system:'You are a barcode reader. Look at the image and find the barcode number (EAN-13, EAN-8, UPC-A etc). Return ONLY the digits, nothing else. If you cannot find a barcode, return the word NONE.',
         messages:[{role:'user',content:[
           {type:'image',source:{type:'base64',media_type:'image/jpeg',data:b64}},
           {type:'text',text:'What is the barcode number in this image? Return only the digits.'}
         ]}]})});
     const data=await res.json();
+    if(data.error||data.type==='error'){
+      _barcodeScanning=false;
+      setBarcodeStatus('error','AI read failed — type barcode number below.');
+      console.error('Barcode API error:',data.error||data);
+      return;
+    }
     const raw=(data.content||[]).map(b=>b.text||'').join('').trim().replace(/\s/g,'');
     // Extract only digits
     const digits=raw.replace(/[^0-9]/g,'');
-    if(!digits||raw==='NONE'||digits.length<6){
+    if(!digits||raw.toUpperCase()==='NONE'||digits.length<6){
       _barcodeScanning=false;
       setBarcodeStatus('error','Could not read barcode — reposition and try again, or type it below.');
       return;
     }
     gv('barcode-manual').value=digits;
     setBarcodeStatus('looking');
-    lookupBarcode(digits);
+    lookupBarcode(digits,b64);
   }catch(e){
     _barcodeScanning=false;
     setBarcodeStatus('error','Read failed — try again.');
   }
 }
 
-async function lookupBarcode(code){
+function renderBarcodeProduct(prod){
+  // prod = {name, servingG, servingLabel, per100, serving}
+  window._barcodeEntry={name:prod.name,emoji:'🏷️',...prod.serving,thumb:null};
+  window._barcodePer100=prod.per100;
+  window._barcodeServingG=prod.servingG;
+  window._barcodeName=prod.name;
+  gv('bc-name').textContent=prod.name;
+  gv('bc-serving').textContent=`Per serving (${prod.servingLabel})`;
+  gv('bc-cal').textContent=prod.serving.calories+' kcal';
+  gv('bc-p').textContent=prod.serving.protein+'g P';
+  gv('bc-c').textContent=prod.serving.carbs+'g C';
+  gv('bc-f').textContent=prod.serving.fat+'g F';
+  gv('bc-fibre').textContent=prod.serving.fibre+'g fibre';
+  gv('bc-sugar').textContent=prod.serving.sugar+'g sugar';
+  gv('bc-sodium').textContent=prod.serving.sodium+'mg sodium';
+  gv('barcode-qty').value='1';
+  gv('barcode-result').style.display='block';
+  _barcodeScanning=false;
+  stopBarcodeCamera();
+  setBarcodeStatus('found');
+}
+
+async function lookupBarcode(code,b64=null){
   if(!code||code.trim()===''){alert('Enter a barcode number.');return;}
+  const cacheKey=`${KEY}_bc_${code.trim()}`;
+
+  // 1. Check local cache first — works even when OFf is down
+  const cached=load(cacheKey,null);
+  if(cached){renderBarcodeProduct(cached);return;}
+
   gv('barcode-status').textContent='Looking up…';
   gv('barcode-result').style.display='none';
   try{
     const res=await fetch(`https://world.openfoodfacts.org/api/v2/product/${code.trim()}?fields=product_name,brands,nutriments,serving_size,serving_quantity,image_front_small_url`);
     const data=await res.json();
     if(data.status!==1||!data.product){
-      _barcodeScanning=false; setBarcodeStatus('error','Product not found in database — try typing the name in Log a Meal instead.');
+      _barcodeScanning=false;
+      setBarcodeStatus('idle',b64?'Not in database — identifying from photo…':'Not found — switching to AI log');
+      setTimeout(()=>{closeBarcodeModal();b64?identifyProductFromImage(b64):openLogModal();},600);
       return;
     }
     const p=data.product;
     const n=p.nutriments||{};
-    // Per 100g values
     const per100={
       calories:Math.round(n['energy-kcal_100g']||n['energy_100g']/4.184||0),
       protein:Math.round((n['proteins_100g']||0)*10)/10,
@@ -1686,30 +1740,47 @@ async function lookupBarcode(code){
     };
     const name=`${p.brands?p.brands.split(',')[0].trim()+' ':''}${p.product_name||'Unknown'}`;
     const servingLabel=p.serving_size||`${servingG}g`;
-    // Store for add
-    window._barcodeEntry={name,emoji:'🏷️',...serving,thumb:null};
-    window._barcodePer100=per100;
-    window._barcodeServingG=servingG;
-    window._barcodeName=name;
-    gv('bc-name').textContent=name;
-    gv('bc-serving').textContent=`Per serving (${servingLabel})`;
-    gv('bc-cal').textContent=serving.calories+' kcal';
-    gv('bc-p').textContent=serving.protein+'g P';
-    gv('bc-c').textContent=serving.carbs+'g C';
-    gv('bc-f').textContent=serving.fat+'g F';
-    gv('bc-fibre').textContent=serving.fibre+'g fibre';
-    gv('bc-sugar').textContent=serving.sugar+'g sugar';
-    gv('bc-sodium').textContent=serving.sodium+'mg sodium';
-    gv('barcode-qty').value='1';
-    gv('barcode-result').style.display='block';
-    _barcodeScanning=false;
-    stopBarcodeCamera();
-    setBarcodeStatus('found');
+    const prod={name,servingG,servingLabel,per100,serving};
+    // 2. Save to cache so future scans work even offline/OFf down
+    localStorage.setItem(cacheKey,JSON.stringify(prod));
+    renderBarcodeProduct(prod);
   }catch(e){
     _barcodeScanning=false;
-    setBarcodeStatus('error','Lookup failed — product may not be in database.');
+    if(b64){
+      setBarcodeStatus('idle','Database unavailable — identifying from photo…');
+      setTimeout(()=>{closeBarcodeModal();identifyProductFromImage(b64);},600);
+    }else{
+      setBarcodeStatus('error','Lookup failed — database may be down.');
+    }
     console.error(e);
   }
+}
+
+// When OFf has no match, use the original scan photo to identify the product
+async function identifyProductFromImage(b64){
+  openLogModal();
+  const descEl=gv('meal-desc');
+  if(descEl)descEl.value='Identifying product from packaging…';
+  try{
+    const res=await fetch(PROXY,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-haiku-4-5-20251001',
+        max_tokens:80,
+        messages:[{role:'user',content:[
+          {type:'image',source:{type:'base64',media_type:'image/jpeg',data:b64}},
+          {type:'text',text:'What food product is shown? Reply with only the brand and product name (e.g. "Danone Activia Strawberry Yogurt 125g"). Nothing else.'}
+        ]}]
+      })
+    });
+    const data=await res.json();
+    const name=(data.content||[]).map(c=>c.text||'').join('').trim().replace(/^["']+|["']+$/g,'');
+    if(descEl)descEl.value=name||'Scanned product';
+  }catch(e){
+    if(descEl)descEl.value='Scanned product';
+  }
+  analyzeMeal();
 }
 
 let _barcodeLock=false;
@@ -1808,7 +1879,7 @@ async function runImpactScan(){
 
   try{
     const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:400,
+      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:400,
         system:'Nutrition expert. Return ONLY valid JSON, no markdown: {"name":"food name","emoji":"single emoji","calories":number,"protein":number,"carbs":number,"fat":number,"verdict":"one punchy sentence about whether this fits remaining targets"}',
         messages:[{role:'user',content}]})});
     const data=await res.json();
@@ -1921,25 +1992,83 @@ function calcStreak(){
   return streak;
 }
 
-function renderWeekly(){
-  const el=gv('weekly-content');if(!el)return;
+function renderProgressPage(){
+  const el=gv('progress-content');if(!el)return;
+
+  // ── Weekly data ──
   const days=getWeekData();
   const streak=calcStreak();
   const tgt=getCalTarget();
-
-  // Averages over days with data
   const logged=days.filter(d=>d.hasData);
   const avgCal=logged.length?Math.round(logged.reduce((a,d)=>a+d.t.cal,0)/logged.length):0;
   const avgP=logged.length?Math.round(logged.reduce((a,d)=>a+d.t.p,0)/logged.length):0;
   const daysOnTarget=logged.filter(d=>d.t.cal>=tgt*0.8&&d.t.cal<=tgt*1.15).length;
 
-  let html=`
+  // ── Body data ──
+  const wEs=entries.filter(e=>e.weight!=null),bEs=entries.filter(e=>e.bf!=null);
+  const lw=wEs.length?wEs[wEs.length-1].weight:null,lb=bEs.length?bEs[bEs.length-1].bf:null;
+  const pw=wEs.length>1?wEs[wEs.length-2].weight:BASELINE.weight,pb=bEs.length>1?bEs[bEs.length-2].bf:BASELINE.bf;
+  const wd=lw!=null?(lw-pw).toFixed(1):null,bd=lb!=null?(lb-pb).toFixed(1):null;
+  const dispW=lw!=null?lw.toFixed(1):BASELINE.weight.toFixed(1);
+  const dispBF=lb!=null?lb.toFixed(1):BASELINE.bf.toFixed(1);
+  const curBF=lb||BASELINE.bf,curWt=lw||BASELINE.weight;
+  const curFat=(curBF/100)*curWt,tgtFat=(GOAL_BF/100)*BASELINE.weight;
+  const fatLost=BASELINE.fatMass-curFat,totalLose=BASELINE.fatMass-tgtFat;
+  const goalPct=Math.max(0,Math.min(100,Math.round((fatLost/totalLose)*100)));
+
+  let html='';
+  let statsHtml='';
+
+  // ── ISO week key for AI cache ──
+  const _wkDate=new Date();const _wkD=new Date(Date.UTC(_wkDate.getFullYear(),_wkDate.getMonth(),_wkDate.getDate()));
+  const _wkDay=_wkD.getUTCDay()||7;_wkD.setUTCDate(_wkD.getUTCDate()+4-_wkDay);
+  const _wkYS=new Date(Date.UTC(_wkD.getUTCFullYear(),0,1));
+  const weekK=`${_wkD.getUTCFullYear()}-W${String(Math.ceil((((_wkD-_wkYS)/86400000)+1)/7)).padStart(2,'0')}`;
+  const _waiCache=localStorage.getItem(`${KEY}_weekly_ai_${weekK}`);
+
+  // ── 1. Streak card ──
+  html+=`
   <div class="week-streak" onclick="openStreakModal()" style="cursor:pointer">
     <div class="streak-fire">🔥</div>
     <div class="streak-num">${streak}</div>
     <div class="streak-lbl">day streak</div>
     <div style="margin-left:auto;font-size:20px;color:var(--muted);font-weight:300">›</div>
-  </div>
+  </div>`;
+
+  // ── 1b. Weekly AI pattern card ──
+  html+=`
+  <div id="weekly-ai-summary" class="wk-ai-card">
+    <div class="wk-ai-head">
+      <span class="wk-ai-title">✦ Weekly Pattern</span>
+      <button class="wk-ai-btn" onclick="generateWeeklySummary('${weekK}')">${_waiCache?'↺ Refresh':'Generate'}</button>
+    </div>
+    <div id="wk-ai-response" class="wk-ai-response"></div>
+  </div>`;
+
+  // ── 2. Body stats (Stats tab) ──
+  statsHtml+=`
+  <div class="prog-hdr"><div class="prog-title">Body Stats</div><button class="add-btn" onclick="openEntryModal()">+ Log</button></div>
+  <div class="stats-grid">
+    <div class="sc"><div class="sc-lbl">Weight</div><div class="sc-val" style="color:var(--blue2)">${dispW}</div><div class="sc-unit">kg</div>
+      ${wd?`<div class="sc-delta"><span class="${parseFloat(wd)<0?'dg':'db'}">${parseFloat(wd)>0?'+':''}${wd} kg</span> vs prev</div>`:'<div class="sc-delta"></div>'}
+    </div>
+    <div class="sc"><div class="sc-lbl">Body Fat</div><div class="sc-val" style="color:var(--cyan)">${dispBF}</div><div class="sc-unit">%</div>
+      ${bd?`<div class="sc-delta"><span class="${parseFloat(bd)<0?'dg':'db'}">${parseFloat(bd)>0?'+':''}${bd}%</span> vs prev</div>`:'<div class="sc-delta"></div>'}
+    </div>
+  </div>`;
+
+  // ── 3. Goal card (Stats tab) ──
+  statsHtml+=`
+  <div class="goal-card">
+    <div class="goal-top"><div class="goal-lbl">Fat Loss Goal</div><div class="goal-pct">${goalPct}%</div></div>
+    <div class="gbar"><div class="gbar-f" style="width:${goalPct}%"></div></div>
+    <div class="goal-detail">Baseline: 22.4kg fat → Target: ${tgtFat.toFixed(1)}kg fat · ${Math.max(0,totalLose-fatLost).toFixed(1)}kg to go</div>
+    <div class="goal-dates"><span>Started: Mar 4, 2026</span><span>Target: Apr 27, 2026</span></div>
+  </div>`;
+
+  // ── 4. This Week ──
+  html+=`
+  <div class="sec-lbl" style="padding-left:0;padding-top:12px">This Week</div>
   <div class="week-stats-row">
     <div class="wk-s"><div class="wk-v" style="color:var(--blue2)">${avgCal||'—'}</div><div class="wk-l">avg kcal/day</div></div>
     <div class="wk-s"><div class="wk-v" style="color:var(--pc)">${avgP||'—'}g</div><div class="wk-l">avg protein</div></div>
@@ -1961,7 +2090,60 @@ function renderWeekly(){
   });
   html+=`</div>`;
 
-  // Per-day detail list
+  // ── Weight Projection Card ──
+  const weekKeys2=new Set(days.map(d=>d.key));
+  let weekDeficit=0,projLogged=0;
+  days.forEach(d=>{if(d.hasData){weekDeficit+=tgt-d.t.cal;projLogged++;}});
+  const woBurned=load(`${KEY}_wo_history`,[])
+    .filter(s=>weekKeys2.has((s.date||'').slice(0,10)))
+    .reduce((a,s)=>a+(s.calories||Math.round((s.duration||0)*5)),0);
+  const effDef=weekDeficit+woBurned;
+  const latestW=[...entries].reverse().find(e=>e.weight!=null);
+  const curW=latestW?.weight??89.1;
+  const projW=Math.round((curW-effDef/7700)*10)/10;
+  const avgDef=projLogged?Math.round(effDef/projLogged):0;
+  const nowD=new Date(),dToSun=(7-nowD.getDay())%7;
+  const sunD=new Date(nowD);sunD.setDate(nowD.getDate()+dToSun);
+  const sunLbl=dToSun===0?'today':'Sun '+sunD.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  const defCol=effDef>=0?'#4ade80':'var(--amber)';
+  const defWord=effDef>=0?'deficit':'surplus';
+  html+=`
+  <div class="wk-proj-card">
+    <div class="wk-proj-head">
+      <span class="wk-proj-title">Weight Projection</span>
+      <span class="wk-proj-period">→ ${sunLbl}</span>
+    </div>
+    <div class="wk-proj-body">
+      <div>
+        <div class="wk-proj-est">Est. Sunday weight</div>
+        <div class="wk-proj-num">${projLogged?projW.toFixed(1)+' kg':'—'}</div>
+      </div>
+      ${projLogged
+        ?`<div class="wk-proj-range-block"><div class="wk-proj-range">±0.3 kg</div><div class="wk-proj-from">from ${curW}kg baseline</div></div>`
+        :`<div class="wk-proj-nodata">Log meals to see projection</div>`}
+    </div>
+    <div class="wk-proj-stats">
+      <div class="wk-proj-stat">
+        <span class="wk-proj-sv" style="color:${defCol}">${projLogged?Math.abs(Math.round(effDef)).toLocaleString():'—'}</span>
+        <span class="wk-proj-sl">kcal ${defWord}</span>
+      </div>
+      <div class="wk-proj-div"></div>
+      <div class="wk-proj-stat">
+        <span class="wk-proj-sv" style="color:${defCol}">${projLogged?Math.abs(avgDef).toLocaleString():'—'}</span>
+        <span class="wk-proj-sl">avg deficit/day</span>
+      </div>
+      ${woBurned>0?`<div class="wk-proj-div"></div><div class="wk-proj-stat"><span class="wk-proj-sv" style="color:var(--cyan)">${woBurned.toLocaleString()}</span><span class="wk-proj-sl">workout kcal</span></div>`:''}
+    </div>
+  </div>`;
+
+  // ── 5. Trend charts (Stats tab) ──
+  statsHtml+=`
+  <div class="sec-lbl" style="padding-left:0;padding-top:8px">Trends</div>
+  <div class="chart-card"><div class="chart-title">Weight (kg)</div><div class="chart-area" id="chart-w"></div></div>
+  <div class="chart-card"><div class="chart-title">Body Fat %</div><div class="chart-area" id="chart-bf"></div></div>`;
+
+  // ── 6. Per-day breakdown ──
+  html+=`<div class="sec-lbl" style="padding-left:0;padding-top:8px">Daily Breakdown</div>`;
   html+=`<div class="week-days">`;
   [...days].reverse().forEach(d=>{
     if(!d.hasData&&!d.isToday)return;
@@ -1980,7 +2162,33 @@ function renderWeekly(){
   });
   html+=`</div>`;
 
+  // ── 7. History (Stats tab) ──
+  if(entries.length){
+    statsHtml+=`<div class="sec-lbl" style="padding-left:0;padding-top:8px">History</div><div class="entries-list">`;
+    [...entries].reverse().forEach((e,ri)=>{
+      const i=entries.length-1-ri;
+      const ds=new Date(e.date).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'});
+      statsHtml+=`<div class="ei"><div><div class="ei-date">${ds}</div>${e.notes?`<div class="ei-note">${e.notes}</div>`:''}</div>
+        <div class="ei-vals">${e.weight!=null?`<div class="ei-v"><div class="ei-vn" style="color:var(--blue2)">${e.weight}</div><div class="ei-vl">kg</div></div>`:''}
+        ${e.bf!=null?`<div class="ei-v"><div class="ei-vn" style="color:var(--cyan)">${e.bf}%</div><div class="ei-vl">BF</div></div>`:''}
+        <button class="ei-del" onclick="deleteEntry(${i})">✕</button></div></div>`;
+    });
+    statsHtml+=`</div>`;
+  }
+
+  statsHtml+=`<button onclick="openEntryModal()" style="width:100%;margin-top:10px;background:rgba(56,139,253,0.08);border:1.5px dashed rgba(56,139,253,0.3);border-radius:12px;padding:13px;font-family:var(--font);font-size:15px;font-weight:700;color:var(--blue2);cursor:pointer;letter-spacing:.05em">+ Log Entry</button>`;
+
   el.innerHTML=html;
+  // Restore cached AI response (use textContent to avoid XSS)
+  const _waiEl=gv('wk-ai-response');
+  if(_waiEl&&_waiCache)_waiEl.textContent=_waiCache;
+
+  const statsEl=gv('progress-stats-content');
+  if(statsEl)statsEl.innerHTML=statsHtml;
+
+  // Render charts after DOM is set
+  renderChart('chart-w',wEs.slice(-8),'weight','kg','#388bfd',84,92);
+  renderChart('chart-bf',bEs.slice(-8),'bf','%','#2dd4c8',18,28);
 }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -2005,7 +2213,7 @@ Time of day: ${new Date().getHours()}:00. Goal: fat loss cut phase.`;
 
   try{
     const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:600,
+      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:600,
         system:'Return ONLY valid JSON, no markdown: {"suggestions":[{"name":"food name","emoji":"emoji","reason":"one line why this fits","calories":number,"protein":number,"carbs":number,"fat":number}]} — 3 suggestions, practical foods available in Dubai, prioritize whatever macro is most behind.',
         messages:[{role:'user',content:ctx}]})});
     const data=await res.json();
@@ -2052,12 +2260,11 @@ const _origRenderAll=renderAll;
 window.renderAll=function(){
   _origRenderAll();
   renderNutrients();
-  renderWeekly();
   renderStreakMini();
 };
 // Call it once now to init
 renderNutrients();
-renderWeekly();
+renderProgressPage();
 renderStreakMini();
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -2167,6 +2374,7 @@ function openStreakModal(){
       if(day.isFuture||(!day.hasData&&!day.onTarget)) cls+=' hm-grey';
       else if(day.onTarget) cls+=' hm-green';
       else cls+=' hm-amber';
+      if(day.k===todayKey()) cls+=' hm-today';
       const title=`${day.k}: ${Math.round(day.totCal)} kcal`;
       html+=`<div class="${cls}" title="${title}"></div>`;
     });
@@ -2218,7 +2426,7 @@ function _newFlameParticle(W,H){
 function _startStreakFlame(streak){
   const canvas=gv('streak-flame-canvas');if(!canvas)return;
   const dpr=window.devicePixelRatio||1;
-  const W=220,H=180;
+  const W=260,H=200;
   canvas.width=W*dpr;canvas.height=H*dpr;
   canvas.style.width=W+'px';canvas.style.height=H+'px';
   const ctx=canvas.getContext('2d');ctx.scale(dpr,dpr);
@@ -2341,6 +2549,22 @@ document.addEventListener('click',e=>{
   if(_fabOpen && !gv('fab-wrap')?.contains(e.target) && e.target!==gv('fab-dim')) fabClose();
 });
 
+function _updateFab(page){
+  const wrap=gv('fab-wrap');
+  const icon=gv('fab-icon');
+  const mainBtn=gv('fab-main');
+  if(!wrap||!icon||!mainBtn) return;
+  fabClose();
+  if(page==='today'||page==='workout'){
+    wrap.style.display='';
+    wrap.classList.toggle('fab-wo-mode',page==='workout');
+    mainBtn.onclick=fabToggle;
+    icon.innerHTML='<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>';
+  } else {
+    wrap.style.display='none';
+  }
+}
+
 initStykuScroll();
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -2421,12 +2645,13 @@ function getDaysSinceMuscle(){
 
 // ── Render workout page (readiness) ──
 function renderWorkoutPage(){
-  // Restore recovery from WHOOP morning snapshot if available
   const morning=whoopSnaps[0];
-  if(morning&&morning.recovery&&!_woRecovery){
+  if(morning?.recovery){
     _woRecovery=morning.recovery;
     const inp=gv('wo-rec-val');
     if(inp)inp.value=_woRecovery;
+    const lbl=gv('wo-rec-autofill');
+    if(lbl)lbl.style.display='';
   }
   updateReadiness();
   // Restore active session if app was closed mid-workout
@@ -2505,8 +2730,8 @@ function renderLastSession(){
 
 // ── AI Workout Generation ──
 async function generateWorkout(){
-  const btn=gv('wo-gen-btn');
-  if(btn){btn.disabled=true;btn.querySelector('.wo-gen-title').textContent='Generating…';btn.querySelector('.wo-gen-icon').textContent='⏳';}
+  const loader=gv('wo-generating');
+  if(loader)loader.style.display='flex';
 
   const yest=getYesterdayNutrition();
   const rec=_woRecovery||'unknown';
@@ -2519,15 +2744,48 @@ async function generateWorkout(){
   const histSummary=recentSessions.map(s=>`${new Date(s.date).toLocaleDateString('en-US',{weekday:'short'})}: ${s.splitName} (${(s.muscleGroups||[]).join(', ')})`).join('\n');
   const pbSummary=Object.entries(pbs).slice(0,20).map(([ex,pb])=>`${ex}: ${pb.weight}kg x${pb.reps} (1RM ~${pb.oneRM}kg)`).join('\n');
 
-  const prompt=`You are a strength & conditioning coach for a 26-year-old male, 89.1kg, 173cm, 25.1% body fat, goal is fat loss while preserving lean mass (target 64kg lean mass). He trains FASTED in the morning before his first meal.
+  const prompt=`You are an evidence-based strength & hypertrophy coach for a 26-year-old male, 89.1kg, 173cm, 25.1% body fat, goal is fat loss while preserving lean mass (target 64kg lean mass). He trains FASTED in the morning before his first meal. He's an intermediate lifter — past the beginner phase but still making solid progress. Talk to him like a knowledgeable training partner, not a textbook.
 
-TODAY'S CONTEXT:
+═══ TRAINING PHILOSOPHY & EXERCISE SCIENCE BRIEF ═══
+
+1. MECHANICAL TENSION is the primary hypertrophy driver. Prioritize exercises that load the target muscle through a full ROM, especially in the LENGTHENED (stretched) position — research consistently shows stretched-position training produces superior growth. Examples: incline DB curls (biceps stretched at bottom), overhead tricep extensions (long head stretched), Romanian deadlifts (hamstrings loaded at full hip flexion), cable flyes from low pulleys (chest stretched).
+
+2. MIND-MUSCLE CONNECTION (MMC) CUES — every exercise needs a specific internal-focus cue that tells the lifter WHERE to feel the contraction and HOW to initiate the rep:
+   - BAD cue: "keep good form" or "go slow" (too vague)
+   - GOOD cue: "Initiate by driving your elbows back and squeezing your shoulder blades — you should feel your mid-traps and rhomboids fire before your arms bend" (cable row)
+   - GOOD cue: "Push the floor away from you, don't think about pushing the bar up — feel your quads do the work out of the hole" (squat)
+   - Always specify: what muscle should be contracting, what the lifter should feel, a visualization or movement initiation point
+
+3. PROGRESSIVE OVERLOAD METHODS — rotate these to keep driving adaptation:
+   - Straight sets: standard sets across (default for heavy compounds)
+   - Rest-pause: hit near-failure, rack it, rest 15-20s, grind out 3-5 more reps. Great for machines and isolation moves where form breakdown is low-risk
+   - Drop set: on the LAST set, reduce weight ~25% and immediately rep to failure. Best for isolation/cables
+   - Myo-reps: one activation set to ~2 RIR, then 4-5 mini-sets of 3-5 reps with only 10-15s rest between. Insanely time-efficient for accessories
+   - Lengthened partials: after hitting failure on full reps, keep going with partial reps in the bottom (stretched) portion only. Emerging research shows massive hypertrophy stimulus from this technique
+
+4. UNDERRATED EXERCISES — vary the selection, don't default to the same basics every session:
+   Chest: low-to-high cable fly, chest-focused dip (lean forward), svend press, slight-decline DB press, hammer strength incline press, pec deck fly, machine chest press, Smith flat/incline press
+   Back: chest-supported T-bar row, meadows row, straight-arm cable pulldown, seal row, single-arm lat pulldown, plate-loaded row machine, hammer strength pulldown, machine low row, assisted pull-up machine (slow negatives)
+   Shoulders: cable Y-raise, Lu raise (front raise to press), prone incline lateral raise, behind-the-neck press (light), machine lateral raise, reverse pec deck (rear delts), Smith overhead press, machine shoulder press
+   Biceps: incline DB curl, spider curl, bayesian cable curl, preacher curl EZ-bar (wide grip for short head), machine preacher curl, cable hammer curl (rope)
+   Triceps: overhead cable extension (rope), JM press, cross-body cable pushdown, skull crusher (to forehead), machine tricep dip, tricep press machine, Smith close-grip bench
+   Quads: heel-elevated goblet squat, sissy squat, leg press feet low & narrow, pendulum squat, Spanish squat, hack squat machine, Smith squat (heels elevated), leg extension (lengthened partials), belt squat machine
+   Hamstrings: Nordic curl, seated leg curl (most lengthened position), single-leg RDL, slider hamstring curl, lying leg curl machine, glute-ham raise machine, Smith RDL
+   Glutes: barbell hip thrust, 45° back extension, cable pull-through, B-stance RDL, step-up with forward lean, Smith hip thrust, glute drive machine, hip abduction machine (lean forward)
+
+5. SESSION STRUCTURE:
+   - Start with 1-2 heavy compounds (mechanical tension focus, straight sets)
+   - Move to moderate-load work (8-12 reps, controlled tempo)
+   - Finish with isolation/cable work using intensity techniques (rest-pause, drop sets, myo-reps, lengthened partials)
+   - Include at least ONE exercise per primary muscle that loads it in the lengthened/stretched position
+
+═══ TODAY'S CONTEXT ═══
 - WHOOP Recovery: ${rec}%
-- Sleep duration: ${sleepSnap.sleep!=null?(()=>{const hh=Math.floor(sleepSnap.sleep),mm=Math.round((sleepSnap.sleep-hh)*60);return hh+'h'+(mm>0?' '+mm+'m':'');})():'unknown'}
+- Sleep: ${sleepSnap.sleep!=null?(()=>{const hh=Math.floor(sleepSnap.sleep),mm=Math.round((sleepSnap.sleep-hh)*60);return hh+'h'+(mm>0?' '+mm+'m':'');})():'unknown'}
 - HRV: ${sleepSnap.hrv||'unknown'}
 - Yesterday's nutrition: ${Math.round(yest.p||0)}g protein, ${Math.round(yest.cal||0)} kcal, ${Math.round(yest.c||0)}g carbs
 
-RECENT TRAINING HISTORY (last 7 sessions):
+RECENT TRAINING (last 7 sessions):
 ${histSummary||'No recent sessions logged'}
 
 DAYS SINCE MUSCLE GROUP TRAINED:
@@ -2536,24 +2794,26 @@ ${Object.entries(daysAgo).map(([m,d])=>`${m}: ${d} days ago`).join(', ')||'No hi
 PERSONAL BESTS:
 ${pbSummary||'No PBs yet — first session'}
 
+═══ TASK ═══
 Generate a workout split for today. Return ONLY valid JSON, no markdown, no explanation.
 
 JSON format:
 {
   "splitName": "Push — Chest & Shoulders",
   "muscleGroups": ["Chest","Shoulders","Triceps"],
-  "coachNote": "2-line rationale based on recovery and yesterday's nutrition",
+  "coachNote": "2-line rationale referencing recovery data and how it shaped today's plan",
   "exercises": [
     {
-      "name": "Barbell Bench Press",
+      "name": "Incline Dumbbell Press",
       "icon": "💪",
-      "cue": "retract scapula, drive feet into floor",
+      "cue": "Squeeze shoulder blades into the bench, lower until you feel a deep chest stretch, then drive through your palms — feel your upper pecs initiate the push",
+      "intensityTechnique": "straight sets",
       "sets": 4,
       "reps": "6-8",
       "rest": 120,
       "lastWeight": null,
       "suggestedWeight": null,
-      "alternatives": ["Dumbbell Bench Press","Machine Chest Press","Cable Chest Fly"]
+      "alternatives": ["Barbell Bench Press","Machine Chest Press","Smith Incline Press"]
     }
   ],
   "cardio": {
@@ -2569,18 +2829,22 @@ JSON format:
 
 Rules:
 - 6-8 exercises (fewer if recovery < 40)
-- If recovery >= 67: heavy compound focus, 4-5 sets, 5-8 reps
-- If recovery 34-66: moderate volume, 3-4 sets, 8-12 reps  
-- If recovery < 34: light/technique focus, 3 sets, 12-15 reps
+- If recovery >= 67: heavy compound focus, 4-5 sets, 5-8 reps, straight sets on compounds
+- If recovery 34-66: moderate volume, 3-4 sets, 8-12 reps, lean on intensity techniques for efficiency
+- If recovery < 34: light/technique focus, 3 sets, 12-15 reps, prioritize MMC and lengthened partials
 - Fasted training: avoid maximal CNS-heavy lifts if recovery < 50
 - Do NOT repeat muscle groups trained in last 48 hours unless recovery > 80
-- Cardio: fasted morning = prefer steady state (incline walk, moderate bike). Only recommend HIIT if recovery > 80
+- Include at least one lengthened-position exercise per primary muscle group
+- Mix up exercise selection — pull from the underrated exercises list, don't just default to barbell bench/squat/deadlift every time
+- intensityTechnique: one of "straight sets", "rest-pause", "drop set", "myo-reps", "lengthened partials" — use straight sets for heavy compounds, rotate techniques on accessories
+- cue: MUST be a specific MMC cue — what muscle to feel, where to initiate, a visualization. Never generic
 - suggestedWeight: fill in if PB exists for that exercise (suggest same or slight increase), else null
+- Cardio: fasted morning = prefer steady state (incline walk, moderate bike). Only recommend HIIT if recovery > 80
 - Return valid JSON only`;
 
   try{
     const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:2000,messages:[{role:'user',content:prompt}]})});
+      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:2000,messages:[{role:'user',content:prompt}]})});
     const data=await res.json();
     const text=data.content[0].text.trim().replace(/```json|```/g,'').trim();
     _woPlan=JSON.parse(text);
@@ -2589,7 +2853,7 @@ Rules:
     console.error('Workout gen error',e);
     alert('Could not generate workout. Check your connection.');
   }finally{
-    if(btn){btn.disabled=false;btn.querySelector('.wo-gen-title').textContent='Generate Today\'s Split';btn.querySelector('.wo-gen-icon').textContent='⚡';}
+    if(loader)loader.style.display='none';
   }
 }
 
@@ -2605,9 +2869,10 @@ function renderWorkoutPreview(){
       <div class="wo-ex-preview">
         <div class="wo-ex-icon">${ex.icon||getExIcon(ex.name)}</div>
         <div class="wo-ex-info">
-          <div class="wo-ex-name">${ex.name}</div>
+          <div class="wo-ex-name"><a href="https://www.youtube.com/results?search_query=${encodeURIComponent(ex.name+' proper form')}" target="_blank" rel="noopener" class="wo-ex-link" onclick="event.stopPropagation()">${ex.name}</a></div>
           <div class="wo-ex-meta">${ex.sets} sets · ${ex.reps} reps · ${ex.rest}s rest</div>
           <div class="wo-ex-cue">${ex.cue||''}</div>
+          ${ex.intensityTechnique&&ex.intensityTechnique!=='straight sets'?`<div class="wo-ex-intensity">⚡ ${ex.intensityTechnique}</div>`:''}
         </div>
         ${ex.lastWeight?`<div class="wo-ex-last">${ex.lastWeight}kg</div>`:''}
       </div>`).join('');
@@ -2704,13 +2969,14 @@ function renderExerciseCard(ex,ei){
     <div class="wo-ex-card-hdr" onclick="toggleExCollapse(${ei})">
       <div class="wo-ex-card-icon">${ex.icon||getExIcon(ex.name)}</div>
       <div class="wo-ex-card-title">
-        <div class="wo-ex-card-name">${ex.swappedTo||ex.name}</div>
+        <div class="wo-ex-card-name"><a href="https://www.youtube.com/results?search_query=${encodeURIComponent((ex.swappedTo||ex.name)+' proper form')}" target="_blank" rel="noopener" class="wo-ex-link" onclick="event.stopPropagation()">${ex.swappedTo||ex.name}</a></div>
         <div class="wo-ex-card-meta">${ex.sets.length} sets · ${ex.reps||ex.sets[0]?.reps||'—'} reps · ${ex.rest}s rest</div>
       </div>
       <div class="wo-ex-card-check" id="wo-ex-check-${ei}">${ex.sets.every(s=>s.done)?'✅':'○'}</div>
     </div>
     <div class="wo-ex-card-body">
       <div class="wo-ex-cue-line">💡 ${ex.cue||''}</div>
+      ${ex.intensityTechnique&&ex.intensityTechnique!=='straight sets'?`<div class="wo-ex-intensity">⚡ ${ex.intensityTechnique}</div>`:''}
       ${pbLine}
       <div class="wo-sets-header">
         <span>Set</span><span>Last</span><span>Weight</span><span></span><span>Reps</span><span>1RM</span><span></span>
@@ -2826,7 +3092,12 @@ function startRestTimer(ei,secs){
     el.textContent=`Rest: ${remaining}s`;
     el.style.background=remaining<=10?'rgba(248,81,73,0.15)':'rgba(56,139,253,0.10)';
     el.style.color=remaining<=10?'var(--red)':'var(--blue2)';
-    if(remaining<=0){el.textContent='Go! 💪';clearInterval(_woRestInt);setTimeout(()=>{el.style.display='none';},1500);return;}
+    if(remaining<=0){
+      el.textContent='Go! 💪';clearInterval(_woRestInt);setTimeout(()=>{el.style.display='none';},1500);
+      try{const ac=new AudioContext();const o=ac.createOscillator();o.type='sine';o.frequency.value=880;o.connect(ac.destination);o.start();o.stop(ac.currentTime+0.15);}catch(e){}
+      if(navigator.vibrate)navigator.vibrate([200,100,200]);
+      return;
+    }
     remaining--;
   };
   update();
@@ -2885,6 +3156,7 @@ function showWorkoutSummary(session){
       <div class="wo-sum-muscles">${(session.muscleGroups||[]).map(m=>`<span class="wo-muscle-chip">${m}</span>`).join('')}</div>
       ${pbHtml?`<div class="wo-sum-pbs">${pbHtml}</div>`:''}
       <button class="wo-sum-close" onclick="closeWorkoutSummary()">Done</button>
+      <button class="wo-sum-save-routine" onclick="saveAsRoutine()">💾 Save as Routine</button>
     </div>
   </div>`;
 
@@ -2900,6 +3172,65 @@ function closeWorkoutSummary(){
   gv('wo-generate-view').style.display='block';
   renderLastSession();
   renderWorkoutPage();
+}
+
+const WO_ROUTINES_KEY=`${KEY}_routines`;
+function saveAsRoutine(){
+  const session=woHistory().slice(-1)[0];
+  if(!session){alert('No session found.');return;}
+  const name=window.prompt('Name this routine:',session.splitName||'My Routine');
+  if(!name||!name.trim())return;
+  const routines=load(WO_ROUTINES_KEY,[]);
+  routines.push({
+    id:Date.now().toString(36),
+    name:name.trim(),
+    splitName:session.splitName||'',
+    muscleGroups:session.muscleGroups||[],
+    exercises:(session.exercises||[]).map(({name,sets,reps,rest,cue,icon,alternatives})=>({name,sets,reps,rest,cue,icon,alternatives})),
+    cardio:session.cardio?{type:session.cardio.type,duration:session.cardio.duration,intensity:session.cardio.intensity}:null,
+    savedAt:new Date().toISOString()
+  });
+  save(WO_ROUTINES_KEY,routines);
+  const btn=document.querySelector('.wo-sum-save-routine');
+  if(btn){btn.textContent='✓ Saved';btn.disabled=true;}
+}
+
+function showRoutinesModal(){
+  const routines=load(WO_ROUTINES_KEY,[]);
+  const rows=routines.length
+    ?[...routines].reverse().map(r=>`
+        <div class="wo-routine-row" onclick="loadRoutine('${r.id}')">
+          <div class="wo-routine-name">${r.name}</div>
+          <div class="wo-routine-split">${r.splitName}</div>
+          <div class="wo-routine-chips">${(r.muscleGroups||[]).map(m=>`<span class="wo-muscle-chip">${m}</span>`).join('')}</div>
+        </div>`).join('')
+    :`<div class="wo-hist-empty">No saved routines yet.<br>Finish a workout and tap "Save as Routine".</div>`;
+  const modal=document.createElement('div');
+  modal.id='wo-routines-modal';
+  modal.className='wo-hist-modal';
+  modal.innerHTML=`
+    <div class="wo-hist-inner">
+      <div class="wo-hist-topbar">
+        <div class="wo-hist-title">My Routines</div>
+        <button class="wo-hist-close" onclick="document.getElementById('wo-routines-modal').remove()">✕</button>
+      </div>
+      <div class="wo-hist-content-scroll">${rows}</div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+function loadRoutine(id){
+  const r=load(WO_ROUTINES_KEY,[]).find(x=>x.id===id);
+  if(!r)return;
+  _woPlan={
+    splitName:r.splitName,
+    muscleGroups:r.muscleGroups||[],
+    coachNote:'Loaded from saved routine.',
+    exercises:r.exercises||[],
+    cardio:r.cardio||null
+  };
+  const m=gv('wo-routines-modal');if(m)m.remove();
+  renderWorkoutPreview();
 }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -3082,8 +3413,59 @@ function switchWeeklyTab(tab){
   _weeklyTab=tab;
   gv('wk-tab-weekly').classList.toggle('active',tab==='weekly');
   gv('wk-tab-calendar').classList.toggle('active',tab==='calendar');
+  gv('wk-tab-stats').classList.toggle('active',tab==='stats');
   gv('wk-tab-content-weekly').style.display=tab==='weekly'?'block':'none';
   gv('wk-tab-content-calendar').style.display=tab==='calendar'?'block':'none';
+  gv('wk-tab-content-stats').style.display=tab==='stats'?'block':'none';
   if(tab==='calendar')buildCalendar();
-  if(tab==='weekly')renderWeekly();
+  if(tab==='weekly'||tab==='stats')renderProgressPage();
 }
+
+// ══════════════════════════════════════════════════════════════════════════
+// WEEKLY AI PATTERN SUMMARY
+// ══════════════════════════════════════════════════════════════════════════
+async function generateWeeklySummary(weekK){
+  const card=gv('weekly-ai-summary');
+  if(!card)return;
+  const btn=card.querySelector('.wk-ai-btn');
+  const responseEl=gv('wk-ai-response');
+  if(btn){btn.disabled=true;btn.textContent='...';}
+
+  // Gather 7-day data
+  const days=getWeekData();
+  const tgt=getCalTarget();
+  const woSessions=load(`${KEY}_wo_history`,[]);
+  const weekDayKeys=new Set(days.map(d=>d.key));
+  const weekWo=woSessions.filter(s=>weekDayKeys.has((s.date||'').slice(0,10)));
+
+  const dayLines=days.map(d=>{
+    if(!d.hasData&&!d.isToday)return `${d.label}: no data`;
+    const hit=d.t.cal>=tgt*0.8&&d.t.cal<=tgt*1.15?'✓':'✗';
+    const wo=weekWo.filter(s=>(s.date||'').slice(0,10)===d.key).map(s=>s.splitName||'workout').join(', ');
+    return `${d.label}: ${Math.round(d.t.cal)}kcal, ${Math.round(d.t.p)}g P, target ${hit}${wo?`, wo: ${wo}`:''}`;
+  }).join('\n');
+
+  const userMsg=`Week ${weekK}. Daily target: ${tgt}kcal.\n${dayLines}`;
+
+  try{
+    const res=await fetch(PROXY,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-haiku-4-5-20251001',
+        max_tokens:120,
+        system:"You are a concise performance coach. Analyse this week's data and give 2-3 bullet observations about patterns — e.g. consistently under on protein, stronger workout days after better sleep, calories spiking on weekends. Be specific, use the actual numbers, max 60 words total.",
+        messages:[{role:'user',content:userMsg}]
+      })
+    });
+    const data=await res.json();
+    const text=data.content?.[0]?.text||'No response received.';
+    localStorage.setItem(`${KEY}_weekly_ai_${weekK}`,text);
+    if(responseEl)responseEl.textContent=text;
+    if(btn){btn.disabled=false;btn.textContent='↺ Refresh';}
+  }catch(e){
+    if(btn){btn.disabled=false;btn.textContent='Generate';}
+    if(responseEl)responseEl.textContent='Failed — check connection.';
+  }
+}
+
