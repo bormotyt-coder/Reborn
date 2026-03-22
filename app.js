@@ -1,5 +1,19 @@
 
 const PROXY='https://reborn-proxy.bormotyt.workers.dev';
+
+// Lightweight markdown → HTML (bold, italic, headings, newlines)
+function md(text){
+  if(!text)return'';
+  return text
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/\*\*\*(.+?)\*\*\*/gs,'<strong><em>$1</em></strong>')
+    .replace(/\*\*(.+?)\*\*/gs,'<strong>$1</strong>')
+    .replace(/\*([^*\n]+?)\*/g,'<em>$1</em>')
+    .replace(/^#{3}\s+(.+)$/gm,'<div class="md-h3">$1</div>')
+    .replace(/^#{2}\s+(.+)$/gm,'<div class="md-h2">$1</div>')
+    .replace(/^#{1}\s+(.+)$/gm,'<div class="md-h1">$1</div>')
+    .replace(/\n/g,'<br>');
+}
 const TARGETS={cal:2340,p:128,c:200,f:65};
 const BASELINE={weight:89.1,bf:25.1,fatMass:22.4};
 const GOAL_BF=20.1;
@@ -566,7 +580,7 @@ Give a 2-3 sentence honest assessment: how well this meal fits his cut goals, wh
     const data=await res.json();
     const text=data.content.map(b=>b.text||'').join('').trim();
     gv('mdd-analysis-loading').style.display='none';
-    gv('mdd-analysis-body').textContent=text;
+    gv('mdd-analysis-body').innerHTML=md(text);
     btn.style.display='none';
   }catch(err){
     gv('mdd-analysis-loading').style.display='none';
@@ -1003,7 +1017,7 @@ Direct. No fluff. Reference the rolling context if there are patterns worth call
     localStorage.setItem(`${KEY}_last_coach_report`,text);
     chatHistory=[{role:'user',content:prompt},{role:'assistant',content:text}];
     typingDiv.className='chat-msg coach';
-    typingDiv.innerHTML=text.replace(/\n/g,'<br>');
+    typingDiv.innerHTML=md(text);
     msgEl.scrollTop=msgEl.scrollHeight;
     generateCoachSuggestions(text);
   }catch(err){
@@ -1068,7 +1082,7 @@ async function sendChatMessage(){
     const reply=data.content.map(b=>b.text||'').join('').trim();
     chatHistory.push({role:'assistant',content:reply});
     lDiv.className='chat-msg coach';
-    lDiv.innerHTML=reply.replace(/\n/g,'<br>');
+    lDiv.innerHTML=md(reply);
   }catch(err){
     lDiv.className='chat-msg coach';
     lDiv.textContent='Something went wrong. Try again.';
@@ -3533,7 +3547,7 @@ async function generateWeeklySummary(weekK){
     const data=await res.json();
     const text=data.content?.[0]?.text||'No response received.';
     localStorage.setItem(`${KEY}_weekly_ai_${weekK}`,text);
-    if(responseEl)responseEl.textContent=text;
+    if(responseEl)responseEl.innerHTML=md(text);
     if(btn){btn.disabled=false;btn.textContent='↺ Refresh';}
   }catch(e){
     if(btn){btn.disabled=false;btn.textContent='Generate';}
@@ -3715,7 +3729,7 @@ async function loadFastingRecommendation(forceRefresh=false){
   const cacheDate=localStorage.getItem(FAST_AI_KEY+'_date');
   if(!forceRefresh&&cached&&cacheDate===todayKey()){
     const el=gv('fast-ai-content');
-    if(el){el.innerHTML=cached.replace(/\n/g,'<br>');el.style.display='block';}
+    if(el){el.innerHTML=md(cached);el.style.display='block';}
     return;
   }
   const loading=gv('fast-ai-loading'),content=gv('fast-ai-content');
@@ -3734,7 +3748,7 @@ async function loadFastingRecommendation(forceRefresh=false){
     const text=data.content?.[0]?.text||'Could not generate recommendation.';
     localStorage.setItem(FAST_AI_KEY,text);
     localStorage.setItem(FAST_AI_KEY+'_date',todayKey());
-    if(content){content.innerHTML=text.replace(/\n/g,'<br>');content.style.display='block';}
+    if(content){content.innerHTML=md(text);content.style.display='block';}
   }catch(e){
     if(content){content.textContent='Failed to load — check your connection.';content.style.display='block';}
   }finally{
