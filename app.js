@@ -1735,13 +1735,13 @@ async function snapAndReadBarcode(){
           {type:'text',text:'What is the barcode number in this image? Return only the digits.'}
         ]}]})});
     const data=await res.json();
-    if(data.error||data.type==='error'){
+    let raw;
+    try{raw=aiText(data).trim().replace(/\s/g,'');}catch(e){
       _barcodeScanning=false;
       setBarcodeStatus('error','AI read failed — type barcode number below.');
-      console.error('Barcode API error:',data.error||data);
+      console.error('Barcode API error:',e);
       return;
     }
-    const raw=(data.content||[]).map(b=>b.text||'').join('').trim().replace(/\s/g,'');
     // Extract only digits
     const digits=raw.replace(/[^0-9]/g,'');
     if(!digits||raw.toUpperCase()==='NONE'||digits.length<6){
@@ -1858,7 +1858,7 @@ async function identifyProductFromImage(b64){
       })
     });
     const data=await res.json();
-    const name=(data.content||[]).map(c=>c.text||'').join('').trim().replace(/^["']+|["']+$/g,'');
+    const name=aiText(data).trim().replace(/^["']+|["']+$/g,'');
     if(descEl)descEl.value=name||'Scanned product';
   }catch(e){
     if(descEl)descEl.value='Scanned product';
@@ -3551,7 +3551,7 @@ async function generateWeeklySummary(weekK){
       })
     });
     const data=await res.json();
-    const text=data.content?.[0]?.text||'No response received.';
+    const text=aiText(data).trim();
     localStorage.setItem(`${KEY}_weekly_ai_${weekK}`,text);
     if(responseEl)responseEl.innerHTML=md(text);
     if(btn){btn.disabled=false;btn.textContent='↺ Refresh';}
@@ -3751,7 +3751,7 @@ async function loadFastingRecommendation(forceRefresh=false){
       messages:[{role:'user',content:`Based on my data, recommend:\n1. Best fasting protocol (16:8, 18:6, or 20:4) for my fat loss goal and why\n2. Optimal eating window start/end times\n3. Which days this week to fast considering my workout schedule\n4. One key tip for right now\n\n${ctx}`}]
     })});
     const data=await resp.json();
-    const text=data.content?.[0]?.text||'Could not generate recommendation.';
+    const text=aiText(data).trim();
     localStorage.setItem(FAST_AI_KEY,text);
     localStorage.setItem(FAST_AI_KEY+'_date',todayKey());
     if(content){content.innerHTML=md(text);content.style.display='block';}
