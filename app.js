@@ -1,6 +1,14 @@
 
 const PROXY='https://reborn-proxy.bormotyt.workers.dev';
 
+// Extract text from Claude API response, throwing on errors
+function aiText(data){
+  if(data.error)throw new Error(data.error.message||JSON.stringify(data.error));
+  if(data.type==='error')throw new Error(data.error?.message||'API error');
+  if(!data.content||!Array.isArray(data.content))throw new Error('Invalid API response: no content');
+  return data.content.map(b=>b.text||'').join('');
+}
+
 // Lightweight markdown → HTML (bold, italic, headings, newlines)
 function md(text){
   if(!text)return'';
@@ -385,7 +393,7 @@ async function aiLookupQA(){
         system:'Return ONLY valid JSON, no markdown: {"emoji":"single emoji","calories":number,"protein":number,"carbs":number,"fat":number}',
         messages:[{role:'user',content:`Nutrition facts for: ${name}. Use official label if branded.`}]})});
     const data=await res.json();
-    const p=JSON.parse(data.content.map(b=>b.text||'').join('').replace(/```json|```/g,'').trim());
+    const p=JSON.parse(aiText(data).replace(/```json|```/g,'').trim());
     if(p.emoji)gv('qa-emoji-in').value=p.emoji;
     if(p.calories)gv('qa-cal-in').value=p.calories;
     if(p.protein)gv('qa-p-in').value=p.protein;
@@ -578,7 +586,7 @@ Give a 2-3 sentence honest assessment: how well this meal fits his cut goals, wh
       body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:200,
         messages:[{role:'user',content:prompt}]})});
     const data=await res.json();
-    const text=data.content.map(b=>b.text||'').join('').trim();
+    const text=aiText(data).trim();
     gv('mdd-analysis-loading').style.display='none';
     gv('mdd-analysis-body').innerHTML=md(text);
     btn.style.display='none';
@@ -626,7 +634,7 @@ Return ONLY valid JSON, no markdown:
 Identify 2-8 ingredients. Include fibre, sugar, sodium where known (use 0 if unknown). Use official macros for branded products.`,
         messages:[{role:'user',content}]})});
     const data=await res.json();
-    const raw=data.content.map(b=>b.text||'').join('').replace(/```json|```/g,'').trim();
+    const raw=aiText(data).replace(/```json|```/g,'').trim();
     const parsed=JSON.parse(raw);
     ingredients=parsed.ingredients.map((ing,i)=>({...ing,id:i,portion_multiplier:1,selected:true}));
     const conf=parsed.confidence||'medium';
@@ -849,7 +857,7 @@ async function aiLookupIngredient(){
         system:'Return ONLY valid JSON, no markdown: {"emoji":"emoji","portion":"portion description","calories":number,"protein":number,"carbs":number,"fat":number}',
         messages:[{role:'user',content:`Nutrition facts for: ${name}`}]})});
     const data=await res.json();
-    const p=JSON.parse(data.content.map(b=>b.text||'').join('').replace(/```json|```/g,'').trim());
+    const p=JSON.parse(aiText(data).replace(/```json|```/g,'').trim());
     if(p.emoji)gv('add-ing-emoji').value=p.emoji;
     if(p.calories)gv('add-ing-cal').value=p.calories;
     if(p.protein)gv('add-ing-p').value=p.protein;
@@ -1013,7 +1021,7 @@ Direct. No fluff. Reference the rolling context if there are patterns worth call
         system:'You are a direct, no-nonsense performance and nutrition coach for Borna. Honest, specific, actionable. No filler. When you spot multi-day patterns (e.g. 3rd day under on protein), call them out explicitly.',
         messages:[{role:'user',content:prompt}]})});
     const data=await res.json();
-    const text=data.content.map(b=>b.text||'').join('').trim();
+    const text=aiText(data).trim();
     localStorage.setItem(`${KEY}_last_coach_report`,text);
     chatHistory=[{role:'user',content:prompt},{role:'assistant',content:text}];
     typingDiv.className='chat-msg coach';
@@ -1034,7 +1042,7 @@ async function generateCoachSuggestions(debriefText){
         system:'You are a nutrition and performance coach.',
         messages:[{role:'user',content:`Based on this daily debrief, write 3 short questions that the athlete would ask their coach — things like "how can I fix my protein intake?", "what should I eat tonight?", "is my deficit too aggressive?". First-person from the athlete's perspective. Return ONLY 3 lines, one question per line, no numbering, under 10 words each.\n\n${debriefText}`}]})});
     const data=await res.json();
-    const chips=data.content.map(b=>b.text||'').join('').trim().split('\n').map(s=>s.trim()).filter(Boolean).slice(0,3);
+    const chips=aiText(data).trim().split('\n').map(s=>s.trim()).filter(Boolean).slice(0,3);
     const el=gv('coach-suggestions');
     if(!el||!chips.length)return;
     el.innerHTML='';
@@ -1079,7 +1087,7 @@ async function sendChatMessage(){
         system:`You are a direct, no-nonsense performance and nutrition coach for Borna. You have full context of his day. Be specific, honest, and actionable. Keep replies concise.\n\n${getDayContext()}`,
         messages:chatHistory})});
     const data=await res.json();
-    const reply=data.content.map(b=>b.text||'').join('').trim();
+    const reply=aiText(data).trim();
     chatHistory.push({role:'assistant',content:reply});
     lDiv.className='chat-msg coach';
     lDiv.innerHTML=md(reply);
@@ -1958,7 +1966,7 @@ async function runImpactScan(){
         system:'Nutrition expert. Return ONLY valid JSON, no markdown: {"name":"food name","emoji":"single emoji","calories":number,"protein":number,"carbs":number,"fat":number,"verdict":"one punchy sentence about whether this fits remaining targets"}',
         messages:[{role:'user',content}]})});
     const data=await res.json();
-    const raw=data.content.map(b=>b.text||'').join('').replace(/```json|```/g,'').trim();
+    const raw=aiText(data).replace(/```json|```/g,'').trim();
     const parsed=JSON.parse(raw);
     impactEntry={name:parsed.name,emoji:parsed.emoji||'🍽️',calories:Math.round(parsed.calories||0),protein:Math.round((parsed.protein||0)*10)/10,carbs:Math.round((parsed.carbs||0)*10)/10,fat:Math.round((parsed.fat||0)*10)/10,fibre:0,sugar:0,sodium:0,thumb:null};
     renderImpactResult(parsed);
@@ -2292,7 +2300,7 @@ Time of day: ${new Date().getHours()}:00. Goal: fat loss cut phase.`;
         system:'Return ONLY valid JSON, no markdown: {"suggestions":[{"name":"food name","emoji":"emoji","reason":"one line why this fits","calories":number,"protein":number,"carbs":number,"fat":number}]} — 3 suggestions, practical foods available in Dubai, prioritize whatever macro is most behind.',
         messages:[{role:'user',content:ctx}]})});
     const data=await res.json();
-    const raw=data.content.map(b=>b.text||'').join('').replace(/```json|```/g,'').trim();
+    const raw=aiText(data).replace(/```json|```/g,'').trim();
     const parsed=JSON.parse(raw);
 
     el.innerHTML='';
@@ -2920,10 +2928,8 @@ Rules:
   try{
     const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:2000,messages:[{role:'user',content:prompt}]})});
-    if(!res.ok){const errBody=await res.text().catch(()=>'');throw new Error(`HTTP ${res.status}: ${errBody.slice(0,120)}`);}
     const data=await res.json();
-    if(data.error){throw new Error(data.error.message||JSON.stringify(data.error));}
-    const rawText=(data.content&&data.content[0]&&data.content[0].text)||'';
+    const rawText=aiText(data).trim();
     if(!rawText)throw new Error('Empty response from API');
     // Extract JSON — strip any markdown fences and find the first {...}
     const jsonMatch=rawText.replace(/```json|```/g,'').trim().match(/\{[\s\S]*\}/);
