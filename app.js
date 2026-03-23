@@ -1,5 +1,19 @@
 
 const PROXY='https://reborn-proxy.bormotyt.workers.dev';
+
+// Lightweight markdown → HTML (bold, italic, headings, newlines)
+function md(text){
+  if(!text)return'';
+  return text
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/\*\*\*(.+?)\*\*\*/gs,'<strong><em>$1</em></strong>')
+    .replace(/\*\*(.+?)\*\*/gs,'<strong>$1</strong>')
+    .replace(/\*([^*\n]+?)\*/g,'<em>$1</em>')
+    .replace(/^#{3}\s+(.+)$/gm,'<div class="md-h3">$1</div>')
+    .replace(/^#{2}\s+(.+)$/gm,'<div class="md-h2">$1</div>')
+    .replace(/^#{1}\s+(.+)$/gm,'<div class="md-h1">$1</div>')
+    .replace(/\n/g,'<br>');
+}
 const TARGETS={cal:2340,p:128,c:200,f:65};
 const BASELINE={weight:89.1,bf:25.1,fatMass:22.4};
 const GOAL_BF=20.1;
@@ -53,6 +67,25 @@ let mealB64    =null;
 let ingredients=[];
 let activeTab  =0;
 
+// FASTING STATE (must be declared before BOOT runs to avoid TDZ crashes)
+const FAST_LOG_KEY   = 'fasting_log';
+const FAST_STATE_KEY = `${KEY}_fast_state`;
+const FAST_AI_KEY    = `${KEY}_fast_ai_rec`;
+const FAST_CIRC      = 729.1;
+const FAST_PHASES    = [
+  {hours:0, name:'Digestion',          icon:'🍽️', desc:'Your body is processing your last meal'},
+  {hours:4, name:'Glycogen Depletion', icon:'⚡',  desc:'Liver glycogen stores are being depleted'},
+  {hours:8, name:'Fat Burning Begins', icon:'🔥',  desc:'Fat oxidation is ramping up'},
+  {hours:12,name:'Deep Fat Burning',   icon:'💪',  desc:'Body is in full fat-burning mode'},
+  {hours:16,name:'Autophagy Zone',     icon:'🧬',  desc:'Cellular repair and renewal underway'},
+];
+const FAST_PROTO_HRS = {'16:8':16,'18:6':18,'20:4':20,'custom':0};
+let fastState    = load(FAST_STATE_KEY, null);
+let fastLog      = load(FAST_LOG_KEY, []);
+let fastTimer    = null;
+let fastProtocol = '16:8';
+let fastCustomHrs= 0;
+
 // BOOT
 const _n=new Date();
 const _hdrDate=gv('hdr-date');if(_hdrDate)_hdrDate.innerHTML=_n.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})+'<br>'+_n.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
@@ -63,19 +96,18 @@ initWelcomeCard();
 function renderAll(){
   renderWhoopCard();renderSummary();renderRings();
   renderCups();renderFoodList();
-  renderProgress();buildCalendar();updateCoachStats();
+  renderProgressPage();buildCalendar();updateCoachStats();
   // refresh smart subtitle with latest stats
   const sub=gv('wc-sub');if(sub)sub.textContent=getSmartSub();
 }
 
 // NAV
-const PAGE_ORDER=['today','workout','weekly','progress'];
+const PAGE_ORDER=['today','workout','fast','coach','progress'];
 let _currentPage='today';
 function showPage(id,btn){
-  const pages=document.querySelectorAll('.page');
   const fromIdx=PAGE_ORDER.indexOf(_currentPage);
   const toIdx=PAGE_ORDER.indexOf(id);
-  const dir=toIdx>=fromIdx?1:-1; // 1=going right, -1=going left
+  const dir=toIdx>=fromIdx?1:-1;
   const outgoing=gv('pg-'+_currentPage);
   const incoming=gv('pg-'+id);
   if(outgoing&&outgoing!==incoming){
@@ -84,33 +116,27 @@ function showPage(id,btn){
       outgoing.classList.remove('active','page-exit-left','page-exit-right');
     },{once:true});
   }
+  // Clear active states
   document.querySelectorAll('.nb').forEach(b=>b.classList.remove('active'));
+  const cfab=gv('coach-fab');if(cfab)cfab.classList.remove('active');
+  // Set active on correct button
+  if(btn&&btn.classList.contains('nb'))btn.classList.add('active');
+  else if(btn&&btn.id==='coach-fab'&&cfab)cfab.classList.add('active');
+  // else: progress pill — no nav button highlighted
   incoming.classList.remove('page-exit-left','page-exit-right');
   incoming.classList.add('active',dir===1?'page-enter-right':'page-enter-left');
   incoming.addEventListener('animationend',()=>{
     incoming.classList.remove('page-enter-right','page-enter-left');
   },{once:true});
-  btn.classList.add('active');
   incoming.scrollTop=0;
   _currentPage=id;
-  if(id==='weekly')renderWeekly();
-  if(id==='weekly')buildCalendar();
-  if(id==='workout')renderWorkoutPage();
+  _updateFab(id);
+  if(id==='progress'){renderProgressPage();buildCalendar();}
+  if(id==='workout'){renderWorkoutPage();renderWorkoutFastBanner();}
+  if(id==='fast')renderFastPage();
+  if(id==='coach'){updateCoachStats();if(!chatHistory.length)generateCoachReport();}
 }
 
-function openCoachModal(){
-  updateCoachStats();
-  const el=gv('coach-modal-overlay');
-  if(!el)return;
-  el.classList.add('open');
-  document.body.style.overflow='hidden';
-}
-function closeCoachModal(){
-  const el=gv('coach-modal-overlay');
-  if(!el)return;
-  el.classList.remove('open');
-  document.body.style.overflow='';
-}
 
 // ── WHOOP 3-SNAPSHOT ──
 function selectWhoopTab(i){
@@ -230,11 +256,7 @@ function renderSummary(){
   const calEl=gv('cal-num');
   const prevCal=calEl._countTo||0;
   const targetCal=Math.round(t.cal);
-  // Use innerHTML for the kcal sup — animate a child span
-  if(!calEl.querySelector('.cal-count-n')){
-    calEl.innerHTML='<span class="cal-count-n">0</span><sup>kcal</sup>';
-  }
-  const numSpan=calEl.querySelector('.cal-count-n');
+  const numSpan=calEl.querySelector('.cal-count-n')||calEl;
   numSpan._countTo=numSpan._countTo||0;
   const oldTarget=numSpan._countTo;
   numSpan._countTo=targetCal;
@@ -383,19 +405,46 @@ function saveQAItem(){
 // FOOD LIST
 function renderFoodList(){
   const el=gv('food-list');
-  if(!meals.length){el.innerHTML='<div class="empty-st"><span class="empty-icon">🍽️</span>No meals logged yet.<br>Tap Log a Meal or Quick Add.</div>';return;}
+  if(!meals.length){el.innerHTML='<div class="empty-st"><div class="empty-icon">🍽️</div><div>No meals logged yet.<br>Tap Log a Meal or Quick Add.</div></div>';return;}
   el.innerHTML='';
-  for(let i=0;i<meals.length;i++){
-    const m=meals[i];const div=document.createElement('div');div.className='fi';
-    const th=m.thumb?`<img class="fi-thumb" src="${m.thumb}" style="width:46px;height:46px;border-radius:11px;object-fit:cover;flex-shrink:0"/>`:`<div class="fi-thumb">${m.emoji||'🍽️'}</div>`;
-    const pPct=Math.min(Math.round(m.protein/TARGETS.p*100),100);
-    const cPct=Math.min(Math.round(m.carbs/TARGETS.c*100),100);
-    const fPct=Math.min(Math.round(m.fat/TARGETS.f*100),100);
-    div.innerHTML=`<div class="fi-top">${th}<div class="fi-info"><div class="fi-name">${m.name}</div><div class="fi-tags"><span class="ft ftcal">${Math.round(m.calories)} kcal</span><span class="ft ftp">${Math.round(m.protein)}g P</span><span class="ft ftc">${Math.round(m.carbs)}g C</span><span class="ft ftf">${Math.round(m.fat)}g F</span></div></div><button class="fi-del">✕</button></div><div class="fi-bars"><div class="fi-bar-row"><span class="fi-bar-lbl">P</span><div class="fi-bar-track"><div class="fi-bar-fill" style="width:${pPct}%;background:var(--pc)"></div></div><span class="fi-bar-val" style="color:var(--pc)">${Math.round(m.protein)}g</span></div><div class="fi-bar-row"><span class="fi-bar-lbl">C</span><div class="fi-bar-track"><div class="fi-bar-fill" style="width:${cPct}%;background:var(--cc)"></div></div><span class="fi-bar-val" style="color:var(--cc)">${Math.round(m.carbs)}g</span></div><div class="fi-bar-row"><span class="fi-bar-lbl">F</span><div class="fi-bar-track"><div class="fi-bar-fill" style="width:${fPct}%;background:var(--fc)"></div></div><span class="fi-bar-val" style="color:var(--fc)">${Math.round(m.fat)}g</span></div></div>`;
-    div.querySelector('.fi-del').addEventListener('click',(e)=>{e.stopPropagation();deleteMeal(i);});
-    div.addEventListener('click',()=>openMealDetail(i));
-    el.appendChild(div);
-  }
+  // Group by time of day
+  const groups=[
+    {label:'Breakfast',entries:[]},
+    {label:'Lunch',entries:[]},
+    {label:'Snacks',entries:[]},
+    {label:'Dinner',entries:[]},
+    {label:'Uncategorised',entries:[]},
+  ];
+  meals.forEach((m,i)=>{
+    let g=4; // Uncategorised
+    if(m.loggedAt){
+      const d=new Date(m.loggedAt);const mins=d.getHours()*60+d.getMinutes();
+      if(mins<630)g=0;           // <10:30am → Breakfast
+      else if(mins<870)g=1;      // <2:30pm  → Lunch
+      else if(mins<1080)g=2;     // <6pm     → Snacks
+      else g=3;                  // ≥6pm     → Dinner
+    }
+    groups[g].entries.push({m,i});
+  });
+  groups.forEach(({label,entries})=>{
+    if(!entries.length)return;
+    const groupCal=entries.reduce((s,{m})=>s+Math.round(m.calories),0);
+    const hdr=document.createElement('div');
+    hdr.className='meal-group-lbl';
+    hdr.innerHTML=`<span>${label}</span><span>${groupCal} kcal</span>`;
+    el.appendChild(hdr);
+    entries.forEach(({m,i})=>{
+      const div=document.createElement('div');div.className='fi';
+      const th=m.thumb?`<img class="fi-thumb" src="${m.thumb}" style="width:46px;height:46px;border-radius:11px;object-fit:cover;flex-shrink:0"/>`:`<div class="fi-thumb">${m.emoji||'🍽️'}</div>`;
+      const pPct=Math.min(Math.round(m.protein/TARGETS.p*100),100);
+      const cPct=Math.min(Math.round(m.carbs/TARGETS.c*100),100);
+      const fPct=Math.min(Math.round(m.fat/TARGETS.f*100),100);
+      div.innerHTML=`<div class="fi-top">${th}<div class="fi-info"><div class="fi-name">${m.name}</div><div class="fi-tags"><span class="ft ftcal">${Math.round(m.calories)} kcal</span><span class="ft ftp">${Math.round(m.protein)}g P</span><span class="ft ftc">${Math.round(m.carbs)}g C</span><span class="ft ftf">${Math.round(m.fat)}g F</span></div></div><button class="fi-del">✕</button></div><div class="fi-bars"><div class="fi-bar-row"><span class="fi-bar-lbl">P</span><div class="fi-bar-track"><div class="fi-bar-fill" style="width:${pPct}%;background:var(--pc)"></div></div><span class="fi-bar-val" style="color:var(--pc)">${Math.round(m.protein)}g</span></div><div class="fi-bar-row"><span class="fi-bar-lbl">C</span><div class="fi-bar-track"><div class="fi-bar-fill" style="width:${cPct}%;background:var(--cc)"></div></div><span class="fi-bar-val" style="color:var(--cc)">${Math.round(m.carbs)}g</span></div><div class="fi-bar-row"><span class="fi-bar-lbl">F</span><div class="fi-bar-track"><div class="fi-bar-fill" style="width:${fPct}%;background:var(--fc)"></div></div><span class="fi-bar-val" style="color:var(--fc)">${Math.round(m.fat)}g</span></div></div>`;
+      div.querySelector('.fi-del').addEventListener('click',(e)=>{e.stopPropagation();deleteMeal(i);});
+      div.addEventListener('click',()=>openMealDetail(i));
+      el.appendChild(div);
+    });
+  });
 }
 function deleteMeal(i){meals.splice(i,1);save(`${KEY}_meals_${todayKey()}`,meals);renderAll();}
 
@@ -531,7 +580,7 @@ Give a 2-3 sentence honest assessment: how well this meal fits his cut goals, wh
     const data=await res.json();
     const text=data.content.map(b=>b.text||'').join('').trim();
     gv('mdd-analysis-loading').style.display='none';
-    gv('mdd-analysis-body').textContent=text;
+    gv('mdd-analysis-body').innerHTML=md(text);
     btn.style.display='none';
   }catch(err){
     gv('mdd-analysis-loading').style.display='none';
@@ -877,7 +926,9 @@ function getDayContext(){
   const ws=whoopSnaps;
   const mealSum=meals.map(m=>`${m.name}: ${Math.round(m.calories)} kcal, ${Math.round(m.protein)}g P, ${Math.round(m.carbs)}g C, ${Math.round(m.fat)}g F`).join('\n');
   const whoopSum=`Wake: Sleep ${ws[0]?.sleep??'—'}h, Recovery ${ws[0]?.recovery??'—'}%\n1PM: Strain ${ws[1]?.strain??'—'}, Burned ${ws[1]?.burned??'—'} kcal, Steps ${ws[1]?.steps??'—'}\nEOD: Strain ${ws[2]?.strain??'—'}, Burned ${ws[2]?.burned??'—'} kcal, Steps ${ws[2]?.steps??'—'}`;
-  return `BORNA'S DATA TODAY:\nMEALS:\n${mealSum||'None logged'}\nTOTALS: ${Math.round(t.cal)} kcal, ${Math.round(t.p)}g P, ${Math.round(t.c)}g C, ${Math.round(t.f)}g F\nTARGET: ${getCalTarget()} kcal (cut phase)\nMACRO TARGETS: 128g P, 200g C, 65g F\nWHOOP:\n${whoopSum}\nWATER: ${cups} cups (${cups*ML_PER_CUP}ml) / 8 cups\nPROFILE: Male, 26, 89.1kg, 25.1% BF, goal 20.1% BF by Apr 27 2026`;
+  let fastCtx='FASTING: no data';
+  try{if(typeof getFastContext==='function')fastCtx=getFastContext();}catch(e){}
+  return `BORNA'S DATA TODAY:\nMEALS:\n${mealSum||'None logged'}\nTOTALS: ${Math.round(t.cal)} kcal, ${Math.round(t.p)}g P, ${Math.round(t.c)}g C, ${Math.round(t.f)}g F\nTARGET: ${getCalTarget()} kcal (cut phase)\nMACRO TARGETS: 128g P, 200g C, 65g F\nWHOOP:\n${whoopSum}\nWATER: ${cups} cups (${cups*ML_PER_CUP}ml) / 8 cups\n${fastCtx}\nPROFILE: Male, 26, 89.1kg, 25.1% BF, goal 20.1% BF by Apr 27 2026`;
 }
 
 // Build the enriched coach context — called only by generateCoachReport
@@ -920,24 +971,25 @@ function _buildCoachContext(){
 let chatHistory=[];
 
 async function generateCoachReport(){
-  if(!meals.length&&!whoopSnaps.some(s=>s!==null)){alert('Log some meals or Whoop data first.');return;}
-  gv('coach-loading').classList.add('show');gv('coach-response').classList.remove('show');
-  gv('coach-chat').classList.remove('show');
-  chatHistory=[];
+  if(chatHistory.length)return;
+  const msgEl=gv('chat-messages');
+
+  // Typing bubble
+  const typingDiv=document.createElement('div');
+  typingDiv.className='chat-msg coach coach-typing';
+  typingDiv.innerHTML='<span></span><span></span><span></span>';
+  msgEl.appendChild(typingDiv);
+  msgEl.scrollTop=msgEl.scrollHeight;
 
   const ctx=getDayContext();
   const {timeLabel,rolling3,yesterdaySummary,workoutCtx,hour}=_buildCoachContext();
-
-  // Time-appropriate tone and scoring instruction
   const isMorning=hour<14;
   const toneInstruction=isMorning
     ?`It is currently ${timeLabel}. The day is still in progress — do NOT score the day as complete or call it a failure based on what hasn't been logged yet. Focus on what's been done so far and how to finish the day strong.`
     :`It is currently ${timeLabel}. Give a full honest assessment of the complete day.`;
-
   const scoringInstruction=isMorning
     ?`For OVERALL SCORE: rate effort and trajectory so far (e.g. "7/10 — strong start, protein on track, finish with a solid dinner"). Do NOT penalise for meals not yet eaten.`
     :`For OVERALL SCORE: rate the full day 1-10 with one punchy honest line.`;
-
   const prompt=`${ctx}
 
 ROLLING CONTEXT:
@@ -962,22 +1014,38 @@ Direct. No fluff. Reference the rolling context if there are patterns worth call
         messages:[{role:'user',content:prompt}]})});
     const data=await res.json();
     const text=data.content.map(b=>b.text||'').join('').trim();
-
-    // ── Persist report for tomorrow's context ──
-    // Store first 300 chars as a one-sentence summary seed
     localStorage.setItem(`${KEY}_last_coach_report`,text);
+    chatHistory=[{role:'user',content:prompt},{role:'assistant',content:text}];
+    typingDiv.className='chat-msg coach';
+    typingDiv.innerHTML=md(text);
+    msgEl.scrollTop=msgEl.scrollHeight;
+    generateCoachSuggestions(text);
+  }catch(err){
+    typingDiv.className='chat-msg coach';
+    typingDiv.textContent='Could not load debrief. Try again later.';
+    console.error(err);
+  }
+}
 
-    const re=gv('coach-response');
-    re.innerHTML=`<div class="cr-header"><div class="cr-icon">🧠</div><div><div class="cr-title">Daily Debrief</div><div class="cr-time">${new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'})}</div></div></div><div class="cr-body">${text.replace(/\n/g,'<br>')}</div>`;
-    re.classList.add('show');
-    chatHistory=[
-      {role:'user',content:prompt},
-      {role:'assistant',content:text}
-    ];
-    gv('chat-messages').innerHTML='';
-    gv('coach-chat').classList.add('show');
-  }catch(err){alert('Report failed.');console.error(err);}
-  finally{gv('coach-loading').classList.remove('show');}
+async function generateCoachSuggestions(debriefText){
+  try{
+    const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:120,
+        system:'You are a nutrition and performance coach.',
+        messages:[{role:'user',content:`Based on this daily debrief, write 3 short questions that the athlete would ask their coach — things like "how can I fix my protein intake?", "what should I eat tonight?", "is my deficit too aggressive?". First-person from the athlete's perspective. Return ONLY 3 lines, one question per line, no numbering, under 10 words each.\n\n${debriefText}`}]})});
+    const data=await res.json();
+    const chips=data.content.map(b=>b.text||'').join('').trim().split('\n').map(s=>s.trim()).filter(Boolean).slice(0,3);
+    const el=gv('coach-suggestions');
+    if(!el||!chips.length)return;
+    el.innerHTML='';
+    chips.forEach(q=>{
+      const btn=document.createElement('button');
+      btn.className='coach-sug-chip';
+      btn.textContent=q;
+      btn.onclick=()=>{gv('chat-input').value=q;el.innerHTML='';sendChatMessage();};
+      el.appendChild(btn);
+    });
+  }catch(e){console.error('suggestions failed',e);}
 }
 
 function handleChatKey(e){
@@ -988,6 +1056,7 @@ async function sendChatMessage(){
   const inp=gv('chat-input');
   const msg=inp.value.trim();if(!msg)return;
   inp.value='';inp.style.height='auto';
+  const sugEl=gv('coach-suggestions');if(sugEl)sugEl.innerHTML='';
 
   const msgEl=gv('chat-messages');
   // Add user bubble
@@ -1013,7 +1082,7 @@ async function sendChatMessage(){
     const reply=data.content.map(b=>b.text||'').join('').trim();
     chatHistory.push({role:'assistant',content:reply});
     lDiv.className='chat-msg coach';
-    lDiv.innerHTML=reply.replace(/\n/g,'<br>');
+    lDiv.innerHTML=md(reply);
   }catch(err){
     lDiv.className='chat-msg coach';
     lDiv.textContent='Something went wrong. Try again.';
@@ -1278,10 +1347,10 @@ function setBgForTime(h,weatherCode){
   canvas.style.height=ph+'px';
   const tod=getTimeOfDay(h);
   const bgs={
-    morning:  'linear-gradient(135deg,#0c2240,#1a3520)',
-    afternoon:'linear-gradient(135deg,#08172e,#0c2818)',
-    evening:  'linear-gradient(135deg,#1c0a30,#280e0e)',
-    night:    'linear-gradient(135deg,#04060e,#080816)',
+    morning:  'linear-gradient(135deg,#1a4070,#2a5540)',
+    afternoon:'linear-gradient(135deg,#1a3860,#1a4530)',
+    evening:  'linear-gradient(135deg,#2e1450,#401818)',
+    night:    'linear-gradient(135deg,#0a1020,#101828)',
   };
   bg.style.background=bgs[tod];
   _wcScene=_wcInitScene(tod,pw,ph);
@@ -1324,7 +1393,47 @@ async function initWelcomeCard(){
   }
 }
 
-
+// DAY CALENDAR STRIP (Whoop-style horizontal day picker)
+let _dayCalSelected=todayKey();
+const SHORT_DOWS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const SHORT_MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function buildDayCalStrip(){
+  const el=gv('day-cal-strip');if(!el)return;
+  const today=new Date();
+  const days=[];
+  for(let i=13;i>=0;i--){
+    const d=new Date(today);
+    d.setDate(d.getDate()-i);
+    days.push(d);
+  }
+  el.innerHTML='';
+  days.forEach(d=>{
+    const ds=d.toISOString().slice(0,10);
+    const hasData=load(`${KEY}_meals_${ds}`,[]).length>0;
+    const isActive=ds===_dayCalSelected;
+    const isToday=ds===todayKey();
+    const dow=isToday?'Today':SHORT_DOWS[d.getDay()];
+    const item=document.createElement('div');
+    item.className='day-cal-item'+(isActive?' active':'')+(hasData?' has-data':'');
+    item.innerHTML=`<span class="dc-dow">${dow}</span><span class="dc-day">${d.getDate()}</span><span class="dc-month">${SHORT_MONTHS[d.getMonth()]}</span>`;
+    item.addEventListener('click',()=>selectDayCalDay(ds));
+    el.appendChild(item);
+  });
+  // Scroll to active day
+  const activeItem=el.querySelector('.day-cal-item.active');
+  if(activeItem)activeItem.scrollIntoView({behavior:'smooth',inline:'center',block:'nearest'});
+}
+function selectDayCalDay(ds){
+  _dayCalSelected=ds;
+  // Reload meals and whoop data for selected day
+  meals=load(`${KEY}_meals_${ds}`,[]);
+  whoopSnaps=load(`${KEY}_whoopsnaps_${ds}`,[null,null,null]);
+  cups=parseInt(localStorage.getItem(`${KEY}_cups_${ds}`)||'0');
+  renderAll();
+  buildDayCalStrip();
+}
+// Build strip on boot
+buildDayCalStrip();
 
 // CALENDAR
 function buildCalendar(){
@@ -1335,11 +1444,14 @@ function buildCalendar(){
   const fd=new Date(y,m,1).getDay(),days=new Date(y,m+1,0).getDate(),ts=todayKey();
   let html='';
   for(let i=0;i<fd;i++)html+=`<div class="cc empty"></div>`;
+  const woSessions=load(`${KEY}_wo_history`,[]);
   for(let d=1;d<=days;d++){
     const ds=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     const hm=load(`${KEY}_meals_${ds}`,[]).length>0;
-    const hw=load(`${KEY}_whoopsnaps_${ds}`,[null,null,null]).some(s=>s!==null);
-    html+=`<div class="cc${ds===ts?' today':''}${ds===calSelKey?' sel':''}${(hm||hw)?' has-data':''}" onclick="selectDay('${ds}')"><div class="cc-num">${d}</div></div>`;
+    const hw=woSessions.some(s=>s.date&&s.date.slice(0,10)===ds);
+    const dots=(hm?`<div style="width:5px;height:5px;border-radius:50%;background:#4ade80;flex-shrink:0"></div>`:'')+
+               (hw?`<div style="width:5px;height:5px;border-radius:50%;background:var(--blue2);flex-shrink:0"></div>`:'');
+    html+=`<div class="cc${ds===ts?' today':''}${ds===calSelKey?' sel':''}${(hm||hw)?' has-data':''}" onclick="selectDay('${ds}')"><div class="cc-num">${d}</div>${dots?`<div style="display:flex;gap:2px;justify-content:center;margin-top:2px">${dots}</div>`:''}</div>`;
   }
   ce.innerHTML=html;
   renderDayDetail(calSelKey);
@@ -1392,39 +1504,9 @@ function saveEntry(){
   entries.push({date:new Date().toISOString(),weight:w,bf,notes:gv('e-notes').value.trim()});
   save(`${KEY}_entries`,entries);
   gv('e-w').value='';gv('e-bf').value='';gv('e-notes').value='';
-  closeEntryModal();renderProgress();
+  closeEntryModal();renderProgressPage();
 }
-function deleteEntry(i){entries.splice(i,1);save(`${KEY}_entries`,entries);renderProgress();}
-function renderProgress(){
-  const wEs=entries.filter(e=>e.weight!=null),bEs=entries.filter(e=>e.bf!=null);
-  const lw=wEs.length?wEs[wEs.length-1].weight:null,lb=bEs.length?bEs[bEs.length-1].bf:null;
-  const pw=wEs.length>1?wEs[wEs.length-2].weight:BASELINE.weight,pb=bEs.length>1?bEs[bEs.length-2].bf:BASELINE.bf;
-  gv('p-weight').textContent=lw!=null?lw.toFixed(1):BASELINE.weight.toFixed(1);
-  gv('p-bf').textContent=lb!=null?lb.toFixed(1):BASELINE.bf.toFixed(1);
-  const wd=lw!=null?(lw-pw).toFixed(1):null,bd=lb!=null?(lb-pb).toFixed(1):null;
-  if(wd)gv('p-w-delta').innerHTML=`<span class="${parseFloat(wd)<0?'dg':'db'}">${parseFloat(wd)>0?'+':''}${wd} kg</span> vs prev`;
-  if(bd)gv('p-bf-delta').innerHTML=`<span class="${parseFloat(bd)<0?'dg':'db'}">${parseFloat(bd)>0?'+':''}${bd}%</span> vs prev`;
-  const curBF=lb||BASELINE.bf,curW=lw||BASELINE.weight;
-  const curFat=(curBF/100)*curW,tgtFat=(GOAL_BF/100)*BASELINE.weight;
-  const fatLost=BASELINE.fatMass-curFat,totalLose=BASELINE.fatMass-tgtFat;
-  const pct=Math.max(0,Math.min(100,Math.round((fatLost/totalLose)*100)));
-  gv('goal-pct').textContent=pct+'%';gv('gbar-f').style.width=pct+'%';
-  gv('goal-detail').textContent=`Baseline: 22.4kg fat → Target: ${tgtFat.toFixed(1)}kg fat · ${Math.max(0,totalLose-fatLost).toFixed(1)}kg to go`;
-  renderChart('chart-w',wEs.slice(-8),'weight','kg','#388bfd',84,92);
-  renderChart('chart-bf',bEs.slice(-8),'bf','%','#2dd4c8',18,28);
-  const le=gv('entries-list');
-  if(!entries.length){le.innerHTML='<div style="text-align:center;padding:24px;color:var(--muted);font-size:12px">No entries yet.</div>';return;}
-  let html='';
-  [...entries].reverse().forEach((e,ri)=>{
-    const i=entries.length-1-ri;
-    const ds=new Date(e.date).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'});
-    html+=`<div class="ei"><div><div class="ei-date">${ds}</div>${e.notes?`<div class="ei-note">${e.notes}</div>`:''}</div>
-      <div class="ei-vals">${e.weight!=null?`<div class="ei-v"><div class="ei-vn" style="color:var(--blue2)">${e.weight}</div><div class="ei-vl">kg</div></div>`:''}
-      ${e.bf!=null?`<div class="ei-v"><div class="ei-vn" style="color:var(--cyan)">${e.bf}%</div><div class="ei-vl">BF</div></div>`:''}
-      <button class="ei-del" onclick="deleteEntry(${i})">✕</button></div></div>`;
-  });
-  le.innerHTML=html;
-}
+function deleteEntry(i){entries.splice(i,1);save(`${KEY}_entries`,entries);renderProgressPage();}
 function renderChart(id,data,field,unit,color,minV,maxV){
   const el=gv(id);
   if(!data.length){el.innerHTML=`<div style="color:var(--muted);font-size:11px;padding:8px">No data yet.</div>`;return;}
@@ -1595,7 +1677,14 @@ async function startBarcodeCamera(){
       video:{facingMode:'environment',width:{ideal:1920},height:{ideal:1080}}
     });
     video.srcObject=barcodeStream;
-    video.play();
+    await video.play();
+    // Wait for metadata so videoWidth/videoHeight are valid before allowing snap
+    if(!video.videoWidth){
+      await new Promise(res=>{
+        video.addEventListener('loadedmetadata',res,{once:true});
+        setTimeout(res,2000); // max 2s safety timeout
+      });
+    }
     setBarcodeStatus('idle');
   }catch(e){
     setBarcodeStatus('error','Camera unavailable. Type barcode number below.');
@@ -1613,13 +1702,18 @@ async function snapAndReadBarcode(){
     else setBarcodeStatus('error','No camera. Type the barcode number below.');
     return;
   }
+  // Guard: video must have valid dimensions (not a blank/unready frame)
+  if(!video.videoWidth||!video.videoHeight){
+    setBarcodeStatus('error','Camera not ready — wait a moment then try again.');
+    return;
+  }
   _barcodeScanning=true;
   setBarcodeStatus('reading');
 
   // Draw current video frame to canvas
   const canvas=document.createElement('canvas');
-  canvas.width=video.videoWidth||1280;
-  canvas.height=video.videoHeight||720;
+  canvas.width=video.videoWidth;
+  canvas.height=video.videoHeight;
   const ctx=canvas.getContext('2d');
   ctx.drawImage(video,0,0,canvas.width,canvas.height);
   const b64=canvas.toDataURL('image/jpeg',0.92).split(',')[1];
@@ -1633,37 +1727,72 @@ async function snapAndReadBarcode(){
           {type:'text',text:'What is the barcode number in this image? Return only the digits.'}
         ]}]})});
     const data=await res.json();
+    if(data.error||data.type==='error'){
+      _barcodeScanning=false;
+      setBarcodeStatus('error','AI read failed — type barcode number below.');
+      console.error('Barcode API error:',data.error||data);
+      return;
+    }
     const raw=(data.content||[]).map(b=>b.text||'').join('').trim().replace(/\s/g,'');
     // Extract only digits
     const digits=raw.replace(/[^0-9]/g,'');
-    if(!digits||raw==='NONE'||digits.length<6){
+    if(!digits||raw.toUpperCase()==='NONE'||digits.length<6){
       _barcodeScanning=false;
       setBarcodeStatus('error','Could not read barcode — reposition and try again, or type it below.');
       return;
     }
     gv('barcode-manual').value=digits;
     setBarcodeStatus('looking');
-    lookupBarcode(digits);
+    lookupBarcode(digits,b64);
   }catch(e){
     _barcodeScanning=false;
     setBarcodeStatus('error','Read failed — try again.');
   }
 }
 
-async function lookupBarcode(code){
+function renderBarcodeProduct(prod){
+  // prod = {name, servingG, servingLabel, per100, serving}
+  window._barcodeEntry={name:prod.name,emoji:'🏷️',...prod.serving,thumb:null};
+  window._barcodePer100=prod.per100;
+  window._barcodeServingG=prod.servingG;
+  window._barcodeName=prod.name;
+  gv('bc-name').textContent=prod.name;
+  gv('bc-serving').textContent=`Per serving (${prod.servingLabel})`;
+  gv('bc-cal').textContent=prod.serving.calories+' kcal';
+  gv('bc-p').textContent=prod.serving.protein+'g P';
+  gv('bc-c').textContent=prod.serving.carbs+'g C';
+  gv('bc-f').textContent=prod.serving.fat+'g F';
+  gv('bc-fibre').textContent=prod.serving.fibre+'g fibre';
+  gv('bc-sugar').textContent=prod.serving.sugar+'g sugar';
+  gv('bc-sodium').textContent=prod.serving.sodium+'mg sodium';
+  gv('barcode-qty').value='1';
+  gv('barcode-result').style.display='block';
+  _barcodeScanning=false;
+  stopBarcodeCamera();
+  setBarcodeStatus('found');
+}
+
+async function lookupBarcode(code,b64=null){
   if(!code||code.trim()===''){alert('Enter a barcode number.');return;}
+  const cacheKey=`${KEY}_bc_${code.trim()}`;
+
+  // 1. Check local cache first — works even when OFf is down
+  const cached=load(cacheKey,null);
+  if(cached){renderBarcodeProduct(cached);return;}
+
   gv('barcode-status').textContent='Looking up…';
   gv('barcode-result').style.display='none';
   try{
     const res=await fetch(`https://world.openfoodfacts.org/api/v2/product/${code.trim()}?fields=product_name,brands,nutriments,serving_size,serving_quantity,image_front_small_url`);
     const data=await res.json();
     if(data.status!==1||!data.product){
-      _barcodeScanning=false; setBarcodeStatus('error','Product not found in database — try typing the name in Log a Meal instead.');
+      _barcodeScanning=false;
+      setBarcodeStatus('idle',b64?'Not in database — identifying from photo…':'Not found — switching to AI log');
+      setTimeout(()=>{closeBarcodeModal();b64?identifyProductFromImage(b64):openLogModal();},600);
       return;
     }
     const p=data.product;
     const n=p.nutriments||{};
-    // Per 100g values
     const per100={
       calories:Math.round(n['energy-kcal_100g']||n['energy_100g']/4.184||0),
       protein:Math.round((n['proteins_100g']||0)*10)/10,
@@ -1686,30 +1815,47 @@ async function lookupBarcode(code){
     };
     const name=`${p.brands?p.brands.split(',')[0].trim()+' ':''}${p.product_name||'Unknown'}`;
     const servingLabel=p.serving_size||`${servingG}g`;
-    // Store for add
-    window._barcodeEntry={name,emoji:'🏷️',...serving,thumb:null};
-    window._barcodePer100=per100;
-    window._barcodeServingG=servingG;
-    window._barcodeName=name;
-    gv('bc-name').textContent=name;
-    gv('bc-serving').textContent=`Per serving (${servingLabel})`;
-    gv('bc-cal').textContent=serving.calories+' kcal';
-    gv('bc-p').textContent=serving.protein+'g P';
-    gv('bc-c').textContent=serving.carbs+'g C';
-    gv('bc-f').textContent=serving.fat+'g F';
-    gv('bc-fibre').textContent=serving.fibre+'g fibre';
-    gv('bc-sugar').textContent=serving.sugar+'g sugar';
-    gv('bc-sodium').textContent=serving.sodium+'mg sodium';
-    gv('barcode-qty').value='1';
-    gv('barcode-result').style.display='block';
-    _barcodeScanning=false;
-    stopBarcodeCamera();
-    setBarcodeStatus('found');
+    const prod={name,servingG,servingLabel,per100,serving};
+    // 2. Save to cache so future scans work even offline/OFf down
+    localStorage.setItem(cacheKey,JSON.stringify(prod));
+    renderBarcodeProduct(prod);
   }catch(e){
     _barcodeScanning=false;
-    setBarcodeStatus('error','Lookup failed — product may not be in database.');
+    if(b64){
+      setBarcodeStatus('idle','Database unavailable — identifying from photo…');
+      setTimeout(()=>{closeBarcodeModal();identifyProductFromImage(b64);},600);
+    }else{
+      setBarcodeStatus('error','Lookup failed — database may be down.');
+    }
     console.error(e);
   }
+}
+
+// When OFf has no match, use the original scan photo to identify the product
+async function identifyProductFromImage(b64){
+  openLogModal();
+  const descEl=gv('meal-desc');
+  if(descEl)descEl.value='Identifying product from packaging…';
+  try{
+    const res=await fetch(PROXY,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:80,
+        messages:[{role:'user',content:[
+          {type:'image',source:{type:'base64',media_type:'image/jpeg',data:b64}},
+          {type:'text',text:'What food product is shown? Reply with only the brand and product name (e.g. "Danone Activia Strawberry Yogurt 125g"). Nothing else.'}
+        ]}]
+      })
+    });
+    const data=await res.json();
+    const name=(data.content||[]).map(c=>c.text||'').join('').trim().replace(/^["']+|["']+$/g,'');
+    if(descEl)descEl.value=name||'Scanned product';
+  }catch(e){
+    if(descEl)descEl.value='Scanned product';
+  }
+  analyzeMeal();
 }
 
 let _barcodeLock=false;
@@ -1921,25 +2067,83 @@ function calcStreak(){
   return streak;
 }
 
-function renderWeekly(){
-  const el=gv('weekly-content');if(!el)return;
+function renderProgressPage(){
+  const el=gv('progress-content');if(!el)return;
+
+  // ── Weekly data ──
   const days=getWeekData();
   const streak=calcStreak();
   const tgt=getCalTarget();
-
-  // Averages over days with data
   const logged=days.filter(d=>d.hasData);
   const avgCal=logged.length?Math.round(logged.reduce((a,d)=>a+d.t.cal,0)/logged.length):0;
   const avgP=logged.length?Math.round(logged.reduce((a,d)=>a+d.t.p,0)/logged.length):0;
   const daysOnTarget=logged.filter(d=>d.t.cal>=tgt*0.8&&d.t.cal<=tgt*1.15).length;
 
-  let html=`
+  // ── Body data ──
+  const wEs=entries.filter(e=>e.weight!=null),bEs=entries.filter(e=>e.bf!=null);
+  const lw=wEs.length?wEs[wEs.length-1].weight:null,lb=bEs.length?bEs[bEs.length-1].bf:null;
+  const pw=wEs.length>1?wEs[wEs.length-2].weight:BASELINE.weight,pb=bEs.length>1?bEs[bEs.length-2].bf:BASELINE.bf;
+  const wd=lw!=null?(lw-pw).toFixed(1):null,bd=lb!=null?(lb-pb).toFixed(1):null;
+  const dispW=lw!=null?lw.toFixed(1):BASELINE.weight.toFixed(1);
+  const dispBF=lb!=null?lb.toFixed(1):BASELINE.bf.toFixed(1);
+  const curBF=lb||BASELINE.bf,curWt=lw||BASELINE.weight;
+  const curFat=(curBF/100)*curWt,tgtFat=(GOAL_BF/100)*BASELINE.weight;
+  const fatLost=BASELINE.fatMass-curFat,totalLose=BASELINE.fatMass-tgtFat;
+  const goalPct=Math.max(0,Math.min(100,Math.round((fatLost/totalLose)*100)));
+
+  let html='';
+  let statsHtml='';
+
+  // ── ISO week key for AI cache ──
+  const _wkDate=new Date();const _wkD=new Date(Date.UTC(_wkDate.getFullYear(),_wkDate.getMonth(),_wkDate.getDate()));
+  const _wkDay=_wkD.getUTCDay()||7;_wkD.setUTCDate(_wkD.getUTCDate()+4-_wkDay);
+  const _wkYS=new Date(Date.UTC(_wkD.getUTCFullYear(),0,1));
+  const weekK=`${_wkD.getUTCFullYear()}-W${String(Math.ceil((((_wkD-_wkYS)/86400000)+1)/7)).padStart(2,'0')}`;
+  const _waiCache=localStorage.getItem(`${KEY}_weekly_ai_${weekK}`);
+
+  // ── 1. Streak card ──
+  html+=`
   <div class="week-streak" onclick="openStreakModal()" style="cursor:pointer">
     <div class="streak-fire">🔥</div>
     <div class="streak-num">${streak}</div>
     <div class="streak-lbl">day streak</div>
     <div style="margin-left:auto;font-size:20px;color:var(--muted);font-weight:300">›</div>
-  </div>
+  </div>`;
+
+  // ── 1b. Weekly AI pattern card ──
+  html+=`
+  <div id="weekly-ai-summary" class="wk-ai-card">
+    <div class="wk-ai-head">
+      <span class="wk-ai-title">✦ Weekly Pattern</span>
+      <button class="wk-ai-btn" onclick="generateWeeklySummary('${weekK}')">${_waiCache?'↺ Refresh':'Generate'}</button>
+    </div>
+    <div id="wk-ai-response" class="wk-ai-response"></div>
+  </div>`;
+
+  // ── 2. Body stats (Stats tab) ──
+  statsHtml+=`
+  <div class="prog-hdr"><div class="prog-title">Body Stats</div><button class="add-btn" onclick="openEntryModal()">+ Log</button></div>
+  <div class="stats-grid">
+    <div class="sc"><div class="sc-lbl">Weight</div><div class="sc-val" style="color:var(--blue2)">${dispW}</div><div class="sc-unit">kg</div>
+      ${wd?`<div class="sc-delta"><span class="${parseFloat(wd)<0?'dg':'db'}">${parseFloat(wd)>0?'+':''}${wd} kg</span> vs prev</div>`:'<div class="sc-delta"></div>'}
+    </div>
+    <div class="sc"><div class="sc-lbl">Body Fat</div><div class="sc-val" style="color:var(--cyan)">${dispBF}</div><div class="sc-unit">%</div>
+      ${bd?`<div class="sc-delta"><span class="${parseFloat(bd)<0?'dg':'db'}">${parseFloat(bd)>0?'+':''}${bd}%</span> vs prev</div>`:'<div class="sc-delta"></div>'}
+    </div>
+  </div>`;
+
+  // ── 3. Goal card (Stats tab) ──
+  statsHtml+=`
+  <div class="goal-card">
+    <div class="goal-top"><div class="goal-lbl">Fat Loss Goal</div><div class="goal-pct">${goalPct}%</div></div>
+    <div class="gbar"><div class="gbar-f" style="width:${goalPct}%"></div></div>
+    <div class="goal-detail">Baseline: 22.4kg fat → Target: ${tgtFat.toFixed(1)}kg fat · ${Math.max(0,totalLose-fatLost).toFixed(1)}kg to go</div>
+    <div class="goal-dates"><span>Started: Mar 4, 2026</span><span>Target: Apr 27, 2026</span></div>
+  </div>`;
+
+  // ── 4. This Week ──
+  html+=`
+  <div class="sec-lbl" style="padding-left:0;padding-top:12px">This Week</div>
   <div class="week-stats-row">
     <div class="wk-s"><div class="wk-v" style="color:var(--blue2)">${avgCal||'—'}</div><div class="wk-l">avg kcal/day</div></div>
     <div class="wk-s"><div class="wk-v" style="color:var(--pc)">${avgP||'—'}g</div><div class="wk-l">avg protein</div></div>
@@ -1961,7 +2165,60 @@ function renderWeekly(){
   });
   html+=`</div>`;
 
-  // Per-day detail list
+  // ── Weight Projection Card ──
+  const weekKeys2=new Set(days.map(d=>d.key));
+  let weekDeficit=0,projLogged=0;
+  days.forEach(d=>{if(d.hasData){weekDeficit+=tgt-d.t.cal;projLogged++;}});
+  const woBurned=load(`${KEY}_wo_history`,[])
+    .filter(s=>weekKeys2.has((s.date||'').slice(0,10)))
+    .reduce((a,s)=>a+(s.calories||Math.round((s.duration||0)*5)),0);
+  const effDef=weekDeficit+woBurned;
+  const latestW=[...entries].reverse().find(e=>e.weight!=null);
+  const curW=latestW?.weight??89.1;
+  const projW=Math.round((curW-effDef/7700)*10)/10;
+  const avgDef=projLogged?Math.round(effDef/projLogged):0;
+  const nowD=new Date(),dToSun=(7-nowD.getDay())%7;
+  const sunD=new Date(nowD);sunD.setDate(nowD.getDate()+dToSun);
+  const sunLbl=dToSun===0?'today':'Sun '+sunD.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  const defCol=effDef>=0?'#4ade80':'var(--amber)';
+  const defWord=effDef>=0?'deficit':'surplus';
+  html+=`
+  <div class="wk-proj-card">
+    <div class="wk-proj-head">
+      <span class="wk-proj-title">Weight Projection</span>
+      <span class="wk-proj-period">→ ${sunLbl}</span>
+    </div>
+    <div class="wk-proj-body">
+      <div>
+        <div class="wk-proj-est">Est. Sunday weight</div>
+        <div class="wk-proj-num">${projLogged?projW.toFixed(1)+' kg':'—'}</div>
+      </div>
+      ${projLogged
+        ?`<div class="wk-proj-range-block"><div class="wk-proj-range">±0.3 kg</div><div class="wk-proj-from">from ${curW}kg baseline</div></div>`
+        :`<div class="wk-proj-nodata">Log meals to see projection</div>`}
+    </div>
+    <div class="wk-proj-stats">
+      <div class="wk-proj-stat">
+        <span class="wk-proj-sv" style="color:${defCol}">${projLogged?Math.abs(Math.round(effDef)).toLocaleString():'—'}</span>
+        <span class="wk-proj-sl">kcal ${defWord}</span>
+      </div>
+      <div class="wk-proj-div"></div>
+      <div class="wk-proj-stat">
+        <span class="wk-proj-sv" style="color:${defCol}">${projLogged?Math.abs(avgDef).toLocaleString():'—'}</span>
+        <span class="wk-proj-sl">avg deficit/day</span>
+      </div>
+      ${woBurned>0?`<div class="wk-proj-div"></div><div class="wk-proj-stat"><span class="wk-proj-sv" style="color:var(--cyan)">${woBurned.toLocaleString()}</span><span class="wk-proj-sl">workout kcal</span></div>`:''}
+    </div>
+  </div>`;
+
+  // ── 5. Trend charts (Stats tab) ──
+  statsHtml+=`
+  <div class="sec-lbl" style="padding-left:0;padding-top:8px">Trends</div>
+  <div class="chart-card"><div class="chart-title">Weight (kg)</div><div class="chart-area" id="chart-w"></div></div>
+  <div class="chart-card"><div class="chart-title">Body Fat %</div><div class="chart-area" id="chart-bf"></div></div>`;
+
+  // ── 6. Per-day breakdown ──
+  html+=`<div class="sec-lbl" style="padding-left:0;padding-top:8px">Daily Breakdown</div>`;
   html+=`<div class="week-days">`;
   [...days].reverse().forEach(d=>{
     if(!d.hasData&&!d.isToday)return;
@@ -1980,7 +2237,33 @@ function renderWeekly(){
   });
   html+=`</div>`;
 
+  // ── 7. History (Stats tab) ──
+  if(entries.length){
+    statsHtml+=`<div class="sec-lbl" style="padding-left:0;padding-top:8px">History</div><div class="entries-list">`;
+    [...entries].reverse().forEach((e,ri)=>{
+      const i=entries.length-1-ri;
+      const ds=new Date(e.date).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'});
+      statsHtml+=`<div class="ei"><div><div class="ei-date">${ds}</div>${e.notes?`<div class="ei-note">${e.notes}</div>`:''}</div>
+        <div class="ei-vals">${e.weight!=null?`<div class="ei-v"><div class="ei-vn" style="color:var(--blue2)">${e.weight}</div><div class="ei-vl">kg</div></div>`:''}
+        ${e.bf!=null?`<div class="ei-v"><div class="ei-vn" style="color:var(--cyan)">${e.bf}%</div><div class="ei-vl">BF</div></div>`:''}
+        <button class="ei-del" onclick="deleteEntry(${i})">✕</button></div></div>`;
+    });
+    statsHtml+=`</div>`;
+  }
+
+  statsHtml+=`<button onclick="openEntryModal()" style="width:100%;margin-top:10px;background:rgba(56,139,253,0.08);border:1.5px dashed rgba(56,139,253,0.3);border-radius:12px;padding:13px;font-family:var(--font);font-size:15px;font-weight:700;color:var(--blue2);cursor:pointer;letter-spacing:.05em">+ Log Entry</button>`;
+
   el.innerHTML=html;
+  // Restore cached AI response (use textContent to avoid XSS)
+  const _waiEl=gv('wk-ai-response');
+  if(_waiEl&&_waiCache)_waiEl.textContent=_waiCache;
+
+  const statsEl=gv('progress-stats-content');
+  if(statsEl)statsEl.innerHTML=statsHtml;
+
+  // Render charts after DOM is set
+  renderChart('chart-w',wEs.slice(-8),'weight','kg','#388bfd',84,92);
+  renderChart('chart-bf',bEs.slice(-8),'bf','%','#2dd4c8',18,28);
 }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -2052,12 +2335,11 @@ const _origRenderAll=renderAll;
 window.renderAll=function(){
   _origRenderAll();
   renderNutrients();
-  renderWeekly();
   renderStreakMini();
 };
 // Call it once now to init
 renderNutrients();
-renderWeekly();
+renderProgressPage();
 renderStreakMini();
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -2167,6 +2449,7 @@ function openStreakModal(){
       if(day.isFuture||(!day.hasData&&!day.onTarget)) cls+=' hm-grey';
       else if(day.onTarget) cls+=' hm-green';
       else cls+=' hm-amber';
+      if(day.k===todayKey()) cls+=' hm-today';
       const title=`${day.k}: ${Math.round(day.totCal)} kcal`;
       html+=`<div class="${cls}" title="${title}"></div>`;
     });
@@ -2218,7 +2501,7 @@ function _newFlameParticle(W,H){
 function _startStreakFlame(streak){
   const canvas=gv('streak-flame-canvas');if(!canvas)return;
   const dpr=window.devicePixelRatio||1;
-  const W=220,H=180;
+  const W=260,H=200;
   canvas.width=W*dpr;canvas.height=H*dpr;
   canvas.style.width=W+'px';canvas.style.height=H+'px';
   const ctx=canvas.getContext('2d');ctx.scale(dpr,dpr);
@@ -2341,6 +2624,22 @@ document.addEventListener('click',e=>{
   if(_fabOpen && !gv('fab-wrap')?.contains(e.target) && e.target!==gv('fab-dim')) fabClose();
 });
 
+function _updateFab(page){
+  const wrap=gv('fab-wrap');
+  const icon=gv('fab-icon');
+  const mainBtn=gv('fab-main');
+  if(!wrap||!icon||!mainBtn) return;
+  fabClose();
+  if(page==='today'||page==='workout'){
+    wrap.style.display='';
+    wrap.classList.toggle('fab-wo-mode',page==='workout');
+    mainBtn.onclick=fabToggle;
+    icon.innerHTML='<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>';
+  } else {
+    wrap.style.display='none';
+  }
+}
+
 initStykuScroll();
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -2421,12 +2720,13 @@ function getDaysSinceMuscle(){
 
 // ── Render workout page (readiness) ──
 function renderWorkoutPage(){
-  // Restore recovery from WHOOP morning snapshot if available
   const morning=whoopSnaps[0];
-  if(morning&&morning.recovery&&!_woRecovery){
+  if(morning?.recovery){
     _woRecovery=morning.recovery;
     const inp=gv('wo-rec-val');
     if(inp)inp.value=_woRecovery;
+    const lbl=gv('wo-rec-autofill');
+    if(lbl)lbl.style.display='';
   }
   updateReadiness();
   // Restore active session if app was closed mid-workout
@@ -2454,9 +2754,9 @@ function updateReadiness(){
   const arcEl=gv('wo-ready-arc');
   const verdictEl=gv('wo-ready-verdict');
 
-  // Recovery ring
+  // Recovery ring (r=29, circ=2*PI*29=182.2)
   if(rec!=null&&pctEl&&arcEl){
-    const circ=157;
+    const circ=182.2;
     const offset=circ-(circ*rec/100);
     arcEl.style.strokeDashoffset=offset;
     const col=rec>=67?'var(--green)':rec>=34?'var(--amber)':'var(--red)';
@@ -2476,7 +2776,7 @@ function updateReadiness(){
   const sleepEl=gv('wr-sleep');const protEl=gv('wr-protein');const lastEl=gv('wr-last');
   if(sleepEl)sleepEl.textContent=sleepHrs;
   if(protEl)protEl.textContent=yest.p?Math.round(yest.p)+'g':'—';
-  if(lastEl){lastEl.textContent=lastLabel;lastEl.style.fontSize='10px';}
+  if(lastEl)lastEl.textContent=lastLabel;
 
   // Verdict
   if(verdictEl){
@@ -2505,8 +2805,8 @@ function renderLastSession(){
 
 // ── AI Workout Generation ──
 async function generateWorkout(){
-  const btn=gv('wo-gen-btn');
-  if(btn){btn.disabled=true;btn.querySelector('.wo-gen-title').textContent='Generating…';btn.querySelector('.wo-gen-icon').textContent='⏳';}
+  const loader=gv('wo-generating');
+  if(loader)loader.style.display='flex';
 
   const yest=getYesterdayNutrition();
   const rec=_woRecovery||'unknown';
@@ -2519,15 +2819,48 @@ async function generateWorkout(){
   const histSummary=recentSessions.map(s=>`${new Date(s.date).toLocaleDateString('en-US',{weekday:'short'})}: ${s.splitName} (${(s.muscleGroups||[]).join(', ')})`).join('\n');
   const pbSummary=Object.entries(pbs).slice(0,20).map(([ex,pb])=>`${ex}: ${pb.weight}kg x${pb.reps} (1RM ~${pb.oneRM}kg)`).join('\n');
 
-  const prompt=`You are a strength & conditioning coach for a 26-year-old male, 89.1kg, 173cm, 25.1% body fat, goal is fat loss while preserving lean mass (target 64kg lean mass). He trains FASTED in the morning before his first meal.
+  const prompt=`You are an evidence-based strength & hypertrophy coach for a 26-year-old male, 89.1kg, 173cm, 25.1% body fat, goal is fat loss while preserving lean mass (target 64kg lean mass). He trains FASTED in the morning before his first meal. He's an intermediate lifter — past the beginner phase but still making solid progress. Talk to him like a knowledgeable training partner, not a textbook.
 
-TODAY'S CONTEXT:
+═══ TRAINING PHILOSOPHY & EXERCISE SCIENCE BRIEF ═══
+
+1. MECHANICAL TENSION is the primary hypertrophy driver. Prioritize exercises that load the target muscle through a full ROM, especially in the LENGTHENED (stretched) position — research consistently shows stretched-position training produces superior growth. Examples: incline DB curls (biceps stretched at bottom), overhead tricep extensions (long head stretched), Romanian deadlifts (hamstrings loaded at full hip flexion), cable flyes from low pulleys (chest stretched).
+
+2. MIND-MUSCLE CONNECTION (MMC) CUES — every exercise needs a specific internal-focus cue that tells the lifter WHERE to feel the contraction and HOW to initiate the rep:
+   - BAD cue: "keep good form" or "go slow" (too vague)
+   - GOOD cue: "Initiate by driving your elbows back and squeezing your shoulder blades — you should feel your mid-traps and rhomboids fire before your arms bend" (cable row)
+   - GOOD cue: "Push the floor away from you, don't think about pushing the bar up — feel your quads do the work out of the hole" (squat)
+   - Always specify: what muscle should be contracting, what the lifter should feel, a visualization or movement initiation point
+
+3. PROGRESSIVE OVERLOAD METHODS — rotate these to keep driving adaptation:
+   - Straight sets: standard sets across (default for heavy compounds)
+   - Rest-pause: hit near-failure, rack it, rest 15-20s, grind out 3-5 more reps. Great for machines and isolation moves where form breakdown is low-risk
+   - Drop set: on the LAST set, reduce weight ~25% and immediately rep to failure. Best for isolation/cables
+   - Myo-reps: one activation set to ~2 RIR, then 4-5 mini-sets of 3-5 reps with only 10-15s rest between. Insanely time-efficient for accessories
+   - Lengthened partials: after hitting failure on full reps, keep going with partial reps in the bottom (stretched) portion only. Emerging research shows massive hypertrophy stimulus from this technique
+
+4. UNDERRATED EXERCISES — vary the selection, don't default to the same basics every session:
+   Chest: low-to-high cable fly, chest-focused dip (lean forward), svend press, slight-decline DB press, hammer strength incline press, pec deck fly, machine chest press, Smith flat/incline press
+   Back: chest-supported T-bar row, meadows row, straight-arm cable pulldown, seal row, single-arm lat pulldown, plate-loaded row machine, hammer strength pulldown, machine low row, assisted pull-up machine (slow negatives)
+   Shoulders: cable Y-raise, Lu raise (front raise to press), prone incline lateral raise, behind-the-neck press (light), machine lateral raise, reverse pec deck (rear delts), Smith overhead press, machine shoulder press
+   Biceps: incline DB curl, spider curl, bayesian cable curl, preacher curl EZ-bar (wide grip for short head), machine preacher curl, cable hammer curl (rope)
+   Triceps: overhead cable extension (rope), JM press, cross-body cable pushdown, skull crusher (to forehead), machine tricep dip, tricep press machine, Smith close-grip bench
+   Quads: heel-elevated goblet squat, sissy squat, leg press feet low & narrow, pendulum squat, Spanish squat, hack squat machine, Smith squat (heels elevated), leg extension (lengthened partials), belt squat machine
+   Hamstrings: Nordic curl, seated leg curl (most lengthened position), single-leg RDL, slider hamstring curl, lying leg curl machine, glute-ham raise machine, Smith RDL
+   Glutes: barbell hip thrust, 45° back extension, cable pull-through, B-stance RDL, step-up with forward lean, Smith hip thrust, glute drive machine, hip abduction machine (lean forward)
+
+5. SESSION STRUCTURE:
+   - Start with 1-2 heavy compounds (mechanical tension focus, straight sets)
+   - Move to moderate-load work (8-12 reps, controlled tempo)
+   - Finish with isolation/cable work using intensity techniques (rest-pause, drop sets, myo-reps, lengthened partials)
+   - Include at least ONE exercise per primary muscle that loads it in the lengthened/stretched position
+
+═══ TODAY'S CONTEXT ═══
 - WHOOP Recovery: ${rec}%
-- Sleep duration: ${sleepSnap.sleep!=null?(()=>{const hh=Math.floor(sleepSnap.sleep),mm=Math.round((sleepSnap.sleep-hh)*60);return hh+'h'+(mm>0?' '+mm+'m':'');})():'unknown'}
+- Sleep: ${sleepSnap.sleep!=null?(()=>{const hh=Math.floor(sleepSnap.sleep),mm=Math.round((sleepSnap.sleep-hh)*60);return hh+'h'+(mm>0?' '+mm+'m':'');})():'unknown'}
 - HRV: ${sleepSnap.hrv||'unknown'}
 - Yesterday's nutrition: ${Math.round(yest.p||0)}g protein, ${Math.round(yest.cal||0)} kcal, ${Math.round(yest.c||0)}g carbs
 
-RECENT TRAINING HISTORY (last 7 sessions):
+RECENT TRAINING (last 7 sessions):
 ${histSummary||'No recent sessions logged'}
 
 DAYS SINCE MUSCLE GROUP TRAINED:
@@ -2536,24 +2869,26 @@ ${Object.entries(daysAgo).map(([m,d])=>`${m}: ${d} days ago`).join(', ')||'No hi
 PERSONAL BESTS:
 ${pbSummary||'No PBs yet — first session'}
 
+═══ TASK ═══
 Generate a workout split for today. Return ONLY valid JSON, no markdown, no explanation.
 
 JSON format:
 {
   "splitName": "Push — Chest & Shoulders",
   "muscleGroups": ["Chest","Shoulders","Triceps"],
-  "coachNote": "2-line rationale based on recovery and yesterday's nutrition",
+  "coachNote": "2-line rationale referencing recovery data and how it shaped today's plan",
   "exercises": [
     {
-      "name": "Barbell Bench Press",
+      "name": "Incline Dumbbell Press",
       "icon": "💪",
-      "cue": "retract scapula, drive feet into floor",
+      "cue": "Squeeze shoulder blades into the bench, lower until you feel a deep chest stretch, then drive through your palms — feel your upper pecs initiate the push",
+      "intensityTechnique": "straight sets",
       "sets": 4,
       "reps": "6-8",
       "rest": 120,
       "lastWeight": null,
       "suggestedWeight": null,
-      "alternatives": ["Dumbbell Bench Press","Machine Chest Press","Cable Chest Fly"]
+      "alternatives": ["Barbell Bench Press","Machine Chest Press","Smith Incline Press"]
     }
   ],
   "cardio": {
@@ -2569,27 +2904,42 @@ JSON format:
 
 Rules:
 - 6-8 exercises (fewer if recovery < 40)
-- If recovery >= 67: heavy compound focus, 4-5 sets, 5-8 reps
-- If recovery 34-66: moderate volume, 3-4 sets, 8-12 reps  
-- If recovery < 34: light/technique focus, 3 sets, 12-15 reps
+- If recovery >= 67: heavy compound focus, 4-5 sets, 5-8 reps, straight sets on compounds
+- If recovery 34-66: moderate volume, 3-4 sets, 8-12 reps, lean on intensity techniques for efficiency
+- If recovery < 34: light/technique focus, 3 sets, 12-15 reps, prioritize MMC and lengthened partials
 - Fasted training: avoid maximal CNS-heavy lifts if recovery < 50
 - Do NOT repeat muscle groups trained in last 48 hours unless recovery > 80
-- Cardio: fasted morning = prefer steady state (incline walk, moderate bike). Only recommend HIIT if recovery > 80
+- Include at least one lengthened-position exercise per primary muscle group
+- Mix up exercise selection — pull from the underrated exercises list, don't just default to barbell bench/squat/deadlift every time
+- intensityTechnique: one of "straight sets", "rest-pause", "drop set", "myo-reps", "lengthened partials" — use straight sets for heavy compounds, rotate techniques on accessories
+- cue: MUST be a specific MMC cue — what muscle to feel, where to initiate, a visualization. Never generic
 - suggestedWeight: fill in if PB exists for that exercise (suggest same or slight increase), else null
+- Cardio: fasted morning = prefer steady state (incline walk, moderate bike). Only recommend HIIT if recovery > 80
 - Return valid JSON only`;
 
   try{
     const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:2000,messages:[{role:'user',content:prompt}]})});
+    if(!res.ok){const errBody=await res.text().catch(()=>'');throw new Error(`HTTP ${res.status}: ${errBody.slice(0,120)}`);}
     const data=await res.json();
-    const text=data.content[0].text.trim().replace(/```json|```/g,'').trim();
-    _woPlan=JSON.parse(text);
+    if(data.error){throw new Error(data.error.message||JSON.stringify(data.error));}
+    const rawText=(data.content&&data.content[0]&&data.content[0].text)||'';
+    if(!rawText)throw new Error('Empty response from API');
+    // Extract JSON — strip any markdown fences and find the first {...}
+    const jsonMatch=rawText.replace(/```json|```/g,'').trim().match(/\{[\s\S]*\}/);
+    if(!jsonMatch)throw new Error('No JSON found in response');
+    _woPlan=JSON.parse(jsonMatch[0]);
     renderWorkoutPreview();
   }catch(e){
     console.error('Workout gen error',e);
-    alert('Could not generate workout. Check your connection.');
+    const msg=e.message||String(e);
+    const el=gv('wo-plan-preview');
+    if(el){
+      el.style.display='block';
+      el.innerHTML=`<div style="margin:16px;padding:14px 16px;background:rgba(196,91,82,0.06);border:1px solid rgba(196,91,82,0.16);border-radius:16px;font-size:13px;color:var(--red);line-height:1.6"><strong>Workout generation failed</strong><br>${msg}</div>`;
+    }
   }finally{
-    if(btn){btn.disabled=false;btn.querySelector('.wo-gen-title').textContent='Generate Today\'s Split';btn.querySelector('.wo-gen-icon').textContent='⚡';}
+    if(loader)loader.style.display='none';
   }
 }
 
@@ -2605,9 +2955,10 @@ function renderWorkoutPreview(){
       <div class="wo-ex-preview">
         <div class="wo-ex-icon">${ex.icon||getExIcon(ex.name)}</div>
         <div class="wo-ex-info">
-          <div class="wo-ex-name">${ex.name}</div>
+          <div class="wo-ex-name"><a href="https://www.youtube.com/results?search_query=${encodeURIComponent(ex.name+' proper form')}" target="_blank" rel="noopener" class="wo-ex-link" onclick="event.stopPropagation()">${ex.name}</a></div>
           <div class="wo-ex-meta">${ex.sets} sets · ${ex.reps} reps · ${ex.rest}s rest</div>
           <div class="wo-ex-cue">${ex.cue||''}</div>
+          ${ex.intensityTechnique&&ex.intensityTechnique!=='straight sets'?`<div class="wo-ex-intensity">⚡ ${ex.intensityTechnique}</div>`:''}
         </div>
         ${ex.lastWeight?`<div class="wo-ex-last">${ex.lastWeight}kg</div>`:''}
       </div>`).join('');
@@ -2704,13 +3055,14 @@ function renderExerciseCard(ex,ei){
     <div class="wo-ex-card-hdr" onclick="toggleExCollapse(${ei})">
       <div class="wo-ex-card-icon">${ex.icon||getExIcon(ex.name)}</div>
       <div class="wo-ex-card-title">
-        <div class="wo-ex-card-name">${ex.swappedTo||ex.name}</div>
+        <div class="wo-ex-card-name"><a href="https://www.youtube.com/results?search_query=${encodeURIComponent((ex.swappedTo||ex.name)+' proper form')}" target="_blank" rel="noopener" class="wo-ex-link" onclick="event.stopPropagation()">${ex.swappedTo||ex.name}</a></div>
         <div class="wo-ex-card-meta">${ex.sets.length} sets · ${ex.reps||ex.sets[0]?.reps||'—'} reps · ${ex.rest}s rest</div>
       </div>
       <div class="wo-ex-card-check" id="wo-ex-check-${ei}">${ex.sets.every(s=>s.done)?'✅':'○'}</div>
     </div>
     <div class="wo-ex-card-body">
       <div class="wo-ex-cue-line">💡 ${ex.cue||''}</div>
+      ${ex.intensityTechnique&&ex.intensityTechnique!=='straight sets'?`<div class="wo-ex-intensity">⚡ ${ex.intensityTechnique}</div>`:''}
       ${pbLine}
       <div class="wo-sets-header">
         <span>Set</span><span>Last</span><span>Weight</span><span></span><span>Reps</span><span>1RM</span><span></span>
@@ -2826,7 +3178,12 @@ function startRestTimer(ei,secs){
     el.textContent=`Rest: ${remaining}s`;
     el.style.background=remaining<=10?'rgba(248,81,73,0.15)':'rgba(56,139,253,0.10)';
     el.style.color=remaining<=10?'var(--red)':'var(--blue2)';
-    if(remaining<=0){el.textContent='Go! 💪';clearInterval(_woRestInt);setTimeout(()=>{el.style.display='none';},1500);return;}
+    if(remaining<=0){
+      el.textContent='Go! 💪';clearInterval(_woRestInt);setTimeout(()=>{el.style.display='none';},1500);
+      try{const ac=new AudioContext();const o=ac.createOscillator();o.type='sine';o.frequency.value=880;o.connect(ac.destination);o.start();o.stop(ac.currentTime+0.15);}catch(e){}
+      if(navigator.vibrate)navigator.vibrate([200,100,200]);
+      return;
+    }
     remaining--;
   };
   update();
@@ -2885,6 +3242,7 @@ function showWorkoutSummary(session){
       <div class="wo-sum-muscles">${(session.muscleGroups||[]).map(m=>`<span class="wo-muscle-chip">${m}</span>`).join('')}</div>
       ${pbHtml?`<div class="wo-sum-pbs">${pbHtml}</div>`:''}
       <button class="wo-sum-close" onclick="closeWorkoutSummary()">Done</button>
+      <button class="wo-sum-save-routine" onclick="saveAsRoutine()">💾 Save as Routine</button>
     </div>
   </div>`;
 
@@ -2900,6 +3258,65 @@ function closeWorkoutSummary(){
   gv('wo-generate-view').style.display='block';
   renderLastSession();
   renderWorkoutPage();
+}
+
+const WO_ROUTINES_KEY=`${KEY}_routines`;
+function saveAsRoutine(){
+  const session=woHistory().slice(-1)[0];
+  if(!session){alert('No session found.');return;}
+  const name=window.prompt('Name this routine:',session.splitName||'My Routine');
+  if(!name||!name.trim())return;
+  const routines=load(WO_ROUTINES_KEY,[]);
+  routines.push({
+    id:Date.now().toString(36),
+    name:name.trim(),
+    splitName:session.splitName||'',
+    muscleGroups:session.muscleGroups||[],
+    exercises:(session.exercises||[]).map(({name,sets,reps,rest,cue,icon,alternatives})=>({name,sets,reps,rest,cue,icon,alternatives})),
+    cardio:session.cardio?{type:session.cardio.type,duration:session.cardio.duration,intensity:session.cardio.intensity}:null,
+    savedAt:new Date().toISOString()
+  });
+  save(WO_ROUTINES_KEY,routines);
+  const btn=document.querySelector('.wo-sum-save-routine');
+  if(btn){btn.textContent='✓ Saved';btn.disabled=true;}
+}
+
+function showRoutinesModal(){
+  const routines=load(WO_ROUTINES_KEY,[]);
+  const rows=routines.length
+    ?[...routines].reverse().map(r=>`
+        <div class="wo-routine-row" onclick="loadRoutine('${r.id}')">
+          <div class="wo-routine-name">${r.name}</div>
+          <div class="wo-routine-split">${r.splitName}</div>
+          <div class="wo-routine-chips">${(r.muscleGroups||[]).map(m=>`<span class="wo-muscle-chip">${m}</span>`).join('')}</div>
+        </div>`).join('')
+    :`<div class="wo-hist-empty">No saved routines yet.<br>Finish a workout and tap "Save as Routine".</div>`;
+  const modal=document.createElement('div');
+  modal.id='wo-routines-modal';
+  modal.className='wo-hist-modal';
+  modal.innerHTML=`
+    <div class="wo-hist-inner">
+      <div class="wo-hist-topbar">
+        <div class="wo-hist-title">My Routines</div>
+        <button class="wo-hist-close" onclick="document.getElementById('wo-routines-modal').remove()">✕</button>
+      </div>
+      <div class="wo-hist-content-scroll">${rows}</div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+function loadRoutine(id){
+  const r=load(WO_ROUTINES_KEY,[]).find(x=>x.id===id);
+  if(!r)return;
+  _woPlan={
+    splitName:r.splitName,
+    muscleGroups:r.muscleGroups||[],
+    coachNote:'Loaded from saved routine.',
+    exercises:r.exercises||[],
+    cardio:r.cardio||null
+  };
+  const m=gv('wo-routines-modal');if(m)m.remove();
+  renderWorkoutPreview();
 }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -3082,8 +3499,288 @@ function switchWeeklyTab(tab){
   _weeklyTab=tab;
   gv('wk-tab-weekly').classList.toggle('active',tab==='weekly');
   gv('wk-tab-calendar').classList.toggle('active',tab==='calendar');
+  gv('wk-tab-stats').classList.toggle('active',tab==='stats');
   gv('wk-tab-content-weekly').style.display=tab==='weekly'?'block':'none';
   gv('wk-tab-content-calendar').style.display=tab==='calendar'?'block':'none';
+  gv('wk-tab-content-stats').style.display=tab==='stats'?'block':'none';
   if(tab==='calendar')buildCalendar();
-  if(tab==='weekly')renderWeekly();
+  if(tab==='weekly'||tab==='stats')renderProgressPage();
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// WEEKLY AI PATTERN SUMMARY
+// ══════════════════════════════════════════════════════════════════════════
+async function generateWeeklySummary(weekK){
+  const card=gv('weekly-ai-summary');
+  if(!card)return;
+  const btn=card.querySelector('.wk-ai-btn');
+  const responseEl=gv('wk-ai-response');
+  if(btn){btn.disabled=true;btn.textContent='...';}
+
+  // Gather 7-day data
+  const days=getWeekData();
+  const tgt=getCalTarget();
+  const woSessions=load(`${KEY}_wo_history`,[]);
+  const weekDayKeys=new Set(days.map(d=>d.key));
+  const weekWo=woSessions.filter(s=>weekDayKeys.has((s.date||'').slice(0,10)));
+
+  const dayLines=days.map(d=>{
+    if(!d.hasData&&!d.isToday)return `${d.label}: no data`;
+    const hit=d.t.cal>=tgt*0.8&&d.t.cal<=tgt*1.15?'✓':'✗';
+    const wo=weekWo.filter(s=>(s.date||'').slice(0,10)===d.key).map(s=>s.splitName||'workout').join(', ');
+    return `${d.label}: ${Math.round(d.t.cal)}kcal, ${Math.round(d.t.p)}g P, target ${hit}${wo?`, wo: ${wo}`:''}`;
+  }).join('\n');
+
+  const userMsg=`Week ${weekK}. Daily target: ${tgt}kcal.\n${dayLines}`;
+
+  try{
+    const res=await fetch(PROXY,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:120,
+        system:"You are a concise performance coach. Analyse this week's data and give 2-3 bullet observations about patterns — e.g. consistently under on protein, stronger workout days after better sleep, calories spiking on weekends. Be specific, use the actual numbers, max 60 words total.",
+        messages:[{role:'user',content:userMsg}]
+      })
+    });
+    const data=await res.json();
+    const text=data.content?.[0]?.text||'No response received.';
+    localStorage.setItem(`${KEY}_weekly_ai_${weekK}`,text);
+    if(responseEl)responseEl.innerHTML=md(text);
+    if(btn){btn.disabled=false;btn.textContent='↺ Refresh';}
+  }catch(e){
+    if(btn){btn.disabled=false;btn.textContent='Generate';}
+    if(responseEl)responseEl.textContent='Failed — check connection.';
+  }
+}
+
+
+// ══════════════════════════════════════════════════════
+// FASTING MODULE (state vars declared at top of file)
+// ══════════════════════════════════════════════════════
+
+// Resume fasting timer if a fast was active on last session
+if(fastState&&!fastState.end)_startFastTimer();
+setTimeout(()=>_updateFastNavIndicator(),200);
+
+function getFastTargetHours(){
+  return fastProtocol==='custom'?(fastCustomHrs||16):(FAST_PROTO_HRS[fastProtocol]||16);
+}
+
+function selectFastProtocol(proto,btn){
+  fastProtocol=proto;
+  document.querySelectorAll('.fast-proto-btn').forEach(b=>b.classList.remove('active'));
+  if(btn)btn.classList.add('active');
+  const cr=gv('fast-custom-row');
+  if(cr)cr.style.display=proto==='custom'?'block':'none';
+  _updateFastIdleDisplay();
+}
+
+function updateCustomFastProtocol(){
+  fastCustomHrs=parseInt(gv('fast-custom-h')?.value||0)||0;
+  _updateFastIdleDisplay();
+}
+
+function _updateFastIdleDisplay(){
+  const el=gv('fast-proto-display');
+  if(el)el.textContent=getFastTargetHours()+' hours';
+}
+
+function getFastPhase(elapsedHours){
+  let phase=FAST_PHASES[0];
+  for(const p of FAST_PHASES){if(elapsedHours>=p.hours)phase=p;else break;}
+  return phase;
+}
+
+function toggleFast(){
+  if(fastState&&!fastState.end)endFast();
+  else startFast();
+}
+
+function startFast(){
+  fastState={start:new Date().toISOString(),protocol:fastProtocol,targetHours:getFastTargetHours(),end:null};
+  save(FAST_STATE_KEY,fastState);
+  _startFastTimer();
+  renderFastPage();
+  renderWorkoutFastBanner();
+  _updateFastNavIndicator();
+}
+
+function endFast(){
+  if(!fastState)return;
+  fastState.end=new Date().toISOString();
+  const actualHours=(new Date(fastState.end)-new Date(fastState.start))/3600000;
+  fastLog.unshift({start:fastState.start,end:fastState.end,protocol:fastState.protocol,targetHours:fastState.targetHours,actualHours:Math.round(actualHours*10)/10});
+  save(FAST_LOG_KEY,fastLog);
+  _stopFastTimer();
+  fastState=null;
+  save(FAST_STATE_KEY,null);
+  renderFastPage();
+  renderWorkoutFastBanner();
+  _updateFastNavIndicator();
+}
+
+function _startFastTimer(){
+  _stopFastTimer();
+  fastTimer=setInterval(_tickFastTimer,1000);
+  _tickFastTimer();
+}
+function _stopFastTimer(){if(fastTimer){clearInterval(fastTimer);fastTimer=null;}}
+
+function _tickFastTimer(){
+  if(!fastState||fastState.end){_stopFastTimer();return;}
+  const now=new Date();
+  const elapsedMs=now-new Date(fastState.start);
+  const elapsedSec=Math.floor(elapsedMs/1000);
+  const elapsedHours=elapsedMs/3600000;
+  const targetMs=fastState.targetHours*3600000;
+  const remainingMs=Math.max(0,targetMs-elapsedMs);
+  const pct=Math.min(100,(elapsedMs/targetMs)*100);
+
+  // Elapsed timer HH:MM:SS
+  const h=Math.floor(elapsedSec/3600),m=Math.floor((elapsedSec%3600)/60),s=elapsedSec%60;
+  const timerStr=`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  const etEl=gv('fast-elapsed-timer');if(etEl)etEl.textContent=timerStr;
+  const pctEl=gv('fast-pct-label');if(pctEl)pctEl.textContent=`ELAPSED (${Math.round(pct)}%)`;
+
+  // Ring arc
+  const arc=gv('fast-ring-arc');
+  if(arc)arc.style.strokeDashoffset=String(FAST_CIRC*(1-pct/100));
+
+  // Phase
+  const pl=gv('fast-phase-label');if(pl)pl.textContent=getFastPhase(elapsedHours).name.toUpperCase();
+  const pn=gv('fast-phase-name');if(pn)pn.textContent=getFastPhase(elapsedHours).name;
+  const pd=gv('fast-phase-desc');if(pd)pd.textContent=getFastPhase(elapsedHours).desc;
+  const pi=gv('fast-phase-icon');if(pi)pi.textContent=getFastPhase(elapsedHours).icon;
+
+  // Remaining
+  const remH=Math.floor(remainingMs/3600000),remM=Math.floor((remainingMs%3600000)/60000);
+  const remEl=gv('fast-remaining-timer');if(remEl)remEl.textContent=`${remH}h ${String(remM).padStart(2,'0')}m`;
+
+  // Phase dots
+  const dotsEl=gv('fast-phase-dots');
+  if(dotsEl){
+    dotsEl.innerHTML=FAST_PHASES.map(p=>{
+      const done=elapsedHours>=p.hours+4;
+      const curr=!done&&elapsedHours>=p.hours;
+      return`<div class="fast-phase-dot${done?' done':curr?' current':''}"></div>`;
+    }).join('');
+  }
+}
+
+function renderFastPage(){
+  const isActive=fastState&&!fastState.end;
+  const ps=gv('fast-protocol-section');if(ps)ps.style.display=isActive?'none':'block';
+  const idle=gv('fast-idle-content'),actc=gv('fast-active-content');
+  if(idle)idle.style.display=isActive?'none':'block';
+  if(actc)actc.style.display=isActive?'block':'none';
+  const arc=gv('fast-ring-arc');
+  if(arc){arc.classList.toggle('fasting',!!isActive);if(!isActive)arc.style.strokeDashoffset=String(FAST_CIRC);}
+  const ai=gv('fast-active-info');if(ai)ai.style.display=isActive?'block':'none';
+  const btn=gv('fast-main-btn');
+  if(btn){btn.textContent=isActive?'End Fast':'Start Fasting';btn.classList.toggle('ending',!!isActive);}
+  if(isActive&&fastState){
+    const startDt=new Date(fastState.start);
+    const endDt=new Date(startDt.getTime()+fastState.targetHours*3600000);
+    const fmt=d=>d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})+', '+d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+    const sl=gv('fast-start-lbl');if(sl)sl.textContent=fmt(startDt);
+    const el=gv('fast-end-lbl');if(el)el.textContent=fmt(endDt);
+    const gl=gv('fast-goal-label');if(gl)gl.textContent=fastState.targetHours+'H GOAL';
+    const gd=gv('fast-goal-disp');if(gd)gd.textContent=fastState.targetHours+'h';
+    _tickFastTimer();
+  }
+  if(!isActive)_updateFastIdleDisplay();
+  const fsn=gv('fast-streak-num');if(fsn)fsn.textContent=calcStreak();
+  _renderFastLog();
+}
+
+function _renderFastLog(){
+  const c=gv('fast-log-list');if(!c)return;
+  if(!fastLog.length){c.innerHTML='<div style="padding:0 14px 8px;font-size:13px;color:var(--muted)">No fasts logged yet — start your first fast above!</div>';return;}
+  c.innerHTML=fastLog.slice(0,7).map(f=>{
+    const dateStr=new Date(f.start).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+    const dur=f.actualHours!=null?`${f.actualHours}h`:`${f.targetHours}h`;
+    const completed=f.actualHours>=f.targetHours;
+    return`<div class="fast-log-item">
+      <div class="fli-top"><span class="fli-proto">${f.protocol}${completed?' ✓':''}</span><span class="fli-date">${dateStr}</span></div>
+      <div class="fli-dur">${dur}${completed?' · Goal reached! 🎉':f.actualHours!=null&&f.actualHours<f.targetHours?' · Ended early':''}</div>
+    </div>`;
+  }).join('');
+}
+
+function getFastContext(){
+  const isActive=fastState&&!fastState.end;
+  if(isActive){
+    const elapsed=(new Date()-new Date(fastState.start))/3600000;
+    const phase=getFastPhase(elapsed);
+    return`FASTING: Currently fasting (${fastState.protocol}, ${Math.floor(elapsed)}h elapsed, goal ${fastState.targetHours}h) · Phase: ${phase.name}`;
+  }
+  if(fastLog.length){
+    const last=fastLog[0];
+    const ago=new Date(last.start).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+    return`FASTING: Last fast on ${ago} — ${last.protocol}, ${last.actualHours}h (target ${last.targetHours}h)`;
+  }
+  return'FASTING: No fasts logged yet';
+}
+
+async function loadFastingRecommendation(forceRefresh=false){
+  const cached=localStorage.getItem(FAST_AI_KEY);
+  const cacheDate=localStorage.getItem(FAST_AI_KEY+'_date');
+  if(!forceRefresh&&cached&&cacheDate===todayKey()){
+    const el=gv('fast-ai-content');
+    if(el){el.innerHTML=md(cached);el.style.display='block';}
+    return;
+  }
+  const loading=gv('fast-ai-loading'),content=gv('fast-ai-content');
+  if(loading)loading.style.display='block';
+  if(content)content.style.display='none';
+  const recentFasts=fastLog.slice(0,7);
+  const avgDur=recentFasts.length?(recentFasts.reduce((s,f)=>s+(f.actualHours||f.targetHours),0)/recentFasts.length).toFixed(1):'none';
+  const ctx=`${getDayContext()}\n${getFastContext()}\nFasting preference: ${fastProtocol}\nAvg recent fast: ${avgDur}h over ${recentFasts.length} fasts\n${_buildCoachContext().workoutCtx}`;
+  try{
+    const resp=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      model:'claude-sonnet-4-20250514',max_tokens:450,
+      system:'You are a concise intermittent fasting and nutrition coach for Borna (26M, 89.1kg, 25.1% BF, goal 20.1% BF by Apr 27 2026). Give specific, actionable fasting advice. Be brief and direct. No markdown headers, just 3-4 short paragraphs.',
+      messages:[{role:'user',content:`Based on my data, recommend:\n1. Best fasting protocol (16:8, 18:6, or 20:4) for my fat loss goal and why\n2. Optimal eating window start/end times\n3. Which days this week to fast considering my workout schedule\n4. One key tip for right now\n\n${ctx}`}]
+    })});
+    const data=await resp.json();
+    const text=data.content?.[0]?.text||'Could not generate recommendation.';
+    localStorage.setItem(FAST_AI_KEY,text);
+    localStorage.setItem(FAST_AI_KEY+'_date',todayKey());
+    if(content){content.innerHTML=md(text);content.style.display='block';}
+  }catch(e){
+    if(content){content.textContent='Failed to load — check your connection.';content.style.display='block';}
+  }finally{
+    if(loading)loading.style.display='none';
+  }
+}
+
+// Workout page: fasting status banner
+function renderWorkoutFastBanner(){
+  const banner=gv('wo-fast-banner');if(!banner)return;
+  const isActive=fastState&&!fastState.end;
+  if(isActive){
+    const elapsed=(new Date()-new Date(fastState.start))/3600000;
+    const phase=getFastPhase(elapsed);
+    const startTime=new Date(fastState.start).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+    banner.style.display='flex';
+    banner.innerHTML=`<div class="fwb-icon">${phase.icon}</div><div class="fwb-text"><div class="fwb-title">Currently fasting \u00b7 ${phase.name}</div><div class="fwb-sub">Started ${startTime} \u00b7 ${Math.floor(elapsed)}h elapsed \u00b7 ${fastState.targetHours}h goal</div></div>`;
+  }else{
+    banner.style.display='none';
+  }
+}
+
+// Update the Fast nav button indicator dot when fasting state changes
+function _updateFastNavIndicator(){
+  const btn=gv('nb-fast');if(!btn)return;
+  const isActive=fastState&&!fastState.end;
+  let dot=btn.querySelector('.fast-nav-dot');
+  if(isActive&&!dot){
+    dot=document.createElement('div');
+    dot.className='fast-nav-dot';
+    btn.appendChild(dot);
+  } else if(!isActive&&dot){
+    dot.remove();
+  }
 }
