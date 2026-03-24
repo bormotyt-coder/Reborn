@@ -74,6 +74,7 @@ let calSelKey  =todayKey();
 let mealB64    =null;
 let ingredients=[];
 let activeTab  =0;
+const _mealThumbs=new Map(); // session-only thumb storage (keyed by loggedAt)
 
 // FASTING STATE (must be declared before BOOT runs to avoid TDZ crashes)
 const FAST_LOG_KEY   = 'fasting_log';
@@ -377,10 +378,11 @@ function quickLog(id){
   if(_quickLock)return;
   const item=quickItems.find(i=>i.id===id);if(!item)return;
   _quickLock=true;
+  try{
   meals.push({name:item.name,emoji:item.emoji,calories:item.calories,protein:item.protein,carbs:item.carbs,fat:item.fat,fibre:item.fibre||0,sugar:item.sugar||0,sodium:item.sodium||0,thumb:null});
   save(`${KEY}_meals_${todayKey()}`,meals);
   renderAll();
-  setTimeout(()=>{_quickLock=false;},600);
+  }finally{ setTimeout(()=>{_quickLock=false;},600); }
 }
 function openQAModal(){['qa-name-in','qa-emoji-in','qa-cal-in','qa-p-in','qa-c-in','qa-f-in'].forEach(id=>gv(id).value='');gv('qa-loading').classList.remove('show');gv('qa-modal').classList.add('open');}
 function closeQAModal(){gv('qa-modal').classList.remove('open');}
@@ -443,7 +445,8 @@ function renderFoodList(){
     el.appendChild(hdr);
     entries.forEach(({m,i})=>{
       const div=document.createElement('div');div.className='fi';
-      const th=m.thumb?`<img class="fi-thumb" src="${m.thumb}" style="width:46px;height:46px;border-radius:11px;object-fit:cover;flex-shrink:0"/>`:`<div class="fi-thumb">${m.emoji||'🍽️'}</div>`;
+      const _ts=_mealThumbs.get(m.loggedAt);
+      const th=_ts?`<img class="fi-thumb" src="${_ts}" style="width:46px;height:46px;border-radius:11px;object-fit:cover;flex-shrink:0"/>`:`<div class="fi-thumb">${m.emoji||'🍽️'}</div>`;
       const pPct=Math.min(Math.round(m.protein/TARGETS.p*100),100);
       const cPct=Math.min(Math.round(m.carbs/TARGETS.c*100),100);
       const fPct=Math.min(Math.round(m.fat/TARGETS.f*100),100);
@@ -626,14 +629,23 @@ async function analyzeMeal(){
   const prompt=desc?(mealB64?`Analyse this food. Context: "${desc}". Identify every visible ingredient.`:`Identify ingredients and macros for: "${desc}". Use official label for branded products.`):'Identify every ingredient in this food image separately.';
   content.push({type:'text',text:prompt});
   try{
-    const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1500,
+    const reqBody=JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1500,
         system:`Precise nutrition expert. Identify each ingredient separately.
 Return ONLY valid JSON, no markdown:
 {"confidence":"high"|"medium"|"low","confidence_tip":"one sentence or empty","ingredients":[{"name":"name","emoji":"emoji","portion":"e.g. 80g","calories":number,"protein":number,"carbs":number,"fat":number,"fibre":number,"sugar":number,"sodium":number}]}
 Identify 2-8 ingredients. Include fibre, sugar, sodium where known (use 0 if unknown). Use official macros for branded products.`,
-        messages:[{role:'user',content}]})});
-    const data=await res.json();
+        messages:[{role:'user',content}]});
+    let data,lastErr;
+    for(let attempt=0;attempt<3;attempt++){
+      try{
+        if(attempt>0)await new Promise(r=>setTimeout(r,attempt*2000));
+        const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},body:reqBody});
+        data=await res.json();
+        if(data.error&&attempt<2)continue;
+        break;
+      }catch(e){lastErr=e;}
+    }
+    if(!data)throw lastErr||new Error('Network error');
     const raw=aiText(data).replace(/```json|```/g,'').trim();
     const parsed=JSON.parse(raw);
     ingredients=parsed.ingredients.map((ing,i)=>({...ing,id:i,portion_multiplier:1,selected:true}));
@@ -888,6 +900,7 @@ function confirmMeal(){
   const sel=ingredients.filter(i=>i.selected);
   if(!sel.length){alert('Select at least one ingredient.');return;}
   _confirmLock=true;
+  try{
   const t=sel.reduce((a,i)=>({cal:a.cal+i.calories*i.portion_multiplier,p:a.p+i.protein*i.portion_multiplier,c:a.c+i.carbs*i.portion_multiplier,f:a.f+i.fat*i.portion_multiplier}),{cal:0,p:0,c:0,f:0});
   // Capture thumb BEFORE reset clears mealB64. Never persist to localStorage — base64 causes silent quota failures on iOS.
   const thumbForSession=mealB64?`data:image/jpeg;base64,${mealB64}`:null;
@@ -912,13 +925,14 @@ function confirmMeal(){
   };
   meals.push(entry);
   save(`${KEY}_meals_${todayKey()}`,meals);
-  entry.thumb=thumbForSession; // attach to in-memory only
+  // Store thumb in session-only map — never on the entry object (which lives in meals[])
+  if(thumbForSession)_mealThumbs.set(entry.loggedAt,thumbForSession);
   gv('log-modal').classList.remove('open');
   resetLogModal();
   renderAll();
   const todayBtn=document.querySelector('.nb');
   if(todayBtn)showPage('today',todayBtn);
-  setTimeout(()=>{_confirmLock=false;},800);
+  }finally{ setTimeout(()=>{_confirmLock=false;},800); }
 }
 
 // AI COACH
@@ -1870,6 +1884,7 @@ let _barcodeLock=false;
 function addBarcodeItem(){
   if(!window._barcodeEntry||_barcodeLock)return;
   _barcodeLock=true;
+  try{
   const qty=parseFloat(gv('barcode-qty').value)||1;
   const e=window._barcodeEntry;
   const entry={
@@ -1890,7 +1905,7 @@ function addBarcodeItem(){
   closeBarcodeModal();
   const todayBtn=document.querySelector('.nb');
   if(todayBtn)showPage('today',todayBtn);
-  setTimeout(()=>{_barcodeLock=false;},800);
+  }finally{ setTimeout(()=>{_barcodeLock=false;},800); }
 }
 
 
@@ -2033,13 +2048,14 @@ let _impactLock=false;
 function addImpactMeal(){
   if(!impactEntry||_impactLock)return;
   _impactLock=true;
+  try{
   meals.push(impactEntry);
   save(`${KEY}_meals_${todayKey()}`,meals);
   renderAll();
   closeImpactModal();
   const todayBtn=document.querySelector('.nb');
   if(todayBtn)showPage('today',todayBtn);
-  setTimeout(()=>{_impactLock=false;},800);
+  }finally{ setTimeout(()=>{_impactLock=false;},800); }
 }
 
 // ══════════════════════════════════════════════════════════════════════════
