@@ -9,6 +9,24 @@ function aiText(data){
   return data.content.map(b=>b.text||'').join('');
 }
 
+// Classify API errors into user-friendly messages
+function _apiErrMsg(e){
+  const m=(e&&e.message||String(e)).toLowerCase();
+  if(m.includes('credit')||m.includes('billing')||m.includes('insufficient'))
+    return 'API credits exhausted — top up your Anthropic account.';
+  if(m.includes('invalid')&&m.includes('key')||m.includes('authentication'))
+    return 'API key invalid — check proxy configuration.';
+  if(m.includes('overloaded')||m.includes('529')||m.includes('capacity'))
+    return 'API is busy — try again in a minute.';
+  if(m.includes('rate')||m.includes('limit')||m.includes('429')||m.includes('too many'))
+    return 'Rate limited — wait a moment and retry.';
+  if(m.includes('load failed')||m.includes('failed to fetch')||m.includes('networkerror')||m.includes('network'))
+    return 'Network error — check your connection.';
+  if(m.includes('timeout')||m.includes('timed out')||m.includes('aborted'))
+    return 'Request timed out — try again.';
+  return 'Something went wrong — try again.';
+}
+
 // Lightweight markdown → HTML (bold, italic, headings, newlines)
 function md(text){
   if(!text)return'';
@@ -401,7 +419,7 @@ async function aiLookupQA(){
     if(p.protein)gv('qa-p-in').value=p.protein;
     if(p.carbs)gv('qa-c-in').value=p.carbs;
     if(p.fat)gv('qa-f-in').value=p.fat;
-  }catch(e){alert('Lookup failed.');}
+  }catch(e){alert(_apiErrMsg(e));}
   finally{gv('qa-loading').classList.remove('show');}
 }
 function saveQAItem(){
@@ -595,7 +613,7 @@ Give a 2-3 sentence honest assessment: how well this meal fits his cut goals, wh
     btn.style.display='none';
   }catch(err){
     gv('mdd-analysis-loading').style.display='none';
-    gv('mdd-analysis-body').textContent='Analysis failed. Try again.';
+    gv('mdd-analysis-body').textContent=_apiErrMsg(err);
     btn.disabled=false;btn.textContent='✦ Analyse with Coach';
   }
 }
@@ -658,7 +676,7 @@ Identify 2-8 ingredients. Include fibre, sugar, sodium where known (use 0 if unk
     else te.classList.remove('show');
     renderIngredients();gv('ing-results').style.display='block';
     gv('btn-analyze').textContent='RE-ANALYSE';
-  }catch(err){alert('Analysis failed. Please try again.');console.error(err);}
+  }catch(err){alert(_apiErrMsg(err));console.error(err);}
   finally{gv('btn-analyze').disabled=false;gv('meal-loading').classList.remove('show');}
 }
 
@@ -876,7 +894,7 @@ async function aiLookupIngredient(){
     if(p.carbs)gv('add-ing-c').value=p.carbs;
     if(p.fat)gv('add-ing-f').value=p.fat;
     if(p.portion)gv('add-ing-portion').value=p.portion;
-  }catch(e){alert('Lookup failed. Fill in manually.');}
+  }catch(e){alert(_apiErrMsg(e)+' Fill in manually.');}
   finally{gv('ing-lookup-loading').classList.remove('show');}
 }
 function addManualIngredient(){
@@ -1044,7 +1062,7 @@ Direct. No fluff. Reference the rolling context if there are patterns worth call
     generateCoachSuggestions(text);
   }catch(err){
     typingDiv.className='chat-msg coach';
-    typingDiv.textContent='Could not load debrief. Try again later.';
+    typingDiv.textContent=_apiErrMsg(err);
     console.error(err);
   }
 }
@@ -1107,7 +1125,7 @@ async function sendChatMessage(){
     lDiv.innerHTML=md(reply);
   }catch(err){
     lDiv.className='chat-msg coach';
-    lDiv.textContent='Something went wrong. Try again.';
+    lDiv.textContent=_apiErrMsg(err);
     chatHistory.pop();
   }
   msgEl.scrollTop=msgEl.scrollHeight;
@@ -1986,7 +2004,7 @@ async function runImpactScan(){
     impactEntry={name:parsed.name,emoji:parsed.emoji||'🍽️',calories:Math.round(parsed.calories||0),protein:Math.round((parsed.protein||0)*10)/10,carbs:Math.round((parsed.carbs||0)*10)/10,fat:Math.round((parsed.fat||0)*10)/10,fibre:0,sugar:0,sodium:0,thumb:null};
     renderImpactResult(parsed);
   }catch(err){
-    alert('Analysis failed. Try again.');console.error(err);
+    alert(_apiErrMsg(err));console.error(err);
   }finally{
     gv('impact-scan-btn').disabled=false;
     gv('impact-loading').classList.remove('show');
@@ -2348,7 +2366,7 @@ Time of day: ${new Date().getHours()}:00. Goal: fat loss cut phase.`;
       el.appendChild(div);
     }
   }catch(e){
-    el.innerHTML='<div style="color:var(--muted);font-size:12px;padding:8px 0">Suggestions failed. Try again.</div>';
+    el.innerHTML=`<div style="color:var(--muted);font-size:12px;padding:8px 0">${_apiErrMsg(e)}</div>`;
   }finally{
     btn.disabled=false;btn.textContent='↻ Refresh';
   }
@@ -2935,7 +2953,7 @@ Generate a workout split for today. Return ONLY valid JSON.`;
     renderWorkoutPreview();
   }catch(e){
     console.error('Workout gen error',e);
-    const msg=e.message||String(e);
+    const msg=_apiErrMsg(e);
     const el=gv('wo-plan-preview');
     if(el){
       el.style.display='block';
@@ -3554,7 +3572,7 @@ async function generateWeeklySummary(weekK){
     if(btn){btn.disabled=false;btn.textContent='↺ Refresh';}
   }catch(e){
     if(btn){btn.disabled=false;btn.textContent='Generate';}
-    if(responseEl)responseEl.textContent='Failed — check connection.';
+    if(responseEl)responseEl.textContent=_apiErrMsg(e);
   }
 }
 
@@ -3753,7 +3771,7 @@ async function loadFastingRecommendation(forceRefresh=false){
     localStorage.setItem(FAST_AI_KEY+'_date',todayKey());
     if(content){content.innerHTML=md(text);content.style.display='block';}
   }catch(e){
-    if(content){content.textContent='Failed to load — check your connection.';content.style.display='block';}
+    if(content){content.textContent=_apiErrMsg(e);content.style.display='block';}
   }finally{
     if(loading)loading.style.display='none';
   }
