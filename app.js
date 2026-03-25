@@ -2843,7 +2843,7 @@ async function generateWorkout(){
   const histSummary=recentSessions.map(s=>`${new Date(s.date).toLocaleDateString('en-US',{weekday:'short'})}: ${s.splitName} (${(s.muscleGroups||[]).join(', ')})`).join('\n');
   const pbSummary=Object.entries(pbs).slice(0,20).map(([ex,pb])=>`${ex}: ${pb.weight}kg x${pb.reps} (1RM ~${pb.oneRM}kg)`).join('\n');
 
-  const prompt=`You are an evidence-based strength & hypertrophy coach for a 26-year-old male, 89.1kg, 173cm, 25.1% body fat, goal is fat loss while preserving lean mass (target 64kg lean mass). He trains FASTED in the morning before his first meal. He's an intermediate lifter — past the beginner phase but still making solid progress. Talk to him like a knowledgeable training partner, not a textbook.
+  const woSystem=`You are an evidence-based strength & hypertrophy coach for a 26-year-old male, 89.1kg, 173cm, 25.1% body fat, goal is fat loss while preserving lean mass (target 64kg lean mass). He trains FASTED in the morning before his first meal. He's an intermediate lifter — past the beginner phase but still making solid progress. Talk to him like a knowledgeable training partner, not a textbook.
 
 ═══ TRAINING PHILOSOPHY & EXERCISE SCIENCE BRIEF ═══
 
@@ -2878,7 +2878,25 @@ async function generateWorkout(){
    - Finish with isolation/cable work using intensity techniques (rest-pause, drop sets, myo-reps, lengthened partials)
    - Include at least ONE exercise per primary muscle that loads it in the lengthened/stretched position
 
-═══ TODAY'S CONTEXT ═══
+Rules:
+- 6-8 exercises (fewer if recovery < 40)
+- If recovery >= 67: heavy compound focus, 4-5 sets, 5-8 reps, straight sets on compounds
+- If recovery 34-66: moderate volume, 3-4 sets, 8-12 reps, lean on intensity techniques for efficiency
+- If recovery < 34: light/technique focus, 3 sets, 12-15 reps, prioritize MMC and lengthened partials
+- Fasted training: avoid maximal CNS-heavy lifts if recovery < 50
+- Do NOT repeat muscle groups trained in last 48 hours unless recovery > 80
+- Include at least one lengthened-position exercise per primary muscle group
+- Mix up exercise selection — pull from the underrated exercises list, don't just default to barbell bench/squat/deadlift every time
+- intensityTechnique: one of "straight sets", "rest-pause", "drop set", "myo-reps", "lengthened partials" — use straight sets for heavy compounds, rotate techniques on accessories
+- cue: MUST be a specific MMC cue — what muscle to feel, where to initiate, a visualization. Never generic
+- suggestedWeight: fill in if PB exists for that exercise (suggest same or slight increase), else null
+- Cardio: fasted morning = prefer steady state (incline walk, moderate bike). Only recommend HIIT if recovery > 80
+- Return ONLY valid JSON, no markdown, no explanation.
+
+JSON format:
+{"splitName":"Push — Chest & Shoulders","muscleGroups":["Chest","Shoulders","Triceps"],"coachNote":"2-line rationale referencing recovery data and how it shaped today's plan","exercises":[{"name":"Incline Dumbbell Press","icon":"💪","cue":"specific MMC cue","intensityTechnique":"straight sets","sets":4,"reps":"6-8","rest":120,"lastWeight":null,"suggestedWeight":null,"alternatives":["alt1","alt2"]}],"cardio":{"machine":"Treadmill","icon":"🏃","duration":15,"speed":6.5,"incline":8,"unit":"km/h","rationale":"one line"}}`;
+
+  const prompt=`═══ TODAY'S CONTEXT ═══
 - WHOOP Recovery: ${rec}%
 - Sleep: ${sleepSnap.sleep!=null?(()=>{const hh=Math.floor(sleepSnap.sleep),mm=Math.round((sleepSnap.sleep-hh)*60);return hh+'h'+(mm>0?' '+mm+'m':'');})():'unknown'}
 - HRV: ${sleepSnap.hrv||'unknown'}
@@ -2893,67 +2911,21 @@ ${Object.entries(daysAgo).map(([m,d])=>`${m}: ${d} days ago`).join(', ')||'No hi
 PERSONAL BESTS:
 ${pbSummary||'No PBs yet — first session'}
 
-═══ TASK ═══
-Generate a workout split for today. Return ONLY valid JSON, no markdown, no explanation.
-
-JSON format:
-{
-  "splitName": "Push — Chest & Shoulders",
-  "muscleGroups": ["Chest","Shoulders","Triceps"],
-  "coachNote": "2-line rationale referencing recovery data and how it shaped today's plan",
-  "exercises": [
-    {
-      "name": "Incline Dumbbell Press",
-      "icon": "💪",
-      "cue": "Squeeze shoulder blades into the bench, lower until you feel a deep chest stretch, then drive through your palms — feel your upper pecs initiate the push",
-      "intensityTechnique": "straight sets",
-      "sets": 4,
-      "reps": "6-8",
-      "rest": 120,
-      "lastWeight": null,
-      "suggestedWeight": null,
-      "alternatives": ["Barbell Bench Press","Machine Chest Press","Smith Incline Press"]
-    }
-  ],
-  "cardio": {
-    "machine": "Treadmill",
-    "icon": "🏃",
-    "duration": 15,
-    "speed": 6.5,
-    "incline": 8,
-    "unit": "km/h",
-    "rationale": "Fasted incline walk targets fat oxidation. Closes ~120 kcal of today's deficit."
-  }
-}
-
-Rules:
-- 6-8 exercises (fewer if recovery < 40)
-- If recovery >= 67: heavy compound focus, 4-5 sets, 5-8 reps, straight sets on compounds
-- If recovery 34-66: moderate volume, 3-4 sets, 8-12 reps, lean on intensity techniques for efficiency
-- If recovery < 34: light/technique focus, 3 sets, 12-15 reps, prioritize MMC and lengthened partials
-- Fasted training: avoid maximal CNS-heavy lifts if recovery < 50
-- Do NOT repeat muscle groups trained in last 48 hours unless recovery > 80
-- Include at least one lengthened-position exercise per primary muscle group
-- Mix up exercise selection — pull from the underrated exercises list, don't just default to barbell bench/squat/deadlift every time
-- intensityTechnique: one of "straight sets", "rest-pause", "drop set", "myo-reps", "lengthened partials" — use straight sets for heavy compounds, rotate techniques on accessories
-- cue: MUST be a specific MMC cue — what muscle to feel, where to initiate, a visualization. Never generic
-- suggestedWeight: fill in if PB exists for that exercise (suggest same or slight increase), else null
-- Cardio: fasted morning = prefer steady state (incline walk, moderate bike). Only recommend HIIT if recovery > 80
-- Return valid JSON only`;
+Generate a workout split for today. Return ONLY valid JSON.`;
 
   try{
-    const reqBody=JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:2000,messages:[{role:'user',content:prompt}]});
+    const reqBody=JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:2000,system:woSystem,messages:[{role:'user',content:prompt}]});
     let data,lastErr;
-    for(let attempt=0;attempt<3;attempt++){
+    for(let attempt=0;attempt<4;attempt++){
       try{
-        if(attempt>0)await new Promise(r=>setTimeout(r,attempt*2000));
+        if(attempt>0)await new Promise(r=>setTimeout(r,attempt*3000));
         const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},body:reqBody});
         data=await res.json();
-        if(data.error&&attempt<2)continue;
+        if(data.error&&attempt<3)continue;
         break;
       }catch(e){lastErr=e;}
     }
-    if(!data)throw lastErr||new Error('Network error');
+    if(!data)throw lastErr||new Error('Network error — check your connection and try again');
     const rawText=aiText(data).trim();
     if(!rawText)throw new Error('Empty response from API');
     // Extract JSON — strip any markdown fences and find the first {...}
