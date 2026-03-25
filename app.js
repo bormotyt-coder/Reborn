@@ -2942,9 +2942,18 @@ Rules:
 - Return valid JSON only`;
 
   try{
-    const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:2000,messages:[{role:'user',content:prompt}]})});
-    const data=await res.json();
+    const reqBody=JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:2000,messages:[{role:'user',content:prompt}]});
+    let data,lastErr;
+    for(let attempt=0;attempt<3;attempt++){
+      try{
+        if(attempt>0)await new Promise(r=>setTimeout(r,attempt*2000));
+        const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},body:reqBody});
+        data=await res.json();
+        if(data.error&&attempt<2)continue;
+        break;
+      }catch(e){lastErr=e;}
+    }
+    if(!data)throw lastErr||new Error('Network error');
     const rawText=aiText(data).trim();
     if(!rawText)throw new Error('Empty response from API');
     // Extract JSON — strip any markdown fences and find the first {...}
