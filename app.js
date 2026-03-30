@@ -1,6 +1,14 @@
 
 const PROXY='https://reborn-proxy.bormotyt.workers.dev';
 
+// Fetch with a hard timeout so requests never hang indefinitely.
+// Resolves/rejects like normal fetch but aborts after `ms` milliseconds.
+function fetchWithTimeout(url, options, ms=45000){
+  const ctrl=new AbortController();
+  const timer=setTimeout(()=>ctrl.abort(),ms);
+  return fetch(url,{...options,signal:ctrl.signal}).finally(()=>clearTimeout(timer));
+}
+
 // Extract text from Claude API response, throwing on errors
 function aiText(data){
   if(data.error)throw new Error(data.error.message||JSON.stringify(data.error));
@@ -408,7 +416,7 @@ async function aiLookupQA(){
   const name=gv('qa-name-in').value.trim();if(!name){alert('Enter a name first.');return;}
   gv('qa-loading').classList.add('show');
   try{
-    const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
+    const res=await fetchWithTimeout(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:300,
         system:'Return ONLY valid JSON, no markdown: {"emoji":"single emoji","calories":number,"protein":number,"carbs":number,"fat":number}',
         messages:[{role:'user',content:`Nutrition facts for: ${name}. Use official label if branded.`}]})});
@@ -603,7 +611,7 @@ After this meal, remaining for the day: ${remaining.cal} kcal, ${remaining.p}g P
 
 Give a 2-3 sentence honest assessment: how well this meal fits his cut goals, what it does well or poorly, and one actionable tip. Be direct, no fluff.`;
   try{
-    const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
+    const res=await fetchWithTimeout(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:200,
         messages:[{role:'user',content:prompt}]})});
     const data=await res.json();
@@ -657,7 +665,7 @@ Identify 2-8 ingredients. Include fibre, sugar, sodium where known (use 0 if unk
     for(let attempt=0;attempt<3;attempt++){
       try{
         if(attempt>0)await new Promise(r=>setTimeout(r,attempt*2000));
-        const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},body:reqBody});
+        const res=await fetchWithTimeout(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},body:reqBody});
         data=await res.json();
         if(data.error&&attempt<2)continue;
         break;
@@ -882,7 +890,7 @@ async function aiLookupIngredient(){
   const name=gv('add-ing-name').value.trim();if(!name){alert('Enter ingredient name first.');return;}
   gv('ing-lookup-loading').classList.add('show');
   try{
-    const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
+    const res=await fetchWithTimeout(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:300,
         system:'Return ONLY valid JSON, no markdown: {"emoji":"emoji","portion":"portion description","calories":number,"protein":number,"carbs":number,"fat":number}',
         messages:[{role:'user',content:`Nutrition facts for: ${name}`}]})});
@@ -1048,7 +1056,7 @@ Give me a direct daily debrief:
 Direct. No fluff. Reference the rolling context if there are patterns worth calling out.`;
 
   try{
-    const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
+    const res=await fetchWithTimeout(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:900,
         system:'You are a direct, no-nonsense performance and nutrition coach for Borna. Honest, specific, actionable. No filler. When you spot multi-day patterns (e.g. 3rd day under on protein), call them out explicitly.',
         messages:[{role:'user',content:prompt}]})});
@@ -1069,7 +1077,7 @@ Direct. No fluff. Reference the rolling context if there are patterns worth call
 
 async function generateCoachSuggestions(debriefText){
   try{
-    const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
+    const res=await fetchWithTimeout(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:120,
         system:'You are a nutrition and performance coach.',
         messages:[{role:'user',content:`Based on this daily debrief, write 3 short questions that the athlete would ask their coach — things like "how can I fix my protein intake?", "what should I eat tonight?", "is my deficit too aggressive?". First-person from the athlete's perspective. Return ONLY 3 lines, one question per line, no numbering, under 10 words each.\n\n${debriefText}`}]})});
@@ -1114,7 +1122,7 @@ async function sendChatMessage(){
   chatHistory.push({role:'user',content:msg});
 
   try{
-    const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
+    const res=await fetchWithTimeout(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:600,
         system:`You are a direct, no-nonsense performance and nutrition coach for Borna. You have full context of his day. Be specific, honest, and actionable. Keep replies concise.\n\n${getDayContext()}`,
         messages:chatHistory})});
@@ -1759,7 +1767,7 @@ async function snapAndReadBarcode(){
   const b64=canvas.toDataURL('image/jpeg',0.92).split(',')[1];
 
   try{
-    const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
+    const res=await fetchWithTimeout(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:100,
         system:'You are a barcode reader. Look at the image and find the barcode number (EAN-13, EAN-8, UPC-A etc). Return ONLY the digits, nothing else. If you cannot find a barcode, return the word NONE.',
         messages:[{role:'user',content:[
@@ -1877,7 +1885,7 @@ async function identifyProductFromImage(b64){
   const descEl=gv('meal-desc');
   if(descEl)descEl.value='Identifying product from packaging…';
   try{
-    const res=await fetch(PROXY,{
+    const res=await fetchWithTimeout(PROXY,{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
@@ -1994,7 +2002,7 @@ async function runImpactScan(){
   content.push({type:'text',text:prompt});
 
   try{
-    const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
+    const res=await fetchWithTimeout(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:400,
         system:'Nutrition expert. Return ONLY valid JSON, no markdown: {"name":"food name","emoji":"single emoji","calories":number,"protein":number,"carbs":number,"fat":number,"verdict":"one punchy sentence about whether this fits remaining targets"}',
         messages:[{role:'user',content}]})});
@@ -2329,7 +2337,7 @@ Remaining targets: ${remCal} kcal, ${remP}g protein, ${remC}g carbs, ${remF}g fa
 Time of day: ${new Date().getHours()}:00. Goal: fat loss cut phase.`;
 
   try{
-    const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
+    const res=await fetchWithTimeout(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:600,
         system:'Return ONLY valid JSON, no markdown: {"suggestions":[{"name":"food name","emoji":"emoji","reason":"one line why this fits","calories":number,"protein":number,"carbs":number,"fat":number}]} — 3 suggestions, practical foods available in Dubai, prioritize whatever macro is most behind.',
         messages:[{role:'user',content:ctx}]})});
@@ -2937,7 +2945,7 @@ Generate a workout split for today. Return ONLY valid JSON.`;
     for(let attempt=0;attempt<4;attempt++){
       try{
         if(attempt>0)await new Promise(r=>setTimeout(r,attempt*3000));
-        const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},body:reqBody});
+        const res=await fetchWithTimeout(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},body:reqBody});
         data=await res.json();
         if(data.error&&attempt<3)continue;
         break;
@@ -3555,7 +3563,7 @@ async function generateWeeklySummary(weekK){
   const userMsg=`Week ${weekK}. Daily target: ${tgt}kcal.\n${dayLines}`;
 
   try{
-    const res=await fetch(PROXY,{
+    const res=await fetchWithTimeout(PROXY,{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
@@ -3760,7 +3768,7 @@ async function loadFastingRecommendation(forceRefresh=false){
   const avgDur=recentFasts.length?(recentFasts.reduce((s,f)=>s+(f.actualHours||f.targetHours),0)/recentFasts.length).toFixed(1):'none';
   const ctx=`${getDayContext()}\n${getFastContext()}\nFasting preference: ${fastProtocol}\nAvg recent fast: ${avgDur}h over ${recentFasts.length} fasts\n${_buildCoachContext().workoutCtx}`;
   try{
-    const resp=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+    const resp=await fetchWithTimeout(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
       model:'claude-sonnet-4-20250514',max_tokens:450,
       system:'You are a concise intermittent fasting and nutrition coach for Borna (26M, 89.1kg, 25.1% BF, goal 20.1% BF by Apr 27 2026). Give specific, actionable fasting advice. Be brief and direct. No markdown headers, just 3-4 short paragraphs.',
       messages:[{role:'user',content:`Based on my data, recommend:\n1. Best fasting protocol (16:8, 18:6, or 20:4) for my fat loss goal and why\n2. Optimal eating window start/end times\n3. Which days this week to fast considering my workout schedule\n4. One key tip for right now\n\n${ctx}`}]
