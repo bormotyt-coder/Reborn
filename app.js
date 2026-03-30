@@ -9,6 +9,28 @@ function fetchWithTimeout(url, options, ms=45000){
   return fetch(url,{...options,signal:ctrl.signal}).finally(()=>clearTimeout(timer));
 }
 
+// Single entry-point for all Claude API calls.
+// Automatically retries up to 3 times with exponential backoff + jitter on
+// transient failures (network errors, timeouts, 429 rate-limits, 529 overload).
+async function callAI(bodyObj){
+  let lastErr;
+  for(let attempt=0;attempt<3;attempt++){
+    try{
+      if(attempt>0)await new Promise(r=>setTimeout(r,attempt*2000+Math.random()*500));
+      const res=await fetchWithTimeout(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(bodyObj)});
+      const data=await res.json();
+      if(data.error){
+        const msg=(data.error.message||'').toLowerCase();
+        // Retry on overload / rate-limit; throw immediately on auth / billing errors
+        if(attempt<2&&(msg.includes('overloaded')||msg.includes('rate')||msg.includes('429')||msg.includes('529')))continue;
+        throw new Error(data.error.message||JSON.stringify(data.error));
+      }
+      return data;
+    }catch(e){lastErr=e;}
+  }
+  throw lastErr||new Error('Network error');
+}
+
 // Extract text from Claude API response, throwing on errors
 function aiText(data){
   if(data.error)throw new Error(data.error.message||JSON.stringify(data.error));
@@ -416,11 +438,9 @@ async function aiLookupQA(){
   const name=gv('qa-name-in').value.trim();if(!name){alert('Enter a name first.');return;}
   gv('qa-loading').classList.add('show');
   try{
-    const res=await fetchWithTimeout(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:300,
-        system:'Return ONLY valid JSON, no markdown: {"emoji":"single emoji","calories":number,"protein":number,"carbs":number,"fat":number}',
-        messages:[{role:'user',content:`Nutrition facts for: ${name}. Use official label if branded.`}]})});
-    const data=await res.json();
+    const data=await callAI({model:'claude-sonnet-4-20250514',max_tokens:300,
+      system:'Return ONLY valid JSON, no markdown: {"emoji":"single emoji","calories":number,"protein":number,"carbs":number,"fat":number}',
+      messages:[{role:'user',content:`Nutrition facts for: ${name}. Use official label if branded.`}]});
     const p=JSON.parse(aiText(data).replace(/```json|```/g,'').trim());
     if(p.emoji)gv('qa-emoji-in').value=p.emoji;
     if(p.calories)gv('qa-cal-in').value=p.calories;
@@ -611,10 +631,8 @@ After this meal, remaining for the day: ${remaining.cal} kcal, ${remaining.p}g P
 
 Give a 2-3 sentence honest assessment: how well this meal fits his cut goals, what it does well or poorly, and one actionable tip. Be direct, no fluff.`;
   try{
-    const res=await fetchWithTimeout(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:200,
-        messages:[{role:'user',content:prompt}]})});
-    const data=await res.json();
+    const data=await callAI({model:'claude-sonnet-4-20250514',max_tokens:200,
+      messages:[{role:'user',content:prompt}]});
     const text=aiText(data).trim();
     gv('mdd-analysis-loading').style.display='none';
     gv('mdd-analysis-body').innerHTML=md(text);
@@ -655,23 +673,12 @@ async function analyzeMeal(){
   const prompt=desc?(mealB64?`Analyse this food. Context: "${desc}". Identify every visible ingredient.`:`Identify ingredients and macros for: "${desc}". Use official label for branded products.`):'Identify every ingredient in this food image separately.';
   content.push({type:'text',text:prompt});
   try{
-    const reqBody=JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1500,
+    const data=await callAI({model:'claude-sonnet-4-20250514',max_tokens:1500,
         system:`Precise nutrition expert. Identify each ingredient separately.
 Return ONLY valid JSON, no markdown:
 {"confidence":"high"|"medium"|"low","confidence_tip":"one sentence or empty","ingredients":[{"name":"name","emoji":"emoji","portion":"e.g. 80g","calories":number,"protein":number,"carbs":number,"fat":number,"fibre":number,"sugar":number,"sodium":number}]}
 Identify 2-8 ingredients. Include fibre, sugar, sodium where known (use 0 if unknown). Use official macros for branded products.`,
         messages:[{role:'user',content}]});
-    let data,lastErr;
-    for(let attempt=0;attempt<3;attempt++){
-      try{
-        if(attempt>0)await new Promise(r=>setTimeout(r,attempt*2000));
-        const res=await fetchWithTimeout(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},body:reqBody});
-        data=await res.json();
-        if(data.error&&attempt<2)continue;
-        break;
-      }catch(e){lastErr=e;}
-    }
-    if(!data)throw lastErr||new Error('Network error');
     const raw=aiText(data).replace(/```json|```/g,'').trim();
     const parsed=JSON.parse(raw);
     ingredients=parsed.ingredients.map((ing,i)=>({...ing,id:i,portion_multiplier:1,selected:true}));
@@ -890,11 +897,9 @@ async function aiLookupIngredient(){
   const name=gv('add-ing-name').value.trim();if(!name){alert('Enter ingredient name first.');return;}
   gv('ing-lookup-loading').classList.add('show');
   try{
-    const res=await fetchWithTimeout(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:300,
-        system:'Return ONLY valid JSON, no markdown: {"emoji":"emoji","portion":"portion description","calories":number,"protein":number,"carbs":number,"fat":number}',
-        messages:[{role:'user',content:`Nutrition facts for: ${name}`}]})});
-    const data=await res.json();
+    const data=await callAI({model:'claude-sonnet-4-20250514',max_tokens:300,
+      system:'Return ONLY valid JSON, no markdown: {"emoji":"emoji","portion":"portion description","calories":number,"protein":number,"carbs":number,"fat":number}',
+      messages:[{role:'user',content:`Nutrition facts for: ${name}`}]});
     const p=JSON.parse(aiText(data).replace(/```json|```/g,'').trim());
     if(p.emoji)gv('add-ing-emoji').value=p.emoji;
     if(p.calories)gv('add-ing-cal').value=p.calories;
@@ -1056,11 +1061,9 @@ Give me a direct daily debrief:
 Direct. No fluff. Reference the rolling context if there are patterns worth calling out.`;
 
   try{
-    const res=await fetchWithTimeout(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:900,
-        system:'You are a direct, no-nonsense performance and nutrition coach for Borna. Honest, specific, actionable. No filler. When you spot multi-day patterns (e.g. 3rd day under on protein), call them out explicitly.',
-        messages:[{role:'user',content:prompt}]})});
-    const data=await res.json();
+    const data=await callAI({model:'claude-sonnet-4-20250514',max_tokens:900,
+      system:'You are a direct, no-nonsense performance and nutrition coach for Borna. Honest, specific, actionable. No filler. When you spot multi-day patterns (e.g. 3rd day under on protein), call them out explicitly.',
+      messages:[{role:'user',content:prompt}]});
     const text=aiText(data).trim();
     localStorage.setItem(`${KEY}_last_coach_report`,text);
     chatHistory=[{role:'user',content:prompt},{role:'assistant',content:text}];
@@ -1077,11 +1080,9 @@ Direct. No fluff. Reference the rolling context if there are patterns worth call
 
 async function generateCoachSuggestions(debriefText){
   try{
-    const res=await fetchWithTimeout(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:120,
-        system:'You are a nutrition and performance coach.',
-        messages:[{role:'user',content:`Based on this daily debrief, write 3 short questions that the athlete would ask their coach — things like "how can I fix my protein intake?", "what should I eat tonight?", "is my deficit too aggressive?". First-person from the athlete's perspective. Return ONLY 3 lines, one question per line, no numbering, under 10 words each.\n\n${debriefText}`}]})});
-    const data=await res.json();
+    const data=await callAI({model:'claude-sonnet-4-20250514',max_tokens:120,
+      system:'You are a nutrition and performance coach.',
+      messages:[{role:'user',content:`Based on this daily debrief, write 3 short questions that the athlete would ask their coach — things like "how can I fix my protein intake?", "what should I eat tonight?", "is my deficit too aggressive?". First-person from the athlete's perspective. Return ONLY 3 lines, one question per line, no numbering, under 10 words each.\n\n${debriefText}`}]});
     const chips=aiText(data).trim().split('\n').map(s=>s.trim()).filter(Boolean).slice(0,3);
     const el=gv('coach-suggestions');
     if(!el||!chips.length)return;
@@ -1122,11 +1123,9 @@ async function sendChatMessage(){
   chatHistory.push({role:'user',content:msg});
 
   try{
-    const res=await fetchWithTimeout(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:600,
-        system:`You are a direct, no-nonsense performance and nutrition coach for Borna. You have full context of his day. Be specific, honest, and actionable. Keep replies concise.\n\n${getDayContext()}`,
-        messages:chatHistory})});
-    const data=await res.json();
+    const data=await callAI({model:'claude-sonnet-4-20250514',max_tokens:600,
+      system:`You are a direct, no-nonsense performance and nutrition coach for Borna. You have full context of his day. Be specific, honest, and actionable. Keep replies concise.\n\n${getDayContext()}`,
+      messages:chatHistory});
     const reply=aiText(data).trim();
     chatHistory.push({role:'assistant',content:reply});
     lDiv.className='chat-msg coach';
@@ -1767,14 +1766,12 @@ async function snapAndReadBarcode(){
   const b64=canvas.toDataURL('image/jpeg',0.92).split(',')[1];
 
   try{
-    const res=await fetchWithTimeout(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:100,
-        system:'You are a barcode reader. Look at the image and find the barcode number (EAN-13, EAN-8, UPC-A etc). Return ONLY the digits, nothing else. If you cannot find a barcode, return the word NONE.',
-        messages:[{role:'user',content:[
-          {type:'image',source:{type:'base64',media_type:'image/jpeg',data:b64}},
-          {type:'text',text:'What is the barcode number in this image? Return only the digits.'}
-        ]}]})});
-    const data=await res.json();
+    const data=await callAI({model:'claude-sonnet-4-20250514',max_tokens:100,
+      system:'You are a barcode reader. Look at the image and find the barcode number (EAN-13, EAN-8, UPC-A etc). Return ONLY the digits, nothing else. If you cannot find a barcode, return the word NONE.',
+      messages:[{role:'user',content:[
+        {type:'image',source:{type:'base64',media_type:'image/jpeg',data:b64}},
+        {type:'text',text:'What is the barcode number in this image? Return only the digits.'}
+      ]}]});
     let raw;
     try{raw=aiText(data).trim().replace(/\s/g,'');}catch(e){
       _barcodeScanning=false;
@@ -1885,19 +1882,14 @@ async function identifyProductFromImage(b64){
   const descEl=gv('meal-desc');
   if(descEl)descEl.value='Identifying product from packaging…';
   try{
-    const res=await fetchWithTimeout(PROXY,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        model:'claude-sonnet-4-20250514',
-        max_tokens:80,
-        messages:[{role:'user',content:[
-          {type:'image',source:{type:'base64',media_type:'image/jpeg',data:b64}},
-          {type:'text',text:'What food product is shown? Reply with only the brand and product name (e.g. "Danone Activia Strawberry Yogurt 125g"). Nothing else.'}
-        ]}]
-      })
+    const data=await callAI({
+      model:'claude-sonnet-4-20250514',
+      max_tokens:80,
+      messages:[{role:'user',content:[
+        {type:'image',source:{type:'base64',media_type:'image/jpeg',data:b64}},
+        {type:'text',text:'What food product is shown? Reply with only the brand and product name (e.g. "Danone Activia Strawberry Yogurt 125g"). Nothing else.'}
+      ]}]
     });
-    const data=await res.json();
     const name=aiText(data).trim().replace(/^["']+|["']+$/g,'');
     if(descEl)descEl.value=name||'Scanned product';
   }catch(e){
@@ -2002,11 +1994,9 @@ async function runImpactScan(){
   content.push({type:'text',text:prompt});
 
   try{
-    const res=await fetchWithTimeout(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:400,
-        system:'Nutrition expert. Return ONLY valid JSON, no markdown: {"name":"food name","emoji":"single emoji","calories":number,"protein":number,"carbs":number,"fat":number,"verdict":"one punchy sentence about whether this fits remaining targets"}',
-        messages:[{role:'user',content}]})});
-    const data=await res.json();
+    const data=await callAI({model:'claude-sonnet-4-20250514',max_tokens:400,
+      system:'Nutrition expert. Return ONLY valid JSON, no markdown: {"name":"food name","emoji":"single emoji","calories":number,"protein":number,"carbs":number,"fat":number,"verdict":"one punchy sentence about whether this fits remaining targets"}',
+      messages:[{role:'user',content}]});
     const raw=aiText(data).replace(/```json|```/g,'').trim();
     const parsed=JSON.parse(raw);
     impactEntry={name:parsed.name,emoji:parsed.emoji||'🍽️',calories:Math.round(parsed.calories||0),protein:Math.round((parsed.protein||0)*10)/10,carbs:Math.round((parsed.carbs||0)*10)/10,fat:Math.round((parsed.fat||0)*10)/10,fibre:0,sugar:0,sodium:0,thumb:null};
@@ -2337,11 +2327,9 @@ Remaining targets: ${remCal} kcal, ${remP}g protein, ${remC}g carbs, ${remF}g fa
 Time of day: ${new Date().getHours()}:00. Goal: fat loss cut phase.`;
 
   try{
-    const res=await fetchWithTimeout(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:600,
-        system:'Return ONLY valid JSON, no markdown: {"suggestions":[{"name":"food name","emoji":"emoji","reason":"one line why this fits","calories":number,"protein":number,"carbs":number,"fat":number}]} — 3 suggestions, practical foods available in Dubai, prioritize whatever macro is most behind.',
-        messages:[{role:'user',content:ctx}]})});
-    const data=await res.json();
+    const data=await callAI({model:'claude-sonnet-4-20250514',max_tokens:600,
+      system:'Return ONLY valid JSON, no markdown: {"suggestions":[{"name":"food name","emoji":"emoji","reason":"one line why this fits","calories":number,"protein":number,"carbs":number,"fat":number}]} — 3 suggestions, practical foods available in Dubai, prioritize whatever macro is most behind.',
+      messages:[{role:'user',content:ctx}]});
     const raw=aiText(data).replace(/```json|```/g,'').trim();
     const parsed=JSON.parse(raw);
 
@@ -2940,18 +2928,7 @@ ${pbSummary||'No PBs yet — first session'}
 Generate a workout split for today. Return ONLY valid JSON.`;
 
   try{
-    const reqBody=JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:2000,system:woSystem,messages:[{role:'user',content:prompt}]});
-    let data,lastErr;
-    for(let attempt=0;attempt<4;attempt++){
-      try{
-        if(attempt>0)await new Promise(r=>setTimeout(r,attempt*3000));
-        const res=await fetchWithTimeout(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},body:reqBody});
-        data=await res.json();
-        if(data.error&&attempt<3)continue;
-        break;
-      }catch(e){lastErr=e;}
-    }
-    if(!data)throw lastErr||new Error('Network error — check your connection and try again');
+    const data=await callAI({model:'claude-sonnet-4-20250514',max_tokens:2000,system:woSystem,messages:[{role:'user',content:prompt}]});
     const rawText=aiText(data).trim();
     if(!rawText)throw new Error('Empty response from API');
     // Extract JSON — strip any markdown fences and find the first {...}
@@ -3563,17 +3540,12 @@ async function generateWeeklySummary(weekK){
   const userMsg=`Week ${weekK}. Daily target: ${tgt}kcal.\n${dayLines}`;
 
   try{
-    const res=await fetchWithTimeout(PROXY,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        model:'claude-sonnet-4-20250514',
-        max_tokens:120,
-        system:"You are a concise performance coach. Analyse this week's data and give 2-3 bullet observations about patterns — e.g. consistently under on protein, stronger workout days after better sleep, calories spiking on weekends. Be specific, use the actual numbers, max 60 words total.",
-        messages:[{role:'user',content:userMsg}]
-      })
+    const data=await callAI({
+      model:'claude-sonnet-4-20250514',
+      max_tokens:120,
+      system:"You are a concise performance coach. Analyse this week's data and give 2-3 bullet observations about patterns — e.g. consistently under on protein, stronger workout days after better sleep, calories spiking on weekends. Be specific, use the actual numbers, max 60 words total.",
+      messages:[{role:'user',content:userMsg}]
     });
-    const data=await res.json();
     const text=aiText(data).trim();
     localStorage.setItem(`${KEY}_weekly_ai_${weekK}`,text);
     if(responseEl)responseEl.innerHTML=md(text);
@@ -3768,12 +3740,11 @@ async function loadFastingRecommendation(forceRefresh=false){
   const avgDur=recentFasts.length?(recentFasts.reduce((s,f)=>s+(f.actualHours||f.targetHours),0)/recentFasts.length).toFixed(1):'none';
   const ctx=`${getDayContext()}\n${getFastContext()}\nFasting preference: ${fastProtocol}\nAvg recent fast: ${avgDur}h over ${recentFasts.length} fasts\n${_buildCoachContext().workoutCtx}`;
   try{
-    const resp=await fetchWithTimeout(PROXY,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+    const data=await callAI({
       model:'claude-sonnet-4-20250514',max_tokens:450,
       system:'You are a concise intermittent fasting and nutrition coach for Borna (26M, 89.1kg, 25.1% BF, goal 20.1% BF by Apr 27 2026). Give specific, actionable fasting advice. Be brief and direct. No markdown headers, just 3-4 short paragraphs.',
       messages:[{role:'user',content:`Based on my data, recommend:\n1. Best fasting protocol (16:8, 18:6, or 20:4) for my fat loss goal and why\n2. Optimal eating window start/end times\n3. Which days this week to fast considering my workout schedule\n4. One key tip for right now\n\n${ctx}`}]
-    })});
-    const data=await resp.json();
+    });
     const text=aiText(data).trim();
     localStorage.setItem(FAST_AI_KEY,text);
     localStorage.setItem(FAST_AI_KEY+'_date',todayKey());
