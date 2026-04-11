@@ -1561,11 +1561,11 @@ body[class*="theme-"] .nb.active::after {
   background: var(--page-accent);
 }
 
-body[class*="theme-"] .main-fab {
+body[class*="theme-"] .fab-main {
   background: var(--page-accent);
 }
 
-body[class*="theme-"] .main-fab:active {
+body[class*="theme-"] .fab-main:active {
   background: var(--page-accent2);
 }
 

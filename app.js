@@ -3654,28 +3654,28 @@ function toggleSetDone(ei,si){
   if(!_woSession)return;
   const set=_woSession.exercises[ei].sets[si];
   set.done=!set.done;
-  // Start rest timer if just completed
-  if(set.done){
-    const rest=_woSession.exercises[ei].rest||90;
-    startRestTimer(ei,rest);
-    // Update PB
-    if(set.weight&&set.reps){
-      const ex=_woSession.exercises[ei];
-      const name=ex.swappedTo||ex.name;
-      const pbs=woPBs();
-      const oneRM=epley(parseFloat(set.weight),parseInt(set.reps));
-      if(!pbs[name]||oneRM>pbs[name].oneRM){
-        pbs[name]={weight:parseFloat(set.weight),reps:parseInt(set.reps),oneRM,date:new Date().toISOString()};
-        woSave(WO_PBS_KEY,pbs);
-      }
+  // Update PB if completing a set
+  if(set.done && set.weight && set.reps){
+    const ex=_woSession.exercises[ei];
+    const name=ex.swappedTo||ex.name;
+    const pbs=woPBs();
+    const oneRM=epley(parseFloat(set.weight),parseInt(set.reps));
+    if(!pbs[name]||oneRM>pbs[name].oneRM){
+      pbs[name]={weight:parseFloat(set.weight),reps:parseInt(set.reps),oneRM,date:new Date().toISOString()};
+      woSave(WO_PBS_KEY,pbs);
     }
   }
   woSave(WO_KEY,_woSession);
   // Re-render just the check icon
   const check=gv(`wo-ex-check-${ei}`);
   if(check)check.textContent=_woSession.exercises[ei].sets.every(s=>s.done)?'✅':'○';
-  // Re-render the specific set row
+  // Re-render exercises
   renderExercises();
+  // Start rest timer AFTER render (so the element exists)
+  if(set.done){
+    const rest=_woSession.exercises[ei].rest||90;
+    setTimeout(()=>startRestTimer(ei,rest), 50);
+  }
 }
 
 function toggleExCollapse(ei){
