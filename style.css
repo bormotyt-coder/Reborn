@@ -48,6 +48,14 @@
   --sh-sm: 0 1px 4px rgba(0,0,0,0.04);
   --sh-md: 0 2px 12px rgba(0,0,0,0.06);
   --sh-lg: 0 8px 30px rgba(0,0,0,0.10);
+  
+  /* Page theme accent (default - food/today) */
+  --page-accent: #7D9F85;
+  --page-accent2: #6B8B73;
+  --page-bg-tint: #F5F7F2;
+  --page-accent-dim: rgba(125, 159, 133, 0.10);
+  --page-accent-glow: rgba(125, 159, 133, 0.12);
+}
   --cyan: var(--cc);
 }
 
@@ -904,7 +912,6 @@ input:focus, textarea:focus, select:focus { border-color: var(--blue); }
 .wo-set-reps {}
 .wo-set-x { font-size: 12px; color: var(--muted); }
 .wo-set-1rm { font-size: 10px; color: var(--muted); min-width: 40px; text-align: right; }
-.wo-set-ghost { font-size: 10px; color: var(--ghost); }
 .wo-set-done-btn { width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--border); background: #fff; display: flex; align-items: center; justify-content: center; font-size: 14px; cursor: pointer; flex-shrink: 0; }
 .wo-set-done-btn.done { background: var(--green); border-color: var(--green); color: #fff; }
 .wo-add-set-btn { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 7px 14px; font-size: 12px; font-weight: 600; color: var(--blue); cursor: pointer; margin-top: 6px; }
@@ -1338,4 +1345,280 @@ input:focus, textarea:focus, select:focus { border-color: var(--blue); }
 }
 .connection-warning::before {
   content: '⚠️';
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   GHOST SETS & TREND INDICATORS
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+.wo-set-ghost {
+  font-size: 10px;
+  color: var(--muted);
+  min-width: 48px;
+  text-align: center;
+  opacity: 0.7;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  justify-content: center;
+}
+
+.wo-trend-up {
+  color: #4ade80;
+  font-weight: 700;
+  font-size: 11px;
+}
+
+.wo-trend-down {
+  color: #f87171;
+  font-weight: 700;
+  font-size: 11px;
+}
+
+.wo-trend-same {
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 10px;
+}
+
+.wo-ghost-date {
+  font-size: 9px;
+  color: var(--muted);
+  opacity: 0.6;
+  margin: -4px 0 4px;
+  padding-left: 24px;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   ENHANCED REST TIMER
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+.wo-rest-timer {
+  margin-top: 10px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(56, 139, 253, 0.08);
+}
+
+.rest-timer-content {
+  position: relative;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.rest-timer-content.urgent {
+  background: rgba(248, 81, 73, 0.12);
+}
+
+.rest-timer-content.pulsing {
+  animation: rest-pulse 0.5s ease-in-out infinite;
+}
+
+@keyframes rest-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.01); }
+}
+
+.rest-timer-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: rgba(56, 139, 253, 0.15);
+  transition: width 1s linear;
+  z-index: 0;
+}
+
+.rest-timer-content.urgent .rest-timer-bar {
+  background: rgba(248, 81, 73, 0.2);
+}
+
+.rest-timer-time {
+  font-family: var(--font);
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--blue2);
+  z-index: 1;
+  min-width: 60px;
+}
+
+.rest-timer-content.urgent .rest-timer-time {
+  color: var(--red);
+}
+
+.rest-timer-btns {
+  display: flex;
+  gap: 8px;
+  z-index: 1;
+}
+
+.rest-timer-btn {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text2);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.rest-timer-btn:active {
+  transform: scale(0.95);
+}
+
+.rest-timer-btn.skip {
+  background: transparent;
+  border-color: transparent;
+  color: var(--muted);
+}
+
+.rest-timer-done {
+  padding: 14px;
+  text-align: center;
+  font-family: var(--font);
+  font-size: 20px;
+  font-weight: 800;
+  color: #4ade80;
+  background: rgba(74, 222, 128, 0.12);
+  animation: rest-done-pop 0.3s ease-out;
+}
+
+@keyframes rest-done-pop {
+  0% { transform: scale(0.8); opacity: 0; }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   PAGE-SPECIFIC COLOR THEMES
+   Each tab has its own accent color while maintaining the calm pastel vibe
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+/* Food/Today page - Fresh sage green */
+body.theme-today,
+body.theme-progress {
+  --page-accent: #7D9F85;
+  --page-accent2: #6B8B73;
+  --page-bg-tint: linear-gradient(180deg, rgba(125,159,133,0.04) 0%, transparent 120px);
+  --page-accent-dim: rgba(125, 159, 133, 0.10);
+  --page-accent-glow: rgba(125, 159, 133, 0.12);
+}
+
+/* Workout page - Warm terracotta/coral */
+body.theme-workout {
+  --page-accent: #C4785A;
+  --page-accent2: #B06A4E;
+  --page-bg-tint: linear-gradient(180deg, rgba(196,120,90,0.04) 0%, transparent 120px);
+  --page-accent-dim: rgba(196, 120, 90, 0.10);
+  --page-accent-glow: rgba(196, 120, 90, 0.12);
+}
+
+/* Fasting page - Calm lavender */
+body.theme-fast {
+  --page-accent: #8B6DB0;
+  --page-accent2: #7A5C9E;
+  --page-bg-tint: linear-gradient(180deg, rgba(139,109,176,0.04) 0%, transparent 120px);
+  --page-accent-dim: rgba(139, 109, 176, 0.10);
+  --page-accent-glow: rgba(139, 109, 176, 0.12);
+}
+
+/* Coach page - Teal (existing blue) */
+body.theme-coach {
+  --page-accent: #4A7C7E;
+  --page-accent2: #3D6C6E;
+  --page-bg-tint: linear-gradient(180deg, rgba(74,124,126,0.04) 0%, transparent 120px);
+  --page-accent-dim: rgba(74, 124, 126, 0.10);
+  --page-accent-glow: rgba(74, 124, 126, 0.12);
+}
+
+/* Apply page tint to background */
+body[class*="theme-"]::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 200px;
+  background: var(--page-bg-tint);
+  pointer-events: none;
+  z-index: 0;
+  transition: background 0.4s ease;
+}
+
+/* Page-themed elements */
+body[class*="theme-"] .nb.active {
+  color: var(--page-accent);
+}
+
+body[class*="theme-"] .nb.active::after {
+  background: var(--page-accent);
+}
+
+body[class*="theme-"] .main-fab {
+  background: var(--page-accent);
+}
+
+body[class*="theme-"] .main-fab:active {
+  background: var(--page-accent2);
+}
+
+/* Themed progress bars */
+body.theme-today .pbar-f,
+body.theme-progress .pbar-f {
+  background: linear-gradient(90deg, #7D9F85, #9AB8A0);
+}
+
+body.theme-workout .pbar-f {
+  background: linear-gradient(90deg, #C4785A, #D49478);
+}
+
+body.theme-fast .pbar-f {
+  background: linear-gradient(90deg, #8B6DB0, #A687C4);
+}
+
+/* Themed buttons and accents */
+body[class*="theme-"] .btn-confirm {
+  color: var(--page-accent);
+  border-color: var(--page-accent-dim);
+  background: var(--page-accent-glow);
+}
+
+body[class*="theme-"] .wo-add-set-btn {
+  color: var(--page-accent);
+}
+
+/* Themed rest timer */
+body.theme-workout .rest-timer-bar {
+  background: rgba(196, 120, 90, 0.2);
+}
+
+body.theme-workout .rest-timer-time {
+  color: #C4785A;
+}
+
+/* Themed water tracker on today page */
+body.theme-today .water-lbl,
+body.theme-today .water-ct {
+  color: #7D9F85;
+}
+
+body.theme-today .water-bar-fill {
+  background: linear-gradient(90deg, #7D9F85, #9AB8A0);
+}
+
+/* Keep fasting color consistent */
+body.theme-fast .fast-ring-fg {
+  stroke: #8B6DB0;
+}
+
+/* Smooth theme transitions */
+.nb, .main-fab, .pbar-f, .btn-confirm {
+  transition: color 0.3s ease, background 0.3s ease, border-color 0.3s ease;
 }

@@ -552,6 +552,12 @@ function showPage(id,btn){
   },{once:true});
   incoming.scrollTop=0;
   _currentPage=id;
+  
+  // Apply page-specific color theme
+  document.body.classList.remove('theme-today','theme-progress','theme-workout','theme-fast','theme-coach');
+  const themeMap = { today:'theme-today', progress:'theme-progress', workout:'theme-workout', fast:'theme-fast', coach:'theme-coach' };
+  if(themeMap[id]) document.body.classList.add(themeMap[id]);
+  
   _updateFab(id);
   if(id==='progress'){renderProgressPage();buildCalendar();}
   if(id==='workout'){renderWorkoutPage();renderWorkoutFastBanner();}
@@ -3181,6 +3187,62 @@ function getDaysSinceMuscle(){
   return map;
 }
 
+// ── Ghost Sets: Get last performed sets for an exercise ──
+function getExerciseGhostSets(exerciseName) {
+  const hist = woHistory();
+  const normalizedName = exerciseName.toLowerCase().trim();
+  
+  // Search backwards through history for the most recent session containing this exercise
+  for (let i = hist.length - 1; i >= 0; i--) {
+    const session = hist[i];
+    if (!session.exercises) continue;
+    
+    const exercise = session.exercises.find(ex => {
+      const exName = (ex.swappedTo || ex.name || '').toLowerCase().trim();
+      return exName === normalizedName;
+    });
+    
+    if (exercise && exercise.sets && exercise.sets.length > 0) {
+      // Only return sets that were actually completed with data
+      const completedSets = exercise.sets.filter(s => s.done && s.weight && s.reps);
+      if (completedSets.length > 0) {
+        return {
+          date: session.date,
+          sets: completedSets.map(s => ({
+            weight: parseFloat(s.weight),
+            reps: parseInt(s.reps),
+            rpe: s.rpe || null
+          }))
+        };
+      }
+    }
+  }
+  return null; // No previous data found
+}
+
+// ── Get suggested weight/reps for next set based on previous set ──
+function getSuggestedNextSet(currentSets, ghostSets, setIndex) {
+  // If we have a completed previous set in this workout, use it
+  const lastCompletedSet = currentSets.slice(0, setIndex).reverse().find(s => s.done && s.weight && s.reps);
+  
+  if (lastCompletedSet) {
+    const weight = parseFloat(lastCompletedSet.weight);
+    const reps = parseInt(lastCompletedSet.reps);
+    // Suggest same weight, slightly fewer reps (fatigue) or same if first couple sets
+    const suggestedReps = setIndex < 2 ? reps : Math.max(reps - 1, Math.ceil(reps * 0.9));
+    return { weight, reps: suggestedReps, source: 'previous_set' };
+  }
+  
+  // Fall back to ghost data from last workout
+  if (ghostSets && ghostSets.sets && ghostSets.sets[setIndex]) {
+    const ghost = ghostSets.sets[setIndex];
+    return { weight: ghost.weight, reps: ghost.reps, source: 'last_workout' };
+  }
+  
+  // No suggestion available
+  return null;
+}
+
 // ── Render workout page (readiness) ──
 function renderWorkoutPage(){
   const morning=whoopSnaps[0];
@@ -3475,14 +3537,41 @@ function renderExercises(){
 
 function renderExerciseCard(ex,ei){
   const pbs=woPBs();
-  const pb=pbs[ex.name];
+  const exName = ex.swappedTo || ex.name;
+  const pb=pbs[exName];
   const pbLine=pb?`<div class="wo-pb-badge">PB: ${pb.weight}kg × ${pb.reps} → 1RM ${pb.oneRM}kg</div>`:'';
+
+  // Get ghost sets from last workout
+  const ghostData = getExerciseGhostSets(exName);
+  const ghostSets = ghostData?.sets || [];
 
   const setsHtml=ex.sets.map((s,si)=>{
     const oneRM=s.weight&&s.reps?epley(parseFloat(s.weight),parseInt(s.reps)):null;
+    
+    // Ghost set data for this specific set
+    const ghost = ghostSets[si];
+    let ghostText = '—';
+    let trendIndicator = '';
+    
+    if (ghost) {
+      ghostText = `${ghost.weight}×${ghost.reps}`;
+      // Show trend if current set is complete
+      if (s.weight && s.reps && s.done) {
+        const currentVolume = parseFloat(s.weight) * parseInt(s.reps);
+        const ghostVolume = ghost.weight * ghost.reps;
+        if (currentVolume > ghostVolume) {
+          trendIndicator = '<span class="wo-trend-up">↑</span>';
+        } else if (currentVolume < ghostVolume) {
+          trendIndicator = '<span class="wo-trend-down">↓</span>';
+        } else {
+          trendIndicator = '<span class="wo-trend-same">=</span>';
+        }
+      }
+    }
+    
     return `<div class="wo-set-row ${s.done?'done':''}">
       <div class="wo-set-num">${si+1}</div>
-      <div class="wo-set-ghost">${ex.suggestedWeight||ex.lastWeight||'—'}</div>
+      <div class="wo-set-ghost">${ghostText}${trendIndicator}</div>
       <input class="wo-set-inp" type="number" placeholder="kg" value="${s.weight}"
         oninput="setExerciseSet(${ei},${si},'weight',this.value)" min="0" step="0.5">
       <span class="wo-set-x">×</span>
@@ -3495,13 +3584,16 @@ function renderExerciseCard(ex,ei){
     </div>`;
   }).join('');
 
+  // Ghost data date indicator
+  const ghostDateHint = ghostData ? `<div class="wo-ghost-date">Last: ${new Date(ghostData.date).toLocaleDateString('en-GB',{day:'numeric',month:'short'})}</div>` : '';
+
   const altHtml=(ex.alternatives||[]).map(a=>`<button class="wo-alt-btn" onclick="swapExercise(${ei},'${a.replace(/'/g,"\\'")}')">↻ ${a}</button>`).join('');
 
   return `<div class="wo-ex-card ${ex.collapsed?'collapsed':''}" id="wo-ex-${ei}">
     <div class="wo-ex-card-hdr" onclick="toggleExCollapse(${ei})">
       <div class="wo-ex-card-icon">${ex.icon||getExIcon(ex.name)}</div>
       <div class="wo-ex-card-title">
-        <div class="wo-ex-card-name"><a href="https://www.youtube.com/results?search_query=${encodeURIComponent((ex.swappedTo||ex.name)+' proper form')}" target="_blank" rel="noopener" class="wo-ex-link" onclick="event.stopPropagation()">${ex.swappedTo||ex.name}</a></div>
+        <div class="wo-ex-card-name"><a href="https://www.youtube.com/results?search_query=${encodeURIComponent(exName+' proper form')}" target="_blank" rel="noopener" class="wo-ex-link" onclick="event.stopPropagation()">${exName}</a></div>
         <div class="wo-ex-card-meta">${ex.sets.length} sets · ${ex.reps||ex.sets[0]?.reps||'—'} reps · ${ex.rest}s rest</div>
       </div>
       <div class="wo-ex-card-check" id="wo-ex-check-${ei}">${ex.sets.every(s=>s.done)?'✅':'○'}</div>
@@ -3511,8 +3603,9 @@ function renderExerciseCard(ex,ei){
       ${ex.intensityTechnique&&ex.intensityTechnique!=='straight sets'?`<div class="wo-ex-intensity">⚡ ${ex.intensityTechnique}</div>`:''}
       ${pbLine}
       <div class="wo-sets-header">
-        <span>Set</span><span>Last</span><span>Weight</span><span></span><span>Reps</span><span>1RM</span><span></span>
+        <span>Set</span><span>Last${ghostDateHint?'':''}</span><span>Weight</span><span></span><span>Reps</span><span>1RM</span><span></span>
       </div>
+      ${ghostDateHint}
       ${setsHtml}
       <button class="wo-add-set-btn" onclick="addSet(${ei})">+ Add Set</button>
       ${altHtml?`<div class="wo-alts-row">${altHtml}</div>`:''}
@@ -3598,10 +3691,84 @@ function addSet(ei){
   renderExercises();
 }
 
+// ── Exercise cue lookup (MMC cues for common exercises) ──
+const EXERCISE_CUES = {
+  // Chest
+  'bench press': 'Drive through your chest, not arms. Squeeze pecs at the top, controlled descent.',
+  'incline dumbbell press': 'Feel the stretch at the bottom, drive elbows toward each other at top.',
+  'cable fly': 'Slight bend in elbows, squeeze chest together like hugging a tree.',
+  'dumbbell fly': 'Control the stretch, think about bringing your elbows together.',
+  'push-up': 'Protract shoulders at top, chest to floor, core tight throughout.',
+  'machine chest press': 'Push through your chest, not shoulders. Full range of motion.',
+  
+  // Back
+  'lat pulldown': 'Pull with your elbows, not hands. Drive elbows down and back.',
+  'cable row': 'Initiate by squeezing shoulder blades, then pull elbows back.',
+  'seated row': 'Chest up, squeeze back at contraction. No momentum.',
+  'barbell row': 'Hip hinge, pull to lower chest, squeeze lats at top.',
+  'dumbbell row': 'Drive elbow to hip, feel lat stretch at bottom.',
+  'pull-up': 'Lead with chest to bar, squeeze lats at top.',
+  'face pull': 'Pull to face level, externally rotate at end. Rear delts and traps.',
+  't-bar row': 'Drive elbows back, squeeze shoulder blades together.',
+  
+  // Shoulders
+  'overhead press': 'Core tight, press straight up, lockout overhead.',
+  'lateral raise': 'Lead with elbows, slight bend, control the descent.',
+  'front raise': 'Slight lean forward, raise to eye level, slow negative.',
+  'rear delt fly': 'Bent over, lead with elbows out, squeeze rear delts.',
+  'arnold press': 'Rotate as you press, feel all three delt heads.',
+  'shoulder press machine': 'Keep back against pad, press through delts.',
+  
+  // Arms
+  'bicep curl': 'Elbows pinned, squeeze at top, control the negative.',
+  'hammer curl': 'Neutral grip, focus on brachialis and forearm.',
+  'tricep pushdown': 'Elbows locked at sides, squeeze triceps at bottom.',
+  'skull crusher': 'Elbows fixed, lower to forehead, extend fully.',
+  'overhead tricep extension': 'Elbows by ears, full stretch at bottom.',
+  'preacher curl': 'Arm flat on pad, no swinging, peak contraction.',
+  'cable curl': 'Constant tension, squeeze bicep at top.',
+  
+  // Legs
+  'squat': 'Push floor away, knees track toes, chest up throughout.',
+  'leg press': 'Full depth, push through heels, control the descent.',
+  'romanian deadlift': 'Hinge at hips, feel hamstring stretch, squeeze glutes at top.',
+  'leg curl': 'Squeeze hamstrings, control both phases of the movement.',
+  'leg extension': 'Quad squeeze at top, don\'t lock aggressively.',
+  'lunge': 'Step forward, knee over ankle, drive through front heel.',
+  'bulgarian split squat': 'Lean slightly forward, feel the stretch, drive up through front leg.',
+  'hip thrust': 'Drive through heels, squeeze glutes at top, chin tucked.',
+  'calf raise': 'Full stretch at bottom, peak squeeze at top, pause.',
+  'deadlift': 'Push floor away, bar close to body, lockout with hips.',
+  'sumo deadlift': 'Knees out, chest up, drive through heels.',
+  'goblet squat': 'Elbows between knees, sit back, chest proud.',
+  
+  // Core
+  'plank': 'Squeeze glutes and core, straight line from head to heels.',
+  'dead bug': 'Lower back pressed to floor, opposite arm and leg extend.',
+  'hanging leg raise': 'Control the swing, curl pelvis up, feel lower abs.',
+  'cable crunch': 'Curl down with abs, not hip flexors, squeeze at bottom.',
+  'ab wheel': 'Core braced, roll out with control, don\'t collapse lower back.',
+  'russian twist': 'Lean back slightly, rotate from core not arms.',
+  'pallof press': 'Resist rotation, press straight out, brace core.',
+};
+
+function getExerciseCue(exerciseName) {
+  const normalized = exerciseName.toLowerCase().trim();
+  // Direct match
+  if (EXERCISE_CUES[normalized]) return EXERCISE_CUES[normalized];
+  // Partial match
+  for (const [key, cue] of Object.entries(EXERCISE_CUES)) {
+    if (normalized.includes(key) || key.includes(normalized)) return cue;
+  }
+  return 'Focus on the target muscle, control the movement, full range of motion.';
+}
+
 function swapExercise(ei,newName){
   if(!_woSession)return;
   _woSession.exercises[ei].swappedTo=newName;
   _woSession.exercises[ei].icon=getExIcon(newName);
+  // Update cue to match new exercise
+  _woSession.exercises[ei].cue = getExerciseCue(newName);
   woSave(WO_KEY,_woSession);
   renderExercises();
 }
@@ -3613,27 +3780,96 @@ function toggleCardioDone(){
   renderCardioSection();
 }
 
-// ── Rest timer ──
-function startRestTimer(ei,secs){
-  if(_woRestInt)clearInterval(_woRestInt);
-  let remaining=secs;
-  const el=gv(`wo-rest-timer-${ei}`);
-  if(!el)return;
-  el.style.display='flex';
-  const update=()=>{
-    el.textContent=`Rest: ${remaining}s`;
-    el.style.background=remaining<=10?'rgba(248,81,73,0.15)':'rgba(56,139,253,0.10)';
-    el.style.color=remaining<=10?'var(--red)':'var(--blue2)';
-    if(remaining<=0){
-      el.textContent='Go! 💪';clearInterval(_woRestInt);setTimeout(()=>{el.style.display='none';},1500);
-      try{const ac=new AudioContext();const o=ac.createOscillator();o.type='sine';o.frequency.value=880;o.connect(ac.destination);o.start();o.stop(ac.currentTime+0.15);}catch(e){}
-      if(navigator.vibrate)navigator.vibrate([200,100,200]);
+// ── Rest timer (enhanced) ──
+let _restTimerState = { ei: null, remaining: 0, total: 0 };
+
+function startRestTimer(ei, secs) {
+  if (_woRestInt) clearInterval(_woRestInt);
+  
+  _restTimerState = { ei, remaining: secs, total: secs };
+  
+  const el = gv(`wo-rest-timer-${ei}`);
+  if (!el) return;
+  
+  el.style.display = 'flex';
+  
+  const renderTimer = () => {
+    const mins = Math.floor(_restTimerState.remaining / 60);
+    const secsLeft = _restTimerState.remaining % 60;
+    const timeStr = mins > 0 
+      ? `${mins}:${secsLeft.toString().padStart(2, '0')}` 
+      : `${secsLeft}s`;
+    
+    const progress = (_restTimerState.total - _restTimerState.remaining) / _restTimerState.total;
+    const isUrgent = _restTimerState.remaining <= 10;
+    const isPulsing = _restTimerState.remaining <= 5 && _restTimerState.remaining > 0;
+    
+    el.innerHTML = `
+      <div class="rest-timer-content ${isUrgent ? 'urgent' : ''} ${isPulsing ? 'pulsing' : ''}">
+        <div class="rest-timer-bar" style="width: ${progress * 100}%"></div>
+        <div class="rest-timer-time">${timeStr}</div>
+        <div class="rest-timer-btns">
+          <button class="rest-timer-btn" onclick="addRestTime(30)">+30s</button>
+          <button class="rest-timer-btn skip" onclick="skipRestTimer()">Skip</button>
+        </div>
+      </div>
+    `;
+  };
+  
+  const update = () => {
+    if (_restTimerState.remaining <= 0) {
+      // Timer complete
+      el.innerHTML = `<div class="rest-timer-done">Go! 💪</div>`;
+      clearInterval(_woRestInt);
+      playRestChime();
+      if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+      setTimeout(() => { el.style.display = 'none'; }, 2000);
       return;
     }
-    remaining--;
+    renderTimer();
+    _restTimerState.remaining--;
   };
+  
   update();
-  _woRestInt=setInterval(update,1000);
+  _woRestInt = setInterval(update, 1000);
+}
+
+function addRestTime(secs) {
+  _restTimerState.remaining += secs;
+  _restTimerState.total += secs;
+}
+
+function skipRestTimer() {
+  if (_woRestInt) clearInterval(_woRestInt);
+  const el = gv(`wo-rest-timer-${_restTimerState.ei}`);
+  if (el) el.style.display = 'none';
+}
+
+function playRestChime() {
+  try {
+    const ac = new (window.AudioContext || window.webkitAudioContext)();
+    
+    // Pleasant two-tone chime (like a gentle notification)
+    const playTone = (freq, start, dur) => {
+      const o = ac.createOscillator();
+      const g = ac.createGain();
+      o.type = 'sine';
+      o.frequency.value = freq;
+      g.gain.setValueAtTime(0.3, ac.currentTime + start);
+      g.gain.exponentialRampToValueAtTime(0.01, ac.currentTime + start + dur);
+      o.connect(g);
+      g.connect(ac.destination);
+      o.start(ac.currentTime + start);
+      o.stop(ac.currentTime + start + dur);
+    };
+    
+    // Two ascending tones
+    playTone(523, 0, 0.15);     // C5
+    playTone(659, 0.12, 0.2);   // E5
+    playTone(784, 0.25, 0.25);  // G5
+  } catch (e) {
+    console.log('[reBorn] Audio not available');
+  }
 }
 
 // ── Finish workout ──
