@@ -1397,16 +1397,18 @@ input:focus, textarea:focus, select:focus { border-color: var(--blue); }
   margin-top: 10px;
   border-radius: 12px;
   overflow: hidden;
-  background: rgba(56, 139, 253, 0.08);
 }
 
 .rest-timer-content {
   position: relative;
-  padding: 12px 14px;
+  padding: 14px 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  background: rgba(56, 139, 253, 0.08);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .rest-timer-content.urgent {
@@ -1438,11 +1440,11 @@ input:focus, textarea:focus, select:focus { border-color: var(--blue); }
 
 .rest-timer-time {
   font-family: var(--font);
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 800;
   color: var(--blue2);
   z-index: 1;
-  min-width: 60px;
+  min-width: 70px;
 }
 
 .rest-timer-content.urgent .rest-timer-time {
@@ -1453,15 +1455,16 @@ input:focus, textarea:focus, select:focus { border-color: var(--blue); }
   display: flex;
   gap: 8px;
   z-index: 1;
+  margin-left: auto;
 }
 
 .rest-timer-btn {
   background: rgba(255, 255, 255, 0.9);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 6px 12px;
+  padding: 8px 14px;
   font-family: var(--font);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--text2);
   cursor: pointer;
@@ -1479,10 +1482,10 @@ input:focus, textarea:focus, select:focus { border-color: var(--blue); }
 }
 
 .rest-timer-done {
-  padding: 14px;
+  padding: 16px;
   text-align: center;
   font-family: var(--font);
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 800;
   color: #4ade80;
   background: rgba(74, 222, 128, 0.12);
