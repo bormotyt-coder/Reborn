@@ -840,45 +840,62 @@ function renderFoodList(){
   const el=gv('food-list');
   if(!meals.length){el.innerHTML='<div class="empty-st"><div class="empty-icon">🍽️</div><div>No meals logged yet.<br>Tap Log a Meal or Quick Add.</div></div>';return;}
   el.innerHTML='';
-  // Group by time of day
-  const groups=[
-    {label:'Breakfast',entries:[]},
-    {label:'Lunch',entries:[]},
-    {label:'Snacks',entries:[]},
-    {label:'Dinner',entries:[]},
-    {label:'Uncategorised',entries:[]},
-  ];
+  // Group by category (with fallback to time-based for legacy meals)
+  const categoryConfig = {
+    'breakfast':    { label: '🌅 Breakfast', order: 0 },
+    'lunch':        { label: '☀️ Lunch', order: 1 },
+    'snack':        { label: '🍿 Snacks', order: 2 },
+    'dinner':       { label: '🌙 Dinner', order: 3 },
+    'pre-workout':  { label: '💪 Pre-workout', order: 4 },
+    'post-workout': { label: '🏋️ Post-workout', order: 5 },
+  };
+  
+  const groups = {};
   meals.forEach((m,i)=>{
-    let g=4; // Uncategorised
-    if(m.loggedAt){
-      const d=new Date(m.loggedAt);const mins=d.getHours()*60+d.getMinutes();
-      if(mins<630)g=0;           // <10:30am → Breakfast
-      else if(mins<870)g=1;      // <2:30pm  → Lunch
-      else if(mins<1080)g=2;     // <6pm     → Snacks
-      else g=3;                  // ≥6pm     → Dinner
+    // Use explicit category if available, otherwise infer from time
+    let cat = m.category;
+    if (!cat && m.loggedAt) {
+      const d = new Date(m.loggedAt);
+      const mins = d.getHours() * 60 + d.getMinutes();
+      if (mins < 630) cat = 'breakfast';
+      else if (mins < 870) cat = 'lunch';
+      else if (mins < 1080) cat = 'snack';
+      else cat = 'dinner';
     }
-    groups[g].entries.push({m,i});
+    if (!cat) cat = 'snack'; // fallback
+    
+    if (!groups[cat]) groups[cat] = [];
+    groups[cat].push({m, i});
   });
-  groups.forEach(({label,entries})=>{
-    if(!entries.length)return;
-    const groupCal=entries.reduce((s,{m})=>s+Math.round(m.calories),0);
-    const hdr=document.createElement('div');
-    hdr.className='meal-group-lbl';
-    hdr.innerHTML=`<span>${label}</span><span>${groupCal} kcal</span>`;
-    el.appendChild(hdr);
-    entries.forEach(({m,i})=>{
-      const div=document.createElement('div');div.className='fi';
-      const _ts=_mealThumbs.get(m.loggedAt);
-      const th=_ts?`<img class="fi-thumb" src="${_ts}" style="width:46px;height:46px;border-radius:11px;object-fit:cover;flex-shrink:0"/>`:`<div class="fi-thumb">${m.emoji||'🍽️'}</div>`;
-      const pPct=Math.min(Math.round(m.protein/TARGETS.p*100),100);
-      const cPct=Math.min(Math.round(m.carbs/TARGETS.c*100),100);
-      const fPct=Math.min(Math.round(m.fat/TARGETS.f*100),100);
-      div.innerHTML=`<div class="fi-top">${th}<div class="fi-info"><div class="fi-name">${m.name}</div><div class="fi-tags"><span class="ft ftcal">${Math.round(m.calories)} kcal</span><span class="ft ftp">${Math.round(m.protein)}g P</span><span class="ft ftc">${Math.round(m.carbs)}g C</span><span class="ft ftf">${Math.round(m.fat)}g F</span></div></div><button class="fi-del">✕</button></div><div class="fi-bars"><div class="fi-bar-row"><span class="fi-bar-lbl">P</span><div class="fi-bar-track"><div class="fi-bar-fill" style="width:${pPct}%;background:var(--pc)"></div></div><span class="fi-bar-val" style="color:var(--pc)">${Math.round(m.protein)}g</span></div><div class="fi-bar-row"><span class="fi-bar-lbl">C</span><div class="fi-bar-track"><div class="fi-bar-fill" style="width:${cPct}%;background:var(--cc)"></div></div><span class="fi-bar-val" style="color:var(--cc)">${Math.round(m.carbs)}g</span></div><div class="fi-bar-row"><span class="fi-bar-lbl">F</span><div class="fi-bar-track"><div class="fi-bar-fill" style="width:${fPct}%;background:var(--fc)"></div></div><span class="fi-bar-val" style="color:var(--fc)">${Math.round(m.fat)}g</span></div></div>`;
-      div.querySelector('.fi-del').addEventListener('click',(e)=>{e.stopPropagation();deleteMeal(i);});
-      div.addEventListener('click',()=>openMealDetail(i));
-      el.appendChild(div);
+  
+  // Sort categories by order and render
+  Object.keys(groups)
+    .sort((a, b) => (categoryConfig[a]?.order || 99) - (categoryConfig[b]?.order || 99))
+    .forEach(cat => {
+      const entries = groups[cat];
+      if (!entries.length) return;
+      
+      const groupCal = entries.reduce((s, {m}) => s + Math.round(m.calories), 0);
+      const label = categoryConfig[cat]?.label || cat;
+      const hdr = document.createElement('div');
+      hdr.className = 'meal-group-lbl';
+      hdr.innerHTML = `<span>${label}</span><span>${groupCal} kcal</span>`;
+      el.appendChild(hdr);
+      
+      entries.forEach(({m, i}) => {
+        const div = document.createElement('div');
+        div.className = 'fi';
+        const _ts = _mealThumbs.get(m.loggedAt);
+        const th = _ts ? `<img class="fi-thumb" src="${_ts}" style="width:46px;height:46px;border-radius:11px;object-fit:cover;flex-shrink:0"/>` : `<div class="fi-thumb">${m.emoji||'🍽️'}</div>`;
+        const pPct = Math.min(Math.round(m.protein/TARGETS.p*100), 100);
+        const cPct = Math.min(Math.round(m.carbs/TARGETS.c*100), 100);
+        const fPct = Math.min(Math.round(m.fat/TARGETS.f*100), 100);
+        div.innerHTML = `<div class="fi-top">${th}<div class="fi-info"><div class="fi-name">${m.name}</div><div class="fi-tags"><span class="ft ftcal">${Math.round(m.calories)} kcal</span><span class="ft ftp">${Math.round(m.protein)}g P</span><span class="ft ftc">${Math.round(m.carbs)}g C</span><span class="ft ftf">${Math.round(m.fat)}g F</span></div></div><button class="fi-del">✕</button></div><div class="fi-bars"><div class="fi-bar-row"><span class="fi-bar-lbl">P</span><div class="fi-bar-track"><div class="fi-bar-fill" style="width:${pPct}%;background:var(--pc)"></div></div><span class="fi-bar-val" style="color:var(--pc)">${Math.round(m.protein)}g</span></div><div class="fi-bar-row"><span class="fi-bar-lbl">C</span><div class="fi-bar-track"><div class="fi-bar-fill" style="width:${cPct}%;background:var(--cc)"></div></div><span class="fi-bar-val" style="color:var(--cc)">${Math.round(m.carbs)}g</span></div><div class="fi-bar-row"><span class="fi-bar-lbl">F</span><div class="fi-bar-track"><div class="fi-bar-fill" style="width:${fPct}%;background:var(--fc)"></div></div><span class="fi-bar-val" style="color:var(--fc)">${Math.round(m.fat)}g</span></div></div>`;
+        div.querySelector('.fi-del').addEventListener('click', (e) => { e.stopPropagation(); deleteMeal(i); });
+        div.addEventListener('click', () => openMealDetail(i));
+        el.appendChild(div);
+      });
     });
-  });
 }
 function deleteMeal(i){meals.splice(i,1);save(`${KEY}_meals_${todayKey()}`,meals);renderAll();}
 
@@ -1024,8 +1041,11 @@ Give a 2-3 sentence honest assessment: how well this meal fits his cut goals, wh
 // LOG MODAL
 function openLogModal(){resetLogModal();gv('log-modal').classList.add('open');}
 function closeLogModal(){gv('log-modal').classList.remove('open');resetLogModal();}
+
+let _selectedMealCategory = null;
+
 function resetLogModal(){
-  mealB64=null;ingredients=[];
+  mealB64=null;ingredients=[];_selectedMealCategory=null;
   gv('preview').style.display='none';gv('ph-ph').style.display='block';
   gv('photo-zone').classList.remove('has-img');
   gv('meal-desc').value='';gv('ing-results').style.display='none';const li=gv('log-impact');if(li)li.style.display='none';
@@ -1033,6 +1053,40 @@ function resetLogModal(){
   gv('btn-analyze').disabled=false;gv('meal-loading').classList.remove('show');
   gv('file-meal').value='';
   const aif=gv('add-ing-form');if(aif)aif.style.display='none';
+  // Hide category picker
+  const catPicker = gv('meal-cat-picker');
+  if(catPicker) catPicker.style.display = 'none';
+}
+
+function getDefaultMealCategory() {
+  const now = new Date();
+  const mins = now.getHours() * 60 + now.getMinutes();
+  if (mins < 630) return 'breakfast';       // before 10:30am
+  if (mins < 870) return 'lunch';            // before 2:30pm
+  if (mins < 1020) return 'snack';           // before 5pm
+  return 'dinner';                            // 5pm onwards
+}
+
+function showMealCategoryPicker() {
+  const picker = gv('meal-cat-picker');
+  if (!picker) return;
+  picker.style.display = 'block';
+  
+  // Set default category based on time
+  const defaultCat = getDefaultMealCategory();
+  selectMealCategory(defaultCat);
+  
+  // Add click handlers to buttons
+  document.querySelectorAll('.meal-cat-btn').forEach(btn => {
+    btn.onclick = () => selectMealCategory(btn.dataset.cat);
+  });
+}
+
+function selectMealCategory(cat) {
+  _selectedMealCategory = cat;
+  document.querySelectorAll('.meal-cat-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.cat === cat);
+  });
 }
 function handleMealPhoto(e){
   const file=e.target.files[0];if(!file)return;
@@ -1092,6 +1146,7 @@ Identify 2-8 ingredients. Include fibre, sugar, sodium where known (use 0 if unk
     if(parsed.confidence_tip&&conf!=='high'){te.textContent='💡 '+parsed.confidence_tip;te.classList.add('show');}
     else te.classList.remove('show');
     renderIngredients();gv('ing-results').style.display='block';
+    showMealCategoryPicker();
     btn.textContent='RE-ANALYSE';
   }catch(err){
     alert(_apiErrMsg(err));
@@ -1370,6 +1425,7 @@ function confirmMeal(){
       fat:Math.round(i.fat*i.portion_multiplier*10)/10
     })),
     loggedAt:Date.now(),
+    category: _selectedMealCategory || getDefaultMealCategory(),
     thumb:null
   };
   meals.push(entry);
@@ -3138,7 +3194,65 @@ function woSave(key,val){localStorage.setItem(key,JSON.stringify(val));}
 function woHistory(){return woLoad(WO_HIST_KEY,[]);}
 function woPBs(){return woLoad(WO_PBS_KEY,{});}
 function woNotes(){return woLoad(WO_NOTES_KEY,{});}
+function woCoreHistory(){return woLoad(`${KEY}_coreHistory`,[]);}
 function epley(w,r){return r===1?w:Math.round(w*(1+r/30));}  // Epley 1RM formula
+
+// ── Core Exercise Auto-Include ──
+const CORE_EXERCISES = [
+  { name: 'Plank', icon: '🧘', sets: 3, reps: '30-45s', rest: 30, cue: 'Keep your body in a straight line from head to heels. Engage your core by pulling your belly button toward your spine.' },
+  { name: 'Dead Bug', icon: '🪲', sets: 3, reps: '10 each side', rest: 30, cue: 'Press your lower back into the floor. Move opposite arm and leg while maintaining core tension.' },
+  { name: 'Bird Dog', icon: '🐕', sets: 3, reps: '10 each side', rest: 30, cue: 'Extend opposite arm and leg while keeping hips square to the ground. Pause at the top.' },
+  { name: 'Hanging Leg Raise', icon: '🦵', sets: 3, reps: '10-12', rest: 45, cue: 'Control the movement — no swinging. Raise legs to parallel or higher, lower slowly.' },
+  { name: 'Cable Crunch', icon: '🔻', sets: 3, reps: '12-15', rest: 45, cue: 'Curl your spine, bringing your elbows toward your knees. Squeeze at the bottom.' },
+  { name: 'Ab Wheel Rollout', icon: '🛞', sets: 3, reps: '8-10', rest: 45, cue: 'Keep core braced, roll out as far as you can control, pull back using your abs.' },
+  { name: 'Pallof Press', icon: '🎯', sets: 3, reps: '10 each side', rest: 30, cue: 'Press straight out, resist rotation. Feel your obliques working to keep you stable.' },
+  { name: 'Russian Twist', icon: '🔄', sets: 3, reps: '15 each side', rest: 30, cue: 'Lean back slightly, rotate from your core not your arms. Keep feet elevated for extra challenge.' },
+  { name: 'Hollow Body Hold', icon: '🌙', sets: 3, reps: '20-30s', rest: 30, cue: 'Press lower back into floor, arms overhead, legs extended. Create a banana shape.' },
+  { name: 'Side Plank', icon: '📐', sets: 3, reps: '20-30s each', rest: 30, cue: 'Stack your feet or stagger them. Keep your body in a straight line, hips lifted.' },
+];
+
+function getNextCoreExercise() {
+  const history = woCoreHistory();
+  const recent = history.slice(-3); // Last 3 core exercises used
+  
+  // Filter out recently used exercises
+  let available = CORE_EXERCISES.filter(ex => !recent.includes(ex.name));
+  
+  // If all have been used recently, just pick from all
+  if (available.length === 0) {
+    available = CORE_EXERCISES;
+  }
+  
+  // Pick a random one from available
+  const selected = available[Math.floor(Math.random() * available.length)];
+  
+  // Update history (keep last 7 days worth)
+  history.push(selected.name);
+  if (history.length > 7) history.shift();
+  woSave(`${KEY}_coreHistory`, history);
+  
+  return { ...selected, muscle_group: 'Core', isAutoCore: true };
+}
+
+function appendCoreExercise(plan) {
+  if (!plan || !plan.exercises) return plan;
+  
+  // Check if there's already a core exercise in the plan
+  const hasCoreExercise = plan.exercises.some(ex => {
+    const name = ex.name.toLowerCase();
+    return name.includes('plank') || name.includes('crunch') || name.includes('ab') || 
+           name.includes('core') || name.includes('dead bug') || name.includes('bird dog') ||
+           name.includes('leg raise') || name.includes('russian twist') || name.includes('pallof');
+  });
+  
+  // If no core exercise, add one
+  if (!hasCoreExercise) {
+    const coreEx = getNextCoreExercise();
+    plan.exercises.push(coreEx);
+  }
+  
+  return plan;
+}
 
 // ── Exercise Notes ──
 function getExerciseNote(exerciseName) {
@@ -3500,6 +3614,9 @@ Generate a workout split for today. Return ONLY valid JSON.`;
     if(!_woPlan || !_woPlan.exercises){
       throw new Error('Could not parse workout plan');
     }
+    
+    // Auto-append a core exercise if none present
+    _woPlan = appendCoreExercise(_woPlan);
     
     renderWorkoutPreview();
   }catch(e){

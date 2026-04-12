@@ -579,6 +579,18 @@
         <div id="li-bars" style="display:flex;flex-direction:column;gap:7px;margin-bottom:10px"></div>
         <div id="li-verdict" style="font-size:12px;color:var(--text2);line-height:1.7;padding:9px 12px;background:var(--bg);border-radius:10px"></div>
       </div>
+      <!-- Meal Category Picker -->
+      <div class="meal-cat-picker" id="meal-cat-picker" style="display:none">
+        <label class="flbl" style="margin-bottom:8px">Meal Category</label>
+        <div class="meal-cat-btns" id="meal-cat-btns">
+          <button class="meal-cat-btn" data-cat="breakfast">🌅 Breakfast</button>
+          <button class="meal-cat-btn" data-cat="lunch">☀️ Lunch</button>
+          <button class="meal-cat-btn" data-cat="dinner">🌙 Dinner</button>
+          <button class="meal-cat-btn" data-cat="snack">🍿 Snack</button>
+          <button class="meal-cat-btn" data-cat="pre-workout">💪 Pre-workout</button>
+          <button class="meal-cat-btn" data-cat="post-workout">🏋️ Post-workout</button>
+        </div>
+      </div>
       <button class="btn-confirm" onclick="confirmMeal()">+ ADD TO TODAY'S LOG</button>
     </div>
 

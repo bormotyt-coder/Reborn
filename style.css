@@ -507,6 +507,40 @@ input:focus, textarea:focus, select:focus { border-color: var(--blue); }
 .btn-s { width: 100%; background: none; border: 1px solid var(--border); border-radius: var(--r-sm); padding: 14px; font-size: 13px; color: var(--muted); cursor: pointer; margin-top: 8px; }
 .btn-confirm { width: 100%; background: rgba(74,124,126,0.06); border: 1px solid rgba(74,124,126,0.14); border-radius: var(--r-sm); padding: 14px; font-family: var(--font); font-size: 17px; font-weight: 700; color: var(--blue); cursor: pointer; margin-top: 10px; }
 
+/* ── Meal Category Picker ── */
+.meal-cat-picker {
+  margin: 12px 0;
+  padding: 12px;
+  background: var(--bg);
+  border-radius: 14px;
+}
+.meal-cat-btns {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.meal-cat-btn {
+  background: var(--card);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 8px;
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text2);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: center;
+}
+.meal-cat-btn:hover {
+  border-color: var(--blue);
+}
+.meal-cat-btn.active {
+  background: rgba(74,124,126,0.08);
+  border-color: var(--blue);
+  color: var(--blue);
+}
+
 .photo-zone { border: 2px dashed var(--bg3); border-radius: var(--r-md); padding: 22px; text-align: center; cursor: pointer; transition: border-color .2s; margin-bottom: 10px; background: var(--bg); }
 .photo-zone.has-img, .photo-zone:hover { border-color: var(--blue); }
 .photo-zone img { max-width: 100%; max-height: 140px; border-radius: 12px; object-fit: cover; }
