@@ -1127,6 +1127,23 @@ input:focus, textarea:focus, select:focus { border-color: var(--blue); }
 .wo-last-muscles { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
 .wo-summary-modal { position: fixed; inset: 0; background: rgba(28,31,38,0.25); backdrop-filter: blur(6px); z-index: 160; display: flex; align-items: center; justify-content: center; }
 .wo-sum-inner { background: #fff; border-radius: var(--r-xl); padding: 24px 20px; width: 92%; max-width: 380px; max-height: 85vh; overflow-y: auto; box-shadow: var(--sh-lg); }
+
+/* ── Strain Rating Modal ── */
+.wo-strain-modal { position: fixed; inset: 0; background: rgba(28,31,38,0.25); backdrop-filter: blur(6px); z-index: 165; display: flex; align-items: center; justify-content: center; }
+.wo-strain-inner { background: #fff; border-radius: var(--r-xl); padding: 28px 24px; width: 92%; max-width: 360px; box-shadow: var(--sh-lg); text-align: center; }
+.wo-strain-title { font-family: var(--font-display); font-size: 20px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+.wo-strain-sub { font-size: 13px; color: var(--muted); margin-bottom: 20px; }
+.wo-strain-value { font-family: var(--font-display); font-size: 56px; font-weight: 800; color: var(--blue); margin-bottom: 12px; }
+.wo-strain-slider { width: 100%; height: 8px; -webkit-appearance: none; appearance: none; background: linear-gradient(to right, #22c55e 0%, #eab308 45%, #f97316 70%, #ef4444 100%); border-radius: 4px; outline: none; margin-bottom: 8px; }
+.wo-strain-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 24px; height: 24px; background: #fff; border: 3px solid var(--blue); border-radius: 50%; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.15); }
+.wo-strain-labels { display: flex; justify-content: space-between; font-size: 10px; color: var(--muted); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.03em; }
+.wo-strain-zones { display: flex; justify-content: space-between; gap: 4px; margin-bottom: 20px; }
+.wo-strain-zones .zone { flex: 1; padding: 6px 4px; border-radius: 6px; font-size: 11px; font-weight: 700; }
+.wo-strain-zones .z1 { background: rgba(34,197,94,0.12); color: #22c55e; }
+.wo-strain-zones .z2 { background: rgba(234,179,8,0.12); color: #ca8a04; }
+.wo-strain-zones .z3 { background: rgba(249,115,22,0.12); color: #ea580c; }
+.wo-strain-zones .z4 { background: rgba(239,68,68,0.12); color: #ef4444; }
+.wo-strain-save { width: 100%; background: var(--blue); border: none; border-radius: 14px; padding: 14px; font-family: var(--font); font-size: 16px; font-weight: 700; color: #fff; cursor: pointer; }
 .wo-sum-title { font-family: var(--font-display); font-size: 24px; font-weight: 700; color: var(--text); text-align: center; margin-bottom: 4px; }
 .wo-sum-split { font-size: 14px; color: var(--muted); text-align: center; margin-bottom: 16px; }
 .wo-sum-stats { display: flex; justify-content: space-around; margin-bottom: 16px; }
@@ -1658,6 +1675,78 @@ input:focus, textarea:focus, select:focus { border-color: var(--blue); }
   font-size: 22px;
   font-weight: 800;
   color: #4ade80;
+
+/* ── Effort Rating (Weight/Rep Suggestions) ── */
+.wo-effort-rating {
+  width: 100%;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255,255,255,0.15);
+}
+.wo-effort-label {
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.7);
+  text-align: center;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.wo-effort-btns {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+.wo-effort-btn {
+  flex: 1;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: none;
+}
+.wo-effort-btn.easy {
+  background: rgba(74, 222, 128, 0.15);
+  color: #4ade80;
+}
+.wo-effort-btn.good {
+  background: rgba(96, 165, 250, 0.15);
+  color: #60a5fa;
+}
+.wo-effort-btn.hard {
+  background: rgba(251, 146, 60, 0.15);
+  color: #fb923c;
+}
+.wo-effort-btn:active {
+  transform: scale(0.95);
+}
+
+/* ── Suggestion Toast ── */
+.wo-suggestion-toast {
+  position: fixed;
+  bottom: 100px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: var(--text);
+  color: var(--bg);
+  padding: 12px 20px;
+  border-radius: 12px;
+  font-family: var(--font);
+  font-size: 15px;
+  font-weight: 700;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+  opacity: 0;
+  transition: all 0.3s ease;
+  z-index: 9999;
+}
+.wo-suggestion-toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
   background: rgba(74, 222, 128, 0.12);
   animation: rest-done-pop 0.3s ease-out;
 }

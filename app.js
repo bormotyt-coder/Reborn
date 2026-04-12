@@ -3366,6 +3366,24 @@ function getDaysSinceMuscle(){
   return map;
 }
 
+// ── Get exercises done in last N hours (for avoiding repeats) ──
+function getRecentExercises(hoursAgo = 48) {
+  const hist = woHistory();
+  const cutoff = Date.now() - (hoursAgo * 60 * 60 * 1000);
+  const exercises = new Set();
+  
+  for (let i = hist.length - 1; i >= 0; i--) {
+    const session = hist[i];
+    const sessionDate = new Date(session.date).getTime();
+    if (sessionDate < cutoff) break;
+    (session.exercises || []).forEach(ex => {
+      const name = ex.swappedTo || ex.name;
+      if (name) exercises.add(name);
+    });
+  }
+  return Array.from(exercises);
+}
+
 // ── Ghost Sets: Get last performed sets for an exercise ──
 function getExerciseGhostSets(exerciseName) {
   const hist = woHistory();
@@ -3529,10 +3547,14 @@ async function generateWorkout(){
   const recentSessions=getRecentSessions(7);
   const pbs=woPBs();
   const daysAgo=getDaysSinceMuscle();
+  const recentExercises = getRecentExercises(48);
 
   // Build context string
   const histSummary=recentSessions.map(s=>`${new Date(s.date).toLocaleDateString('en-US',{weekday:'short'})}: ${s.splitName} (${(s.muscleGroups||[]).join(', ')})`).join('\n');
   const pbSummary=Object.entries(pbs).slice(0,20).map(([ex,pb])=>`${ex}: ${pb.weight}kg x${pb.reps} (1RM ~${pb.oneRM}kg)`).join('\n');
+  const avoidExercises = recentExercises.length > 0 
+    ? `\nEXERCISES TO AVOID (done in last 48h — pick alternatives):\n${recentExercises.join(', ')}`
+    : '';
 
   const woSystem=`You are an evidence-based strength & hypertrophy coach for a 26-year-old male, 89.1kg, 173cm, 25.1% body fat, goal is fat loss while preserving lean mass (target 64kg lean mass). He trains FASTED in the morning before his first meal. He's an intermediate lifter — past the beginner phase but still making solid progress. Talk to him like a knowledgeable training partner, not a textbook.
 
@@ -3598,6 +3620,7 @@ ${histSummary||'No recent sessions logged'}
 
 DAYS SINCE MUSCLE GROUP TRAINED:
 ${Object.entries(daysAgo).map(([m,d])=>`${m}: ${d} days ago`).join(', ')||'No history'}
+${avoidExercises}
 
 PERSONAL BESTS:
 ${pbSummary||'No PBs yet — first session'}
@@ -3859,6 +3882,11 @@ function toggleSetDone(ei,si){
       pbs[name]={weight:parseFloat(set.weight),reps:parseInt(set.reps),oneRM,date:new Date().toISOString()};
       woSave(WO_PBS_KEY,pbs);
     }
+    // Show effort rating for next set suggestion
+    const nextSetIndex = si + 1;
+    if (nextSetIndex < ex.sets.length && !ex.sets[nextSetIndex].done) {
+      _currentSuggestion = { ei, nextSetIndex, baseWeight: parseFloat(set.weight), baseReps: parseInt(set.reps) };
+    }
   }
   woSave(WO_KEY,_woSession);
   // Re-render just the check icon
@@ -3869,8 +3897,104 @@ function toggleSetDone(ei,si){
   // Start rest timer AFTER render (so the element exists)
   if(set.done){
     const rest=_woSession.exercises[ei].rest||90;
-    setTimeout(()=>startRestTimer(ei,rest), 50);
+    setTimeout(()=>{
+      startRestTimer(ei,rest);
+      // Add effort rating to rest timer after it renders
+      if(_currentSuggestion && _currentSuggestion.ei === ei){
+        setTimeout(()=>showEffortRating(ei), 100);
+      }
+    }, 50);
   }
+}
+
+// ── Weight/Rep Suggestion System ──
+let _currentSuggestion = null;
+
+function showEffortRating(ei) {
+  const timerEl = gv(`wo-rest-timer-${ei}`);
+  if (!timerEl || timerEl.style.display === 'none') return;
+  
+  const existing = timerEl.querySelector('.wo-effort-rating');
+  if (existing) return;
+  
+  const ratingHtml = `
+    <div class="wo-effort-rating">
+      <div class="wo-effort-label">How was that set?</div>
+      <div class="wo-effort-btns">
+        <button class="wo-effort-btn easy" onclick="applyEffortSuggestion('easy')">😊 Easy</button>
+        <button class="wo-effort-btn good" onclick="applyEffortSuggestion('good')">💪 Good</button>
+        <button class="wo-effort-btn hard" onclick="applyEffortSuggestion('hard')">🔥 Hard</button>
+      </div>
+    </div>
+  `;
+  timerEl.insertAdjacentHTML('beforeend', ratingHtml);
+}
+
+function applyEffortSuggestion(effort) {
+  if (!_currentSuggestion || !_woSession) return;
+  
+  const { ei, nextSetIndex, baseWeight, baseReps } = _currentSuggestion;
+  const ex = _woSession.exercises[ei];
+  const nextSet = ex.sets[nextSetIndex];
+  
+  if (!nextSet || nextSet.done) { _currentSuggestion = null; return; }
+  
+  let suggestedWeight, suggestedReps;
+  
+  switch (effort) {
+    case 'easy':
+      // Increase weight by 2.5-5kg
+      suggestedWeight = baseWeight + (baseWeight >= 50 ? 5 : 2.5);
+      suggestedReps = baseReps;
+      break;
+    case 'good':
+      // Keep same
+      suggestedWeight = baseWeight;
+      suggestedReps = baseReps;
+      break;
+    case 'hard':
+      // Keep weight, maybe reduce reps by 1
+      suggestedWeight = baseWeight;
+      suggestedReps = Math.max(baseReps - 1, 1);
+      break;
+    default:
+      suggestedWeight = baseWeight;
+      suggestedReps = baseReps;
+  }
+  
+  // Apply to next set
+  nextSet.weight = suggestedWeight;
+  nextSet.reps = suggestedReps;
+  woSave(WO_KEY, _woSession);
+  
+  // Remove effort rating
+  const timerEl = gv(`wo-rest-timer-${ei}`);
+  if (timerEl) {
+    const ratingEl = timerEl.querySelector('.wo-effort-rating');
+    if (ratingEl) ratingEl.remove();
+  }
+  
+  // Re-render and show toast
+  renderExercises();
+  showSuggestionToast(suggestedWeight, suggestedReps, effort);
+  _currentSuggestion = null;
+}
+
+function showSuggestionToast(weight, reps, effort) {
+  const existing = document.querySelector('.wo-suggestion-toast');
+  if (existing) existing.remove();
+  
+  const emoji = effort === 'easy' ? '📈' : effort === 'hard' ? '📉' : '➡️';
+  const toast = document.createElement('div');
+  toast.className = 'wo-suggestion-toast';
+  toast.innerHTML = `${emoji} Next set: ${weight}kg × ${reps}`;
+  document.body.appendChild(toast);
+  
+  setTimeout(() => toast.classList.add('show'), 10);
+  setTimeout(() => {
+    toast.classList.remove('show');
+    setTimeout(() => toast.remove(), 300);
+  }, 2000);
 }
 
 function toggleExCollapse(ei){
@@ -4204,16 +4328,76 @@ async function finishWorkout(){
   });
   _woSession.totalVolume=Math.round(vol);
 
-  // Save to history
-  const hist=woHistory();
-  hist.push(_woSession);
-  woSave(WO_HIST_KEY,hist);
-  localStorage.removeItem(WO_KEY);
+  // Show strain rating BEFORE saving to history
+  showStrainRating(_woSession);
+}
 
+function showStrainRating(session) {
+  // Estimate strain based on duration and volume (can be overridden by user)
+  const estStrain = Math.min(21, Math.max(5, Math.round(session.duration / 5 + (session.totalVolume / 5000))));
+  
+  const html = `<div class="wo-strain-modal" id="wo-strain-modal">
+    <div class="wo-strain-inner">
+      <div class="wo-strain-title">Rate Your Workout Strain</div>
+      <div class="wo-strain-sub">How hard did this feel overall? (WHOOP scale 1-21)</div>
+      <div class="wo-strain-value" id="strain-value">${estStrain}</div>
+      <input type="range" class="wo-strain-slider" id="strain-slider" min="1" max="21" value="${estStrain}" 
+        oninput="document.getElementById('strain-value').textContent=this.value">
+      <div class="wo-strain-labels">
+        <span>Light</span><span>Moderate</span><span>Hard</span><span>All Out</span>
+      </div>
+      <div class="wo-strain-zones">
+        <span class="zone z1">1-9</span>
+        <span class="zone z2">10-13</span>
+        <span class="zone z3">14-17</span>
+        <span class="zone z4">18-21</span>
+      </div>
+      <button class="wo-strain-save" onclick="saveStrainAndFinish()">Save & Complete</button>
+    </div>
+  </div>`;
+  
+  const wrap = document.createElement('div');
+  wrap.innerHTML = html;
+  document.body.appendChild(wrap.firstElementChild);
+  
+  // Store session temporarily
+  window._pendingSession = session;
+}
+
+function saveStrainAndFinish() {
+  const session = window._pendingSession;
+  if (!session) return;
+  
+  const strain = parseInt(document.getElementById('strain-slider')?.value) || 10;
+  session.strain = strain;
+  
+  // Save workout strain to WHOOP logs
+  const whoopLogsKey = `${KEY}_whoopLogs_${todayKey()}`;
+  const logs = load(whoopLogsKey, { recovery: whoopSnaps[0]?.recovery || null, workouts: [] });
+  logs.workouts.push({
+    time: new Date().toISOString(),
+    type: session.splitName,
+    strain: strain,
+    duration: session.duration,
+    volume: session.totalVolume
+  });
+  save(whoopLogsKey, logs);
+  
+  // Save to history
+  const hist = woHistory();
+  hist.push(session);
+  woSave(WO_HIST_KEY, hist);
+  localStorage.removeItem(WO_KEY);
+  
+  // Remove strain modal
+  const strainModal = gv('wo-strain-modal');
+  if (strainModal) strainModal.remove();
+  
   // Show summary
-  showWorkoutSummary(_woSession);
-  _woSession=null;
-  _woPlan=null;
+  showWorkoutSummary(session);
+  _woSession = null;
+  _woPlan = null;
+  window._pendingSession = null;
 }
 
 function showWorkoutSummary(session){
@@ -4226,6 +4410,8 @@ function showWorkoutSummary(session){
     return `<div class="wo-sum-pb">🏆 ${name}: ${pb.weight}kg × ${pb.reps} → 1RM <strong>${pb.oneRM}kg</strong></div>`;
   }).filter(Boolean).join('');
 
+  const strainColor = session.strain >= 18 ? '#ef4444' : session.strain >= 14 ? '#f97316' : session.strain >= 10 ? '#eab308' : '#22c55e';
+
   const html=`<div class="wo-summary-modal" id="wo-sum-modal">
     <div class="wo-sum-inner">
       <div class="wo-sum-title">Workout Complete 💪</div>
@@ -4233,7 +4419,7 @@ function showWorkoutSummary(session){
       <div class="wo-sum-stats">
         <div class="wo-ss"><div class="wo-ss-v">${session.duration}</div><div class="wo-ss-l">minutes</div></div>
         <div class="wo-ss"><div class="wo-ss-v">${session.totalVolume?.toLocaleString()}</div><div class="wo-ss-l">kg volume</div></div>
-        <div class="wo-ss"><div class="wo-ss-v">${session.exercises.length}</div><div class="wo-ss-l">exercises</div></div>
+        <div class="wo-ss"><div class="wo-ss-v" style="color:${strainColor}">${session.strain || '—'}</div><div class="wo-ss-l">strain</div></div>
       </div>
       <div class="wo-sum-muscles">${(session.muscleGroups||[]).map(m=>`<span class="wo-muscle-chip">${m}</span>`).join('')}</div>
       ${pbHtml?`<div class="wo-sum-pbs">${pbHtml}</div>`:''}
