@@ -3119,6 +3119,7 @@ initStykuScroll();
 const WO_KEY      = `${KEY}_workout`;       // active/in-progress session
 const WO_HIST_KEY = `${KEY}_wo_history`;    // array of completed sessions
 const WO_PBS_KEY  = `${KEY}_wo_pbs`;        // personal bests per exercise
+const WO_NOTES_KEY = `${KEY}_wo_notes`;     // per-exercise persistent notes
 
 // ── State ──
 let _woRecovery  = null;           // WHOOP recovery % entered this session
@@ -3136,7 +3137,71 @@ function woLoad(key,def){try{const v=localStorage.getItem(key);return v?JSON.par
 function woSave(key,val){localStorage.setItem(key,JSON.stringify(val));}
 function woHistory(){return woLoad(WO_HIST_KEY,[]);}
 function woPBs(){return woLoad(WO_PBS_KEY,{});}
+function woNotes(){return woLoad(WO_NOTES_KEY,{});}
 function epley(w,r){return r===1?w:Math.round(w*(1+r/30));}  // Epley 1RM formula
+
+// ── Exercise Notes ──
+function getExerciseNote(exerciseName) {
+  const notes = woNotes();
+  const key = exerciseName.toLowerCase().trim();
+  return notes[key] || '';
+}
+
+function saveExerciseNote(exerciseName, note) {
+  const notes = woNotes();
+  const key = exerciseName.toLowerCase().trim();
+  if (note && note.trim()) {
+    notes[key] = note.trim();
+  } else {
+    delete notes[key];
+  }
+  woSave(WO_NOTES_KEY, notes);
+}
+
+function openNoteModal(ei) {
+  const ex = _woSession?.exercises[ei];
+  if (!ex) return;
+  const exName = ex.swappedTo || ex.name;
+  const currentNote = getExerciseNote(exName);
+  
+  const modal = document.createElement('div');
+  modal.className = 'wo-note-modal-overlay';
+  modal.id = 'wo-note-modal';
+  modal.innerHTML = `
+    <div class="wo-note-modal">
+      <div class="wo-note-modal-hdr">
+        <span>Note for ${exName}</span>
+        <button class="wo-note-modal-close" onclick="closeNoteModal()">✕</button>
+      </div>
+      <textarea id="wo-note-textarea" class="wo-note-textarea" placeholder="Add a personal note for next time...">${currentNote}</textarea>
+      <div class="wo-note-modal-btns">
+        <button class="wo-note-btn-cancel" onclick="closeNoteModal()">Cancel</button>
+        <button class="wo-note-btn-save" onclick="saveNoteFromModal(${ei})">Save</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  setTimeout(() => modal.classList.add('visible'), 10);
+  gv('wo-note-textarea').focus();
+}
+
+function closeNoteModal() {
+  const modal = gv('wo-note-modal');
+  if (modal) {
+    modal.classList.remove('visible');
+    setTimeout(() => modal.remove(), 200);
+  }
+}
+
+function saveNoteFromModal(ei) {
+  const ex = _woSession?.exercises[ei];
+  if (!ex) return;
+  const exName = ex.swappedTo || ex.name;
+  const note = gv('wo-note-textarea')?.value || '';
+  saveExerciseNote(exName, note);
+  closeNoteModal();
+  renderExercises();
+}
 
 // ── Exercise icon map ──
 const EX_ICONS={
@@ -3518,6 +3583,9 @@ function showActiveWorkout(){
   renderExercises();
   renderCardioSection();
   startElapsedTimer();
+  // Show add exercises section
+  const addExSection = gv('wo-add-exercises-section');
+  if(addExSection) addExSection.style.display = 'block';
 }
 
 function startElapsedTimer(){
@@ -3587,19 +3655,26 @@ function renderExerciseCard(ex,ei){
   // Ghost data date indicator
   const ghostDateHint = ghostData ? `<div class="wo-ghost-date">Last: ${new Date(ghostData.date).toLocaleDateString('en-GB',{day:'numeric',month:'short'})}</div>` : '';
 
+  // Get saved note for this exercise
+  const savedNote = getExerciseNote(exName);
+  const noteHtml = savedNote 
+    ? `<div class="wo-ex-note" onclick="openNoteModal(${ei})"><span class="wo-ex-note-icon">📝</span><span class="wo-ex-note-text">${savedNote}</span></div>`
+    : '';
+
   const altHtml=(ex.alternatives||[]).map(a=>`<button class="wo-alt-btn" onclick="swapExercise(${ei},'${a.replace(/'/g,"\\'")}')">↻ ${a}</button>`).join('');
 
   return `<div class="wo-ex-card ${ex.collapsed?'collapsed':''}" id="wo-ex-${ei}">
     <div class="wo-ex-card-hdr" onclick="toggleExCollapse(${ei})">
       <div class="wo-ex-card-icon">${ex.icon||getExIcon(ex.name)}</div>
       <div class="wo-ex-card-title">
-        <div class="wo-ex-card-name"><a href="https://www.youtube.com/results?search_query=${encodeURIComponent(exName+' proper form')}" target="_blank" rel="noopener" class="wo-ex-link" onclick="event.stopPropagation()">${exName}</a></div>
+        <div class="wo-ex-card-name"><a href="https://www.youtube.com/results?search_query=${encodeURIComponent(exName+' proper form')}" target="_blank" rel="noopener" class="wo-ex-link" onclick="event.stopPropagation()">${exName}</a>${savedNote ? '<span class="wo-note-indicator">📝</span>' : ''}</div>
         <div class="wo-ex-card-meta">${ex.sets.length} sets · ${ex.reps||ex.sets[0]?.reps||'—'} reps · ${ex.rest}s rest</div>
       </div>
       <div class="wo-ex-card-check" id="wo-ex-check-${ei}">${ex.sets.every(s=>s.done)?'✅':'○'}</div>
     </div>
     <div class="wo-ex-card-body">
       <div class="wo-ex-cue-line">💡 ${ex.cue||''}</div>
+      ${noteHtml}
       ${ex.intensityTechnique&&ex.intensityTechnique!=='straight sets'?`<div class="wo-ex-intensity">⚡ ${ex.intensityTechnique}</div>`:''}
       ${pbLine}
       <div class="wo-sets-header">
@@ -3607,7 +3682,10 @@ function renderExerciseCard(ex,ei){
       </div>
       ${ghostDateHint}
       ${setsHtml}
-      <button class="wo-add-set-btn" onclick="addSet(${ei})">+ Add Set</button>
+      <div class="wo-ex-btns-row">
+        <button class="wo-add-set-btn" onclick="addSet(${ei})">+ Add Set</button>
+        <button class="wo-add-note-btn" onclick="openNoteModal(${ei})">${savedNote ? '✏️ Edit Note' : '📝 Note'}</button>
+      </div>
       ${altHtml?`<div class="wo-alts-row">${altHtml}</div>`:''}
       <div id="wo-rest-timer-${ei}" class="wo-rest-timer" style="display:none"></div>
     </div>
@@ -3689,6 +3767,119 @@ function addSet(ei){
   _woSession.exercises[ei].sets.push({weight:'',reps:'',rpe:'',done:false});
   woSave(WO_KEY,_woSession);
   renderExercises();
+}
+
+// ── AI Suggest More Exercises ──
+async function suggestMoreExercises() {
+  if (!_woSession) return;
+  
+  const suggestEl = gv('wo-suggested-exercises');
+  const btn = document.querySelector('.wo-add-exercises-btn');
+  if (!suggestEl) return;
+  
+  // Show loading state
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-sm"></span> Generating...';
+  suggestEl.innerHTML = '';
+  
+  // Build context about current workout
+  const currentExercises = _woSession.exercises.map(ex => ex.swappedTo || ex.name);
+  const muscleGroups = _woSession.muscleGroups || [];
+  const splitName = _woSession.splitName || '';
+  
+  const prompt = `Based on this ${splitName} workout targeting ${muscleGroups.join(', ')}, suggest 2-3 complementary exercises to add.
+
+Current exercises: ${currentExercises.join(', ')}
+
+Return ONLY valid JSON array (no markdown, no backticks):
+[
+  {
+    "name": "Exercise Name",
+    "sets": 3,
+    "reps": "10-12",
+    "rest": 60,
+    "muscle_group": "primary muscle",
+    "reason": "brief reason why this complements the workout"
+  }
+]
+
+Requirements:
+- Suggest exercises that complement what's already in the workout
+- Target any undertrained muscle groups
+- Avoid repeating exercises already listed
+- Keep it practical for a gym setting`;
+
+  try {
+    const result = await callAI([{ role: 'user', content: prompt }], { maxTokens: 500 });
+    const suggestions = extractJSON(result);
+    
+    if (!suggestions || !Array.isArray(suggestions)) {
+      throw new Error('Invalid response format');
+    }
+    
+    // Render suggestion cards
+    suggestEl.innerHTML = `
+      <div class="wo-suggest-title">Suggested Exercises</div>
+      ${suggestions.map((s, i) => `
+        <div class="wo-suggest-card">
+          <div class="wo-suggest-card-top">
+            <div class="wo-suggest-card-icon">${getExIcon(s.name)}</div>
+            <div class="wo-suggest-card-info">
+              <div class="wo-suggest-card-name">${s.name}</div>
+              <div class="wo-suggest-card-meta">${s.sets} sets · ${s.reps} reps · ${s.muscle_group}</div>
+            </div>
+            <button class="wo-suggest-add-btn" onclick="addSuggestedExercise(${i})">+ Add</button>
+          </div>
+          <div class="wo-suggest-card-reason">${s.reason}</div>
+        </div>
+      `).join('')}
+    `;
+    
+    // Store suggestions for adding
+    window._suggestedExercises = suggestions;
+    
+  } catch (e) {
+    console.error('[reBorn] Suggest exercises error:', e);
+    suggestEl.innerHTML = `<div class="wo-suggest-error">Failed to generate suggestions. <button onclick="suggestMoreExercises()">Try Again</button></div>`;
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '+ Add Exercises (AI Suggest)';
+  }
+}
+
+function addSuggestedExercise(index) {
+  if (!_woSession || !window._suggestedExercises?.[index]) return;
+  
+  const s = window._suggestedExercises[index];
+  const newExercise = {
+    name: s.name,
+    icon: getExIcon(s.name),
+    sets: Array.from({ length: s.sets }, () => ({ weight: '', reps: '', rpe: '', done: false })),
+    reps: s.reps,
+    rest: s.rest || 60,
+    alternatives: [],
+    cue: getExerciseCue(s.name),
+    collapsed: false,
+    swappedTo: null,
+  };
+  
+  _woSession.exercises.push(newExercise);
+  woSave(WO_KEY, _woSession);
+  renderExercises();
+  
+  // Remove the added suggestion from UI
+  const cards = document.querySelectorAll('.wo-suggest-card');
+  if (cards[index]) {
+    cards[index].style.opacity = '0.5';
+    cards[index].querySelector('.wo-suggest-add-btn').textContent = '✓ Added';
+    cards[index].querySelector('.wo-suggest-add-btn').disabled = true;
+  }
+  
+  // Scroll to the new exercise
+  setTimeout(() => {
+    const newExEl = gv(`wo-ex-${_woSession.exercises.length - 1}`);
+    if (newExEl) newExEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, 100);
 }
 
 // ── Exercise cue lookup (MMC cues for common exercises) ──

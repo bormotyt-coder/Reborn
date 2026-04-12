@@ -914,7 +914,8 @@ input:focus, textarea:focus, select:focus { border-color: var(--blue); }
 .wo-set-1rm { font-size: 10px; color: var(--muted); min-width: 40px; text-align: right; }
 .wo-set-done-btn { width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--border); background: #fff; display: flex; align-items: center; justify-content: center; font-size: 14px; cursor: pointer; flex-shrink: 0; }
 .wo-set-done-btn.done { background: var(--green); border-color: var(--green); color: #fff; }
-.wo-add-set-btn { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 7px 14px; font-size: 12px; font-weight: 600; color: var(--blue); cursor: pointer; margin-top: 6px; }
+.wo-add-set-btn { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 7px 14px; font-size: 12px; font-weight: 600; color: var(--blue); cursor: pointer; }
+.wo-ex-btns-row { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
 .wo-rest-timer { font-size: 13px; font-weight: 600; color: var(--amber); padding: 6px 0; }
 .wo-ex-cue { background: var(--bg); border-radius: 12px; padding: 8px 12px; margin-bottom: 8px; }
 .wo-ex-cue-line { font-size: 12px; color: var(--text2); line-height: 1.5; }
@@ -928,6 +929,141 @@ input:focus, textarea:focus, select:focus { border-color: var(--blue); }
 .wo-ex-link { background: none; border: none; color: var(--blue); font-size: 11px; font-weight: 600; cursor: pointer; text-decoration: underline; }
 .wo-alt-btn { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 5px 10px; font-size: 11px; font-weight: 600; color: var(--text2); cursor: pointer; }
 .wo-alts-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+
+/* ── Exercise Notes ── */
+.wo-note-indicator { font-size: 10px; margin-left: 6px; opacity: 0.7; }
+.wo-ex-note {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 8px 10px; margin: 6px 0;
+  background: rgba(74,124,126,0.06); border: 1px solid rgba(74,124,126,0.12);
+  border-radius: 10px; font-size: 12px; color: var(--text2); line-height: 1.4;
+}
+.wo-ex-note-icon { font-size: 12px; flex-shrink: 0; margin-top: 1px; }
+.wo-ex-note-text { flex: 1; }
+.wo-ex-note-edit {
+  background: none; border: none; color: var(--blue); font-size: 11px;
+  font-weight: 600; cursor: pointer; flex-shrink: 0; padding: 0;
+}
+.wo-add-note-btn {
+  background: none; border: 1px dashed var(--border);
+  border-radius: 8px; padding: 6px 12px; font-size: 11px;
+  font-weight: 600; color: var(--muted); cursor: pointer;
+  margin-top: 4px; margin-left: 6px; transition: all 0.15s;
+}
+.wo-add-note-btn:hover { border-color: var(--blue); color: var(--blue); }
+
+/* Note Modal */
+.wo-note-modal-overlay {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(28,31,38,0.4); backdrop-filter: blur(8px);
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; transition: opacity 0.2s ease;
+}
+.wo-note-modal-overlay.visible { opacity: 1; }
+.wo-note-modal {
+  background: #fff; border-radius: var(--r-xl); padding: 20px;
+  width: 90%; max-width: 360px; box-shadow: var(--sh-lg);
+  transform: translateY(20px); transition: transform 0.2s ease;
+}
+.wo-note-modal-overlay.visible .wo-note-modal { transform: translateY(0); }
+.wo-note-modal-hdr {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 14px;
+}
+.wo-note-modal-hdr span {
+  font-family: var(--font); font-size: 16px; font-weight: 700; color: var(--text);
+}
+.wo-note-modal-close {
+  background: var(--bg2); border: none; width: 28px; height: 28px;
+  border-radius: 50%; font-size: 14px; color: var(--muted); cursor: pointer;
+}
+.wo-note-textarea {
+  width: 100%; min-height: 100px; padding: 12px;
+  border: 1px solid var(--border); border-radius: 12px;
+  font-family: var(--font); font-size: 14px; color: var(--text);
+  resize: vertical; line-height: 1.5;
+}
+.wo-note-textarea:focus { outline: none; border-color: var(--blue); }
+.wo-note-modal-btns {
+  display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px;
+}
+.wo-note-btn-cancel {
+  background: none; border: none; padding: 10px 16px;
+  font-family: var(--font); font-size: 14px; font-weight: 600;
+  color: var(--muted); cursor: pointer;
+}
+.wo-note-btn-save {
+  background: var(--blue); border: none; padding: 10px 20px;
+  border-radius: 10px; font-family: var(--font); font-size: 14px;
+  font-weight: 600; color: #fff; cursor: pointer;
+}
+.wo-note-btn-save:active { transform: scale(0.97); }
+
+/* ── AI Suggest Exercises ── */
+#wo-add-exercises-section { padding: 0 16px 10px; }
+.wo-add-exercises-btn {
+  width: 100%; padding: 14px; margin-top: 8px;
+  background: linear-gradient(135deg, rgba(74,124,126,0.08), rgba(74,124,126,0.04));
+  border: 1px dashed var(--blue); border-radius: 14px;
+  font-family: var(--font); font-size: 14px; font-weight: 600;
+  color: var(--blue); cursor: pointer; transition: all 0.2s;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+.wo-add-exercises-btn:hover { background: rgba(74,124,126,0.1); }
+.wo-add-exercises-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.spinner-sm {
+  width: 16px; height: 16px; border: 2px solid var(--blue);
+  border-top-color: transparent; border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.wo-suggest-title {
+  font-family: var(--font); font-size: 12px; font-weight: 700;
+  color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em;
+  margin: 14px 0 10px; padding-left: 2px;
+}
+.wo-suggest-card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 14px; padding: 14px; margin-bottom: 10px;
+  box-shadow: var(--sh-sm); transition: opacity 0.3s;
+}
+.wo-suggest-card-top {
+  display: flex; align-items: center; gap: 12px;
+}
+.wo-suggest-card-icon { font-size: 22px; }
+.wo-suggest-card-info { flex: 1; }
+.wo-suggest-card-name {
+  font-family: var(--font); font-size: 15px; font-weight: 700; color: var(--text);
+}
+.wo-suggest-card-meta {
+  font-size: 12px; color: var(--muted); margin-top: 2px;
+}
+.wo-suggest-card-reason {
+  font-size: 12px; color: var(--text2); line-height: 1.5;
+  margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border);
+}
+.wo-suggest-add-btn {
+  background: var(--blue); border: none; padding: 8px 14px;
+  border-radius: 8px; font-family: var(--font); font-size: 12px;
+  font-weight: 700; color: #fff; cursor: pointer; flex-shrink: 0;
+  transition: all 0.15s;
+}
+.wo-suggest-add-btn:hover { background: var(--blue2); }
+.wo-suggest-add-btn:disabled {
+  background: var(--green); cursor: default;
+}
+.wo-suggest-error {
+  padding: 14px; background: rgba(196,91,82,0.06);
+  border: 1px solid rgba(196,91,82,0.15); border-radius: 12px;
+  font-size: 13px; color: var(--red); text-align: center; margin-top: 10px;
+}
+.wo-suggest-error button {
+  background: var(--red); border: none; padding: 8px 16px;
+  border-radius: 8px; font-size: 12px; font-weight: 600;
+  color: #fff; cursor: pointer; margin-top: 8px;
+}
+
 .wo-muscle-chip { display: inline-flex; padding: 3px 9px; border-radius: 20px; font-size: 10px; font-weight: 600; background: var(--bg2); color: var(--text2); }
 .wo-cardio-card { margin: 6px 16px; background: var(--card); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 12px 14px; }
 .wo-cardio-card.done { opacity: 0.6; }
