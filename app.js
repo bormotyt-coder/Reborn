@@ -3810,8 +3810,14 @@ Requirements:
 - Keep it practical for a gym setting`;
 
   try {
-    const result = await callAI([{ role: 'user', content: prompt }], { maxTokens: 500 });
-    const suggestions = extractJSON(result);
+    const data = await callAI({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 500,
+      messages: [{ role: 'user', content: prompt }]
+    });
+    
+    const responseText = data?.content?.[0]?.text || '';
+    const suggestions = extractJSON(responseText);
     
     if (!suggestions || !Array.isArray(suggestions)) {
       throw new Error('Invalid response format');
