@@ -193,18 +193,15 @@
   <section class="home-section whoop-section">
     <div class="hs-head">
       <div class="hs-title"><span class="whoop-dot"></span>WHOOP</div>
-      <button class="hs-inline-btn" onclick="openWhoopModal()">+ Log</button>
+      <button class="hs-inline-btn" onclick="openWhoopModal()">+ Morning</button>
     </div>
     <div class="hs-body">
-      <div class="whoop-tab-row">
+      <!-- Morning tab (preserved id for JS compat; visual now a single header label) -->
+      <div class="wh-morning-row">
         <div class="wh-tab active" id="wh-tab-0" onclick="selectWhoopTab(0)">
-          <div class="wh-tab-label">Wake Up</div><div class="wh-tab-time">Sleep &amp; Recovery</div><div class="wh-tab-dot"></div>
-        </div>
-        <div class="wh-tab" id="wh-tab-1" onclick="selectWhoopTab(1)">
-          <div class="wh-tab-label">1 PM</div><div class="wh-tab-time">Mid-day</div><div class="wh-tab-dot"></div>
-        </div>
-        <div class="wh-tab" id="wh-tab-2" onclick="selectWhoopTab(2)">
-          <div class="wh-tab-label">10 PM</div><div class="wh-tab-time">End of day</div><div class="wh-tab-dot"></div>
+          <div class="wh-tab-label">This Morning</div>
+          <div class="wh-tab-time">Sleep &amp; Recovery</div>
+          <div class="wh-tab-dot"></div>
         </div>
       </div>
       <div id="wh-snap-display" style="min-height:52px"></div>

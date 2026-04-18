@@ -446,19 +446,9 @@ const DOWS=['Su','Mo','Tu','We','Th','Fr','Sa'];
 const KEY='rb5';
 
 const SNAP_CFG=[
-  {label:'Wake Up',sub:'Log sleep and recovery from this morning.',fields:[
+  {label:'This Morning',sub:'Log sleep and recovery from this morning.',fields:[
     {id:'sleep',label:'Sleep',ph:'7:42',step:'',inputType:'sleep'},
     {id:'recovery',label:'Recovery %',ph:'e.g. 72',step:'1'},
-  ]},
-  {label:'1 PM',sub:'Log your mid-day Whoop stats.',fields:[
-    {id:'strain',label:'Strain so far',ph:'e.g. 8.2',step:'0.1'},
-    {id:'burned',label:'Cals Burned',ph:'e.g. 1200',step:'10'},
-    {id:'steps',label:'Steps',ph:'e.g. 4500',step:'100'},
-  ]},
-  {label:'10 PM',sub:'Log your final Whoop stats for the day.',fields:[
-    {id:'strain',label:'Final Strain',ph:'e.g. 14.5',step:'0.1'},
-    {id:'burned',label:'Total Burned',ph:'e.g. 2800',step:'10'},
-    {id:'steps',label:'Total Steps',ph:'e.g. 9200',step:'100'},
   ]},
 ];
 
@@ -568,30 +558,55 @@ function showPage(id,btn){
 
 // ── WHOOP 3-SNAPSHOT ──
 function selectWhoopTab(i){
-  activeTab=i;
-  document.querySelectorAll('.wh-tab').forEach((t,j)=>t.classList.toggle('active',j===i));
+  // Only one tab is supported now — force 0 regardless of what the button requests.
+  activeTab=0;
+  document.querySelectorAll('.wh-tab').forEach((t,j)=>t.classList.toggle('active',j===0));
   renderWhoopSnap();
 }
 function renderWhoopCard(){
-  whoopSnaps.forEach((s,i)=>{const t=gv(`wh-tab-${i}`);if(t)t.classList.toggle('has-data',s!==null);});
+  const t0 = gv('wh-tab-0');
+  if (t0) t0.classList.toggle('has-data', !!whoopSnaps[0]);
   renderWhoopSnap();
 }
 function renderWhoopSnap(){
-  const snap=whoopSnaps[activeTab];
   const el=gv('wh-snap-display');
-  if(!snap){el.innerHTML=`<div class="wh-empty">No data yet. Tap <strong>+ Log Snapshot</strong> to add ${SNAP_CFG[activeTab].label} data.</div>`;return;}
-  const cfg=SNAP_CFG[activeTab];
-  const items=cfg.fields.map(f=>{
-    const v=snap[f.id];if(v==null)return'';
-    let d;
-    if(f.id==='steps')d=Number(v).toLocaleString();
-    else if(f.id==='recovery')d=v+'%';
-    else if(f.id==='sleep'){const hh=Math.floor(v),mm=Math.round((v-hh)*60);d=hh+'h'+(mm>0?' '+mm+'m':'');}
-    else d=v;
-    return`<div class="wh-s"><div class="wh-v">${d}</div><div class="wh-l">${f.label}</div></div>`;
-  }).filter(Boolean);
-  const cols=items.length<=2?'wh-grid-2':'wh-grid-3';
-  el.innerHTML=`<div class="wh-grid ${cols}">${items.join('')}</div>`;
+  if(!el) return;
+  const morning = whoopSnaps[0];
+
+  // Morning recovery/sleep row
+  let morningHtml = '';
+  if (morning) {
+    const recVal = morning.recovery!=null ? morning.recovery+'%' : '—';
+    const sleepVal = morning.sleep!=null ? (()=>{const hh=Math.floor(morning.sleep),mm=Math.round((morning.sleep-hh)*60);return hh+'h'+(mm>0?' '+mm+'m':'');})() : '—';
+    morningHtml = `<div class="wh-grid wh-grid-2">
+      <div class="wh-s"><div class="wh-v">${recVal}</div><div class="wh-l">Recovery</div></div>
+      <div class="wh-s"><div class="wh-v">${sleepVal}</div><div class="wh-l">Sleep</div></div>
+    </div>`;
+  } else {
+    morningHtml = `<div class="wh-empty">No morning data yet. Tap <strong>+ Log</strong> for recovery &amp; sleep.</div>`;
+  }
+
+  // Today's workouts aggregate
+  const hist = (typeof woHistory === 'function') ? woHistory() : [];
+  const today = todayKey();
+  const todays = hist.filter(s => s && s.date && new Date(s.date).toISOString().slice(0,10) === today);
+  let workoutsHtml = '';
+  if (todays.length > 0){
+    const totalStrain = getTodaysWorkoutStrain();
+    const totalCals = getTodaysWorkoutBurned();
+    workoutsHtml = `<div class="wh-divider"></div>
+    <div class="wh-grid wh-grid-2">
+      <div class="wh-s"><div class="wh-v">${totalStrain}</div><div class="wh-l">Strain</div></div>
+      <div class="wh-s"><div class="wh-v">${totalCals}</div><div class="wh-l">kcal</div></div>
+    </div>
+    <div class="wh-workouts-list">${todays.map(s => {
+      const t = new Date(s.date);
+      const tStr = t.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'});
+      return `<div class="wh-workout-row"><span class="wh-wr-name">${s.splitName||'Workout'}</span><span class="wh-wr-meta">${s.strain??'—'} · ${s.calories??'—'} kcal · ${tStr}</span></div>`;
+    }).join('')}</div>`;
+  }
+
+  el.innerHTML = morningHtml + workoutsHtml;
 }
 function openWhoopModal(){
   const cfg=SNAP_CFG[activeTab];
@@ -613,7 +628,7 @@ function openWhoopModal(){
     }
     html+='</div>';
   }
-  if(activeTab===0||activeTab===2){
+  if(activeTab===0){
     const g=snap.goal||'cut';
     html+=`<div class="frow"><div><label class="flbl">Goal</label><select id="wf-goal"><option value="cut"${g==='cut'?' selected':''}>Cut (−400 kcal)</option><option value="maintain"${g==='maintain'?' selected':''}>Maintain</option><option value="bulk"${g==='bulk'?' selected':''}>Bulk (+300 kcal)</option></select></div></div>`;
   }
@@ -636,19 +651,55 @@ function saveWhoop(){
   save(`${KEY}_whoopsnaps_${todayKey()}`,whoopSnaps);
   closeWhoopModal();renderAll();
 }
+// Sum calories burned across all of today's completed workouts.
+// Replaces the old "max across time-of-day snapshots" approach.
+function getTodaysWorkoutBurned(){
+  const hist = woHistory();
+  const today = todayKey();
+  let total = 0;
+  for (let i = hist.length - 1; i >= 0; i--){
+    const s = hist[i];
+    if (!s || !s.date) continue;
+    const d = new Date(s.date).toISOString().slice(0,10);
+    if (d !== today) {
+      // hist is chronological; once we hit a non-today entry while scanning backward,
+      // we've passed today's workouts.
+      if (d < today) break;
+      continue;
+    }
+    if (typeof s.calories === 'number') total += s.calories;
+  }
+  return total;
+}
+
+// Sum strain across today's workouts (cap at 21 — WHOOP strain ceiling).
+function getTodaysWorkoutStrain(){
+  const hist = woHistory();
+  const today = todayKey();
+  let total = 0;
+  for (let i = hist.length - 1; i >= 0; i--){
+    const s = hist[i];
+    if (!s || !s.date) continue;
+    const d = new Date(s.date).toISOString().slice(0,10);
+    if (d !== today) { if (d < today) break; continue; }
+    if (typeof s.strain === 'number') total += s.strain;
+  }
+  return Math.min(21, Math.round(total * 10) / 10);
+}
+
 function getCalTarget(){
-  const g=(whoopSnaps[0]&&whoopSnaps[0].goal)||(whoopSnaps[2]&&whoopSnaps[2].goal)||'cut';
+  const g=(whoopSnaps[0]&&whoopSnaps[0].goal)||'cut';
   let base=TARGETS.cal;
   if(g==='bulk')     base+=500;
   if(g==='maintain') base+=200;
-  // Add WHOOP burned calories (take highest across all snapshots, round to nearest 50)
-  const burned=Math.max(whoopSnaps[0]?.burned||0,whoopSnaps[1]?.burned||0,whoopSnaps[2]?.burned||0);
+  // Add today's actual workout calories (sum across sessions, rounded to nearest 50).
+  const burned=getTodaysWorkoutBurned();
   if(burned>0) base+=Math.round(burned/50)*50;
   return base;
 }
 function getCalBurnedAdj(){
   // Returns only the burned-rounding adjustment for label display
-  const burned=Math.max(whoopSnaps[0]?.burned||0,whoopSnaps[1]?.burned||0,whoopSnaps[2]?.burned||0);
+  const burned=getTodaysWorkoutBurned();
   return burned>0?Math.round(burned/50)*50:0;
 }
 
@@ -1452,7 +1503,30 @@ function getDayContext(){
   const t=getTotals();
   const ws=whoopSnaps;
   const mealSum=meals.map(m=>`${m.name}: ${Math.round(m.calories)} kcal, ${Math.round(m.protein)}g P, ${Math.round(m.carbs)}g C, ${Math.round(m.fat)}g F`).join('\n');
-  const whoopSum=`Wake: Sleep ${ws[0]?.sleep??'—'}h, Recovery ${ws[0]?.recovery??'—'}%\n1PM: Strain ${ws[1]?.strain??'—'}, Burned ${ws[1]?.burned??'—'} kcal, Steps ${ws[1]?.steps??'—'}\nEOD: Strain ${ws[2]?.strain??'—'}, Burned ${ws[2]?.burned??'—'} kcal, Steps ${ws[2]?.steps??'—'}`;
+
+  // Morning recovery/sleep
+  const morningLine = `Morning: Sleep ${ws[0]?.sleep??'—'}h, Recovery ${ws[0]?.recovery??'—'}%`;
+
+  // Today's workouts (strain + cals per workout, aggregated)
+  const hist = (typeof woHistory === 'function') ? woHistory() : [];
+  const today = todayKey();
+  const todaysWorkouts = hist.filter(s => {
+    if (!s || !s.date) return false;
+    return new Date(s.date).toISOString().slice(0,10) === today;
+  });
+  let workoutLines = '';
+  if (todaysWorkouts.length > 0){
+    workoutLines = todaysWorkouts.map(s =>
+      `  • ${s.splitName || 'Workout'}: strain ${s.strain??'—'}, ${s.calories??'—'} kcal burned, ${s.duration??'—'} min`
+    ).join('\n');
+    const totStrain = getTodaysWorkoutStrain();
+    const totCals = getTodaysWorkoutBurned();
+    workoutLines = `Today's workouts:\n${workoutLines}\n  Total: ${totStrain} strain, ${totCals} kcal burned`;
+  } else {
+    workoutLines = `Today's workouts: none yet`;
+  }
+  const whoopSum = `${morningLine}\n${workoutLines}`;
+
   let fastCtx='FASTING: no data';
   try{if(typeof getFastContext==='function')fastCtx=getFastContext();}catch(e){}
   return `BORNA'S DATA TODAY:\nMEALS:\n${mealSum||'None logged'}\nTOTALS: ${Math.round(t.cal)} kcal, ${Math.round(t.p)}g P, ${Math.round(t.c)}g C, ${Math.round(t.f)}g F\nTARGET: ${getCalTarget()} kcal (cut phase)\nMACRO TARGETS: 128g P, 200g C, 65g F\nWHOOP:\n${whoopSum}\nWATER: ${cups} cups (${cups*ML_PER_CUP}ml) / 8 cups\n${fastCtx}\nPROFILE: Male, 26, 89.1kg, 25.1% BF, goal 20.1% BF by Apr 27 2026`;
@@ -3236,21 +3310,30 @@ function getNextCoreExercise() {
 
 function appendCoreExercise(plan) {
   if (!plan || !plan.exercises) return plan;
-  
-  // Check if there's already a core exercise in the plan
-  const hasCoreExercise = plan.exercises.some(ex => {
-    const name = ex.name.toLowerCase();
-    return name.includes('plank') || name.includes('crunch') || name.includes('ab') || 
-           name.includes('core') || name.includes('dead bug') || name.includes('bird dog') ||
-           name.includes('leg raise') || name.includes('russian twist') || name.includes('pallof');
-  });
-  
-  // If no core exercise, add one
+
+  // Check if there's already a core/ab exercise — use word-boundary regex
+  // to avoid false matches like "Cable Row" or "C**ab**le Fly".
+  const CORE_PATTERNS = [
+    /\bplank\b/i, /\bcrunch/i, /\babs?\b/i, /\bcore\b/i,
+    /\bdead\s*bug\b/i, /\bbird\s*dog\b/i, /\bleg\s*raise\b/i,
+    /\bhanging\s*(knee|leg)\b/i, /\brussian\s*twist\b/i, /\bpallof\b/i,
+    /\bhollow\s*body\b/i, /\bab\s*wheel\b/i, /\bside\s*plank\b/i,
+    /\bwindshield\s*wiper\b/i, /\bv[- ]?up\b/i, /\bsit[- ]?up\b/i,
+    /\bdragon\s*flag\b/i, /\btoes?\s*to\s*bar\b/i,
+  ];
+  const isCore = (name) => {
+    const n = (name || '').toLowerCase();
+    return CORE_PATTERNS.some(rx => rx.test(n));
+  };
+
+  const hasCoreExercise = plan.exercises.some(ex => isCore(ex.name));
+
+  // If no core exercise, add one as the final exercise
   if (!hasCoreExercise) {
     const coreEx = getNextCoreExercise();
     plan.exercises.push(coreEx);
   }
-  
+
   return plan;
 }
 
@@ -3382,6 +3465,48 @@ function getRecentExercises(hoursAgo = 48) {
     });
   }
   return Array.from(exercises);
+}
+
+// ── Exercises from the last N sessions, with how often each appeared ──
+// Used to force variance across similar-type days (e.g. push→push).
+function getExerciseUsageMap(sessionCount = 5) {
+  const hist = woHistory();
+  const recent = hist.slice(-sessionCount);
+  const map = {};
+  recent.forEach(s => {
+    (s.exercises || []).forEach(ex => {
+      const name = ex.swappedTo || ex.name;
+      if (!name) return;
+      map[name] = (map[name] || 0) + 1;
+    });
+  });
+  return map;
+}
+
+// ── Recent exercises by muscle-group signature ──
+// Returns names done in the last N sessions that shared at least one muscle group.
+function getExercisesRepeatedOnSimilarDays(sessionCount = 3) {
+  const hist = woHistory();
+  if (hist.length === 0) return [];
+  const lastSession = hist[hist.length - 1];
+  const targetMuscles = new Set(lastSession.muscleGroups || []);
+  if (targetMuscles.size === 0) return [];
+
+  // Walk back through history; for sessions sharing ≥1 muscle group, collect exercises.
+  const names = new Set();
+  let found = 0;
+  for (let i = hist.length - 1; i >= 0 && found < sessionCount; i--) {
+    const s = hist[i];
+    const muscles = s.muscleGroups || [];
+    const shares = muscles.some(m => targetMuscles.has(m));
+    if (!shares) continue;
+    (s.exercises || []).forEach(ex => {
+      const n = ex.swappedTo || ex.name;
+      if (n) names.add(n);
+    });
+    found++;
+  }
+  return Array.from(names);
 }
 
 // ── Ghost Sets: Get last performed sets for an exercise ──
@@ -3547,13 +3672,25 @@ async function generateWorkout(){
   const recentSessions=getRecentSessions(7);
   const pbs=woPBs();
   const daysAgo=getDaysSinceMuscle();
-  const recentExercises = getRecentExercises(48);
+  const recentExercises = getRecentExercises(240); // 10 days
+  const similarDayExercises = getExercisesRepeatedOnSimilarDays(3);
+  const usageMap = getExerciseUsageMap(6);
+  const overusedList = Object.entries(usageMap)
+    .filter(([,count]) => count >= 2)
+    .sort((a,b) => b[1]-a[1])
+    .map(([n,c]) => `${n} (${c}×)`);
 
   // Build context string
   const histSummary=recentSessions.map(s=>`${new Date(s.date).toLocaleDateString('en-US',{weekday:'short'})}: ${s.splitName} (${(s.muscleGroups||[]).join(', ')})`).join('\n');
   const pbSummary=Object.entries(pbs).slice(0,20).map(([ex,pb])=>`${ex}: ${pb.weight}kg x${pb.reps} (1RM ~${pb.oneRM}kg)`).join('\n');
-  const avoidExercises = recentExercises.length > 0 
-    ? `\nEXERCISES TO AVOID (done in last 48h — pick alternatives):\n${recentExercises.join(', ')}`
+  const avoidExercises = recentExercises.length > 0
+    ? `\nEXERCISES DONE IN LAST 10 DAYS — strongly prefer alternatives for variance:\n${recentExercises.join(', ')}`
+    : '';
+  const similarDayAvoid = similarDayExercises.length > 0
+    ? `\nEXERCISES FROM THE LAST 3 TRAINING DAYS THAT SHARED MUSCLE GROUPS — rotate away from these to force variance session-to-session:\n${similarDayExercises.join(', ')}`
+    : '';
+  const overusedStr = overusedList.length > 0
+    ? `\nOVERUSED EXERCISES (appeared in 2+ of last 6 sessions) — replace with underrated alternatives from the brief:\n${overusedList.join(', ')}`
     : '';
 
   const woSystem=`You are an evidence-based strength & hypertrophy coach for a 26-year-old male, 89.1kg, 173cm, 25.1% body fat, goal is fat loss while preserving lean mass (target 64kg lean mass). He trains FASTED in the morning before his first meal. He's an intermediate lifter — past the beginner phase but still making solid progress. Talk to him like a knowledgeable training partner, not a textbook.
@@ -3598,6 +3735,7 @@ Rules:
 - If recovery < 34: light/technique focus, 3 sets, 12-15 reps, prioritize MMC and lengthened partials
 - Fasted training: avoid maximal CNS-heavy lifts if recovery < 50
 - Do NOT repeat muscle groups trained in last 48 hours unless recovery > 80
+- VARIANCE RULE (critical): never prescribe the same exercise across two consecutive sessions that share muscle groups. If the user did Barbell Bench Press last push day, today pick a different primary chest press (incline DB, hammer strength incline, Smith incline, etc). At least 50% of today's exercises must be different from the most recent same-muscle-group session. An AI-generated plan that mirrors the previous same-muscle-group day is a failure.
 - Include at least one lengthened-position exercise per primary muscle group
 - Mix up exercise selection — pull from the underrated exercises list, don't just default to barbell bench/squat/deadlift every time
 - intensityTechnique: one of "straight sets", "rest-pause", "drop set", "myo-reps", "lengthened partials" — use straight sets for heavy compounds, rotate techniques on accessories
@@ -3621,6 +3759,8 @@ ${histSummary||'No recent sessions logged'}
 DAYS SINCE MUSCLE GROUP TRAINED:
 ${Object.entries(daysAgo).map(([m,d])=>`${m}: ${d} days ago`).join(', ')||'No history'}
 ${avoidExercises}
+${similarDayAvoid}
+${overusedStr}
 
 PERSONAL BESTS:
 ${pbSummary||'No PBs yet — first session'}
@@ -3741,6 +3881,10 @@ function startElapsedTimer(){
 function renderExercises(){
   const el=gv('wo-exercises');if(!el||!_woSession)return;
   el.innerHTML=_woSession.exercises.map((ex,ei)=>renderExerciseCard(ex,ei)).join('');
+  // If a next-set suggestion is pending, re-display the effort rating (it was wiped by innerHTML).
+  if (_currentSuggestion && typeof _currentSuggestion.ei === 'number') {
+    showEffortRating(_currentSuggestion.ei);
+  }
 }
 
 function renderExerciseCard(ex,ei){
@@ -3801,7 +3945,12 @@ function renderExerciseCard(ex,ei){
     ? `<div class="wo-ex-note" onclick="openNoteModal(${ei})"><span class="wo-ex-note-icon">📝</span><span class="wo-ex-note-text">${savedNote}</span></div>`
     : '';
 
-  const altHtml=(ex.alternatives||[]).map(a=>`<button class="wo-alt-btn" onclick="swapExercise(${ei},'${a.replace(/'/g,"\\'")}')">↻ ${a}</button>`).join('');
+  const altHtml=(ex.alternatives||[]).map(a=>{
+    const isBackToOriginal = (a === ex.name) && !!ex.swappedTo && a !== ex.swappedTo;
+    const icon = isBackToOriginal ? '↺' : '↻';
+    const cls = isBackToOriginal ? 'wo-alt-btn wo-alt-btn-back' : 'wo-alt-btn';
+    return `<button class="${cls}" onclick="swapExercise(${ei},'${a.replace(/'/g,"\\'")}')">${icon} ${a}</button>`;
+  }).join('');
 
   return `<div class="wo-ex-card ${ex.collapsed?'collapsed':''}" id="wo-ex-${ei}">
     <div class="wo-ex-card-hdr" onclick="toggleExCollapse(${ei})">
@@ -3828,6 +3977,7 @@ function renderExerciseCard(ex,ei){
       </div>
       ${altHtml?`<div class="wo-alts-row">${altHtml}</div>`:''}
       <div id="wo-rest-timer-${ei}" class="wo-rest-timer" style="display:none"></div>
+      <div id="wo-effort-slot-${ei}" class="wo-effort-slot" style="display:none"></div>
     </div>
   </div>`;
 }
@@ -3899,11 +4049,11 @@ function toggleSetDone(ei,si){
     const rest=_woSession.exercises[ei].rest||90;
     setTimeout(()=>{
       startRestTimer(ei,rest);
-      // Add effort rating to rest timer after it renders
-      if(_currentSuggestion && _currentSuggestion.ei === ei){
-        setTimeout(()=>showEffortRating(ei), 100);
-      }
     }, 50);
+    // Show effort rating for next-set suggestion (if one is pending)
+    if(_currentSuggestion && _currentSuggestion.ei === ei){
+      setTimeout(()=>showEffortRating(ei), 50);
+    }
   }
 }
 
@@ -3911,23 +4061,30 @@ function toggleSetDone(ei,si){
 let _currentSuggestion = null;
 
 function showEffortRating(ei) {
-  const timerEl = gv(`wo-rest-timer-${ei}`);
-  if (!timerEl || timerEl.style.display === 'none') return;
-  
-  const existing = timerEl.querySelector('.wo-effort-rating');
-  if (existing) return;
-  
-  const ratingHtml = `
+  const slot = gv(`wo-effort-slot-${ei}`);
+  if (!slot) return;
+  if (slot.dataset.shown === '1') return;
+
+  slot.innerHTML = `
     <div class="wo-effort-rating">
-      <div class="wo-effort-label">How was that set?</div>
+      <div class="wo-effort-label">How was that set? Next set will be pre-filled.</div>
       <div class="wo-effort-btns">
-        <button class="wo-effort-btn easy" onclick="applyEffortSuggestion('easy')">😊 Easy</button>
+        <button class="wo-effort-btn easy" onclick="applyEffortSuggestion('easy')">😊 Easy +kg</button>
         <button class="wo-effort-btn good" onclick="applyEffortSuggestion('good')">💪 Good</button>
-        <button class="wo-effort-btn hard" onclick="applyEffortSuggestion('hard')">🔥 Hard</button>
+        <button class="wo-effort-btn hard" onclick="applyEffortSuggestion('hard')">🔥 Hard −1</button>
       </div>
     </div>
   `;
-  timerEl.insertAdjacentHTML('beforeend', ratingHtml);
+  slot.style.display = 'block';
+  slot.dataset.shown = '1';
+}
+
+function hideEffortRating(ei) {
+  const slot = gv(`wo-effort-slot-${ei}`);
+  if (!slot) return;
+  slot.innerHTML = '';
+  slot.style.display = 'none';
+  slot.dataset.shown = '';
 }
 
 function applyEffortSuggestion(effort) {
@@ -3967,12 +4124,7 @@ function applyEffortSuggestion(effort) {
   nextSet.reps = suggestedReps;
   woSave(WO_KEY, _woSession);
   
-  // Remove effort rating
-  const timerEl = gv(`wo-rest-timer-${ei}`);
-  if (timerEl) {
-    const ratingEl = timerEl.querySelector('.wo-effort-rating');
-    if (ratingEl) ratingEl.remove();
-  }
+  hideEffortRating(ei);
   
   // Re-render and show toast
   renderExercises();
@@ -4203,11 +4355,32 @@ function getExerciseCue(exerciseName) {
 
 function swapExercise(ei,newName){
   if(!_woSession)return;
-  _woSession.exercises[ei].swappedTo=newName;
-  _woSession.exercises[ei].icon=getExIcon(newName);
-  // Update cue to match new exercise
-  _woSession.exercises[ei].cue = getExerciseCue(newName);
-  woSave(WO_KEY,_woSession);
+  const ex = _woSession.exercises[ei];
+  if (!ex) return;
+
+  // The exercise currently visible (before swap).
+  const currentDisplayed = ex.swappedTo || ex.name;
+
+  // Remove the chosen new exercise from the alternatives pool…
+  if (Array.isArray(ex.alternatives)) {
+    ex.alternatives = ex.alternatives.filter(a => a !== newName);
+  } else {
+    ex.alternatives = [];
+  }
+
+  // …and add the previously-displayed exercise to the pool so the user can swap back.
+  if (currentDisplayed && currentDisplayed !== newName &&
+      !ex.alternatives.includes(currentDisplayed)) {
+    ex.alternatives.unshift(currentDisplayed); // put "swap back" first
+  }
+
+  // Cap alternatives list — keep it scannable.
+  if (ex.alternatives.length > 4) ex.alternatives = ex.alternatives.slice(0, 4);
+
+  ex.swappedTo = newName;
+  ex.icon = getExIcon(newName);
+  ex.cue = getExerciseCue(newName);
+  woSave(WO_KEY, _woSession);
   renderExercises();
 }
 
@@ -4333,15 +4506,17 @@ async function finishWorkout(){
 }
 
 function showStrainRating(session) {
-  // Estimate strain based on duration and volume (can be overridden by user)
+  // Estimate strain based on duration and volume (user-adjustable)
   const estStrain = Math.min(21, Math.max(5, Math.round(session.duration / 5 + (session.totalVolume / 5000))));
-  
+  // Estimate calories: ~6 kcal/min lifting as a baseline
+  const estCals = Math.max(60, Math.round((session.duration || 0) * 6));
+
   const html = `<div class="wo-strain-modal" id="wo-strain-modal">
     <div class="wo-strain-inner">
-      <div class="wo-strain-title">Rate Your Workout Strain</div>
-      <div class="wo-strain-sub">How hard did this feel overall? (WHOOP scale 1-21)</div>
+      <div class="wo-strain-title">Rate This Workout</div>
+      <div class="wo-strain-sub">Log strain and calories from your WHOOP (or use our estimates).</div>
       <div class="wo-strain-value" id="strain-value">${estStrain}</div>
-      <input type="range" class="wo-strain-slider" id="strain-slider" min="1" max="21" value="${estStrain}" 
+      <input type="range" class="wo-strain-slider" id="strain-slider" min="1" max="21" value="${estStrain}"
         oninput="document.getElementById('strain-value').textContent=this.value">
       <div class="wo-strain-labels">
         <span>Light</span><span>Moderate</span><span>Hard</span><span>All Out</span>
@@ -4352,47 +4527,58 @@ function showStrainRating(session) {
         <span class="zone z3">14-17</span>
         <span class="zone z4">18-21</span>
       </div>
+      <div class="wo-strain-cals-row">
+        <label class="wo-strain-cals-lbl">Calories burned</label>
+        <div class="wo-strain-cals-input-wrap">
+          <input type="number" class="wo-strain-cals-input" id="strain-cals-input"
+            value="${estCals}" min="0" step="10" inputmode="numeric">
+          <span class="wo-strain-cals-unit">kcal</span>
+        </div>
+      </div>
       <button class="wo-strain-save" onclick="saveStrainAndFinish()">Save & Complete</button>
     </div>
   </div>`;
-  
+
   const wrap = document.createElement('div');
   wrap.innerHTML = html;
   document.body.appendChild(wrap.firstElementChild);
-  
-  // Store session temporarily
+
   window._pendingSession = session;
 }
 
 function saveStrainAndFinish() {
   const session = window._pendingSession;
   if (!session) return;
-  
+
   const strain = parseInt(document.getElementById('strain-slider')?.value) || 10;
+  const calsRaw = document.getElementById('strain-cals-input')?.value;
+  const calories = (calsRaw && !isNaN(parseInt(calsRaw))) ? parseInt(calsRaw) : 0;
   session.strain = strain;
-  
-  // Save workout strain to WHOOP logs
+  session.calories = calories;
+
+  // Save workout strain + calories to WHOOP logs
   const whoopLogsKey = `${KEY}_whoopLogs_${todayKey()}`;
   const logs = load(whoopLogsKey, { recovery: whoopSnaps[0]?.recovery || null, workouts: [] });
   logs.workouts.push({
     time: new Date().toISOString(),
     type: session.splitName,
     strain: strain,
+    calories: calories,
     duration: session.duration,
     volume: session.totalVolume
   });
   save(whoopLogsKey, logs);
-  
+
   // Save to history
   const hist = woHistory();
   hist.push(session);
   woSave(WO_HIST_KEY, hist);
   localStorage.removeItem(WO_KEY);
-  
+
   // Remove strain modal
   const strainModal = gv('wo-strain-modal');
   if (strainModal) strainModal.remove();
-  
+
   // Show summary
   showWorkoutSummary(session);
   _woSession = null;
