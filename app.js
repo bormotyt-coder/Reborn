@@ -498,6 +498,12 @@ let fastTimer    = null;
 let fastProtocol = '16:8';
 let fastCustomHrs= 0;
 
+// WORKOUT STORAGE KEYS (must be declared before BOOT runs — renderWhoopSnap reads woHistory)
+const WO_KEY      = `${KEY}_workout`;       // active/in-progress session
+const WO_HIST_KEY = `${KEY}_wo_history`;    // array of completed sessions
+const WO_PBS_KEY  = `${KEY}_wo_pbs`;        // personal bests per exercise
+const WO_NOTES_KEY = `${KEY}_wo_notes`;     // per-exercise persistent notes
+
 // BOOT
 const _n=new Date();
 const _hdrDate=gv('hdr-date');if(_hdrDate)_hdrDate.innerHTML=_n.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})+'<br>'+_n.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
@@ -3246,10 +3252,7 @@ initStykuScroll();
 // ══════════════════════════════════════════════════════════════════════════
 
 // ── Storage keys ──
-const WO_KEY      = `${KEY}_workout`;       // active/in-progress session
-const WO_HIST_KEY = `${KEY}_wo_history`;    // array of completed sessions
-const WO_PBS_KEY  = `${KEY}_wo_pbs`;        // personal bests per exercise
-const WO_NOTES_KEY = `${KEY}_wo_notes`;     // per-exercise persistent notes
+// (WO_KEY, WO_HIST_KEY, WO_PBS_KEY, WO_NOTES_KEY are declared above BOOT to prevent TDZ issues during renderAll.)
 
 // ── State ──
 let _woRecovery  = null;           // WHOOP recovery % entered this session
