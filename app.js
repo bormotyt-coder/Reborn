@@ -589,31 +589,134 @@ function renderWhoopSnap(){
       <div class="wh-s"><div class="wh-v">${sleepVal}</div><div class="wh-l">Sleep</div></div>
     </div>`;
   } else {
-    morningHtml = `<div class="wh-empty">No morning data yet. Tap <strong>+ Log</strong> for recovery &amp; sleep.</div>`;
+    morningHtml = `<div class="wh-empty">No morning data yet. Tap <strong>+ Morning</strong> for recovery &amp; sleep.</div>`;
   }
 
-  // Today's workouts aggregate
-  const hist = (typeof woHistory === 'function') ? woHistory() : [];
-  const today = todayKey();
-  const todays = hist.filter(s => s && s.date && new Date(s.date).toISOString().slice(0,10) === today);
-  let workoutsHtml = '';
-  if (todays.length > 0){
+  // Today's activities
+  const acts = whActivities();
+  let activitiesHtml = `
+    <div class="wh-activities-head">
+      <span class="wh-activities-lbl">Activities Today</span>
+      <button class="wh-add-activity-btn" onclick="openActivityModal()">+ Activity</button>
+    </div>`;
+
+  if (acts.length > 0){
     const totalStrain = getTodaysWorkoutStrain();
     const totalCals = getTodaysWorkoutBurned();
-    workoutsHtml = `<div class="wh-divider"></div>
-    <div class="wh-grid wh-grid-2">
-      <div class="wh-s"><div class="wh-v">${totalStrain}</div><div class="wh-l">Strain</div></div>
-      <div class="wh-s"><div class="wh-v">${totalCals}</div><div class="wh-l">kcal</div></div>
-    </div>
-    <div class="wh-workouts-list">${todays.map(s => {
-      const t = new Date(s.date);
-      const tStr = t.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'});
-      return `<div class="wh-workout-row"><span class="wh-wr-name">${s.splitName||'Workout'}</span><span class="wh-wr-meta">${s.strain??'—'} · ${s.calories??'—'} kcal · ${tStr}</span></div>`;
-    }).join('')}</div>`;
+    activitiesHtml += `
+      <div class="wh-grid wh-grid-2 wh-totals">
+        <div class="wh-s"><div class="wh-v">${totalStrain}</div><div class="wh-l">Total Strain</div></div>
+        <div class="wh-s"><div class="wh-v">${totalCals}</div><div class="wh-l">kcal Burned</div></div>
+      </div>
+      <div class="wh-activities-list">${acts.map(a => {
+        const t = new Date(a.loggedAt);
+        const tStr = t.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'});
+        return `<div class="wh-activity-row" onclick="openActivityModal('${a.id}')">
+          <div class="wh-ar-left">
+            <div class="wh-ar-name">${escapeHtml(a.name)}</div>
+            <div class="wh-ar-time">${tStr}</div>
+          </div>
+          <div class="wh-ar-right">
+            <div class="wh-ar-stat"><span class="wh-ar-v">${a.strain??'—'}</span><span class="wh-ar-u">strain</span></div>
+            <div class="wh-ar-stat"><span class="wh-ar-v">${a.calories??'—'}</span><span class="wh-ar-u">kcal</span></div>
+          </div>
+        </div>`;
+      }).join('')}</div>`;
+  } else {
+    activitiesHtml += `<div class="wh-empty-small">No activities logged today.</div>`;
   }
 
-  el.innerHTML = morningHtml + workoutsHtml;
+  el.innerHTML = morningHtml + `<div class="wh-divider"></div>` + activitiesHtml;
 }
+
+// ── Activity modal ──────────────────────────────────────
+// If activityId is provided, we're editing; else adding new.
+function openActivityModal(activityId) {
+  const acts = whActivities();
+  const editing = activityId ? acts.find(a => a.id === activityId) : null;
+
+  const modalHtml = `
+    <div class="overlay open" id="wh-act-modal">
+      <div class="modal">
+        <div class="m-handle"></div>
+        <div class="m-title">${editing ? 'Edit Activity' : 'Log Activity'}</div>
+        <div class="m-sub">Copy the strain &amp; calories from your Whoop for this activity.</div>
+
+        <label class="flbl">Activity</label>
+        <input type="text" id="wh-act-name" placeholder="e.g. Gym, Football, Run" value="${editing ? escapeAttr(editing.name) : ''}"/>
+
+        <div class="frow">
+          <div>
+            <label class="flbl">Strain (1–21)</label>
+            <input type="number" id="wh-act-strain" min="0" max="21" step="0.1" placeholder="e.g. 12.4" value="${editing?.strain ?? ''}" inputmode="decimal"/>
+          </div>
+          <div>
+            <label class="flbl">Calories</label>
+            <input type="number" id="wh-act-cals" min="0" step="10" placeholder="e.g. 420" value="${editing?.calories ?? ''}" inputmode="numeric"/>
+          </div>
+        </div>
+
+        <button class="btn-p" onclick="saveActivityFromModal('${activityId || ''}')">
+          ${editing ? 'Save Changes' : 'Add Activity'}
+        </button>
+        ${editing
+          ? `<button class="btn-s wh-act-delete" onclick="deleteActivity('${activityId}')">Delete activity</button>`
+          : ''}
+        <button class="btn-s" onclick="closeActivityModal()">Cancel</button>
+      </div>
+    </div>`;
+  const wrap = document.createElement('div');
+  wrap.innerHTML = modalHtml.trim();
+  document.body.appendChild(wrap.firstElementChild);
+  // focus the name field
+  setTimeout(() => { const n = gv('wh-act-name'); if (n && !editing) n.focus(); }, 100);
+}
+
+function closeActivityModal() {
+  const m = gv('wh-act-modal');
+  if (m) m.remove();
+}
+
+function saveActivityFromModal(activityId) {
+  const name = (gv('wh-act-name')?.value || '').trim();
+  const strainRaw = gv('wh-act-strain')?.value;
+  const calsRaw = gv('wh-act-cals')?.value;
+
+  if (!name) { alert('Add an activity name'); return; }
+
+  const strain = strainRaw !== '' && !isNaN(parseFloat(strainRaw)) ? parseFloat(strainRaw) : null;
+  const calories = calsRaw !== '' && !isNaN(parseInt(calsRaw)) ? parseInt(calsRaw) : null;
+
+  const acts = whActivities();
+  if (activityId) {
+    const idx = acts.findIndex(a => a.id === activityId);
+    if (idx >= 0) {
+      acts[idx] = { ...acts[idx], name, strain, calories };
+    }
+  } else {
+    acts.push({
+      id: 'a' + Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+      name, strain, calories,
+      loggedAt: new Date().toISOString()
+    });
+  }
+  whSaveActivities(acts);
+  closeActivityModal();
+  renderAll();
+}
+
+function deleteActivity(activityId) {
+  if (!confirm('Delete this activity?')) return;
+  const acts = whActivities().filter(a => a.id !== activityId);
+  whSaveActivities(acts);
+  closeActivityModal();
+  renderAll();
+}
+
+function escapeHtml(s) {
+  return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+}
+function escapeAttr(s) { return escapeHtml(s); }
 function openWhoopModal(){
   const cfg=SNAP_CFG[activeTab];
   const snap=whoopSnaps[activeTab]||{};
@@ -657,39 +760,28 @@ function saveWhoop(){
   save(`${KEY}_whoopsnaps_${todayKey()}`,whoopSnaps);
   closeWhoopModal();renderAll();
 }
-// Sum calories burned across all of today's completed workouts.
-// Replaces the old "max across time-of-day snapshots" approach.
-function getTodaysWorkoutBurned(){
-  const hist = woHistory();
-  const today = todayKey();
-  let total = 0;
-  for (let i = hist.length - 1; i >= 0; i--){
-    const s = hist[i];
-    if (!s || !s.date) continue;
-    const d = new Date(s.date).toISOString().slice(0,10);
-    if (d !== today) {
-      // hist is chronological; once we hit a non-today entry while scanning backward,
-      // we've passed today's workouts.
-      if (d < today) break;
-      continue;
-    }
-    if (typeof s.calories === 'number') total += s.calories;
-  }
-  return total;
+// ══════════════════════════════════════════════════════════════════════════════
+// WHOOP ACTIVITIES — standalone per-activity log (strain + calories per activity)
+// Replaces the time-of-day snapshots for workouts. Works for ANY activity:
+// gym, football, run, lift, bike, etc. Each day has its own list.
+// ══════════════════════════════════════════════════════════════════════════════
+const WH_ACT_KEY = (ds) => `${KEY}_whoopActivities_${ds || todayKey()}`;
+
+function whActivities(ds) {
+  return load(WH_ACT_KEY(ds), []);
+}
+function whSaveActivities(arr, ds) {
+  save(WH_ACT_KEY(ds), arr);
 }
 
-// Sum strain across today's workouts (cap at 21 — WHOOP strain ceiling).
+// Sum calories burned across today's activities.
+function getTodaysWorkoutBurned(){
+  return whActivities().reduce((a,x) => a + (Number(x.calories) || 0), 0);
+}
+
+// Sum strain across today's activities (cap at 21 — WHOOP strain ceiling).
 function getTodaysWorkoutStrain(){
-  const hist = woHistory();
-  const today = todayKey();
-  let total = 0;
-  for (let i = hist.length - 1; i >= 0; i--){
-    const s = hist[i];
-    if (!s || !s.date) continue;
-    const d = new Date(s.date).toISOString().slice(0,10);
-    if (d !== today) { if (d < today) break; continue; }
-    if (typeof s.strain === 'number') total += s.strain;
-  }
+  const total = whActivities().reduce((a,x) => a + (Number(x.strain) || 0), 0);
   return Math.min(21, Math.round(total * 10) / 10);
 }
 
@@ -698,13 +790,12 @@ function getCalTarget(){
   let base=TARGETS.cal;
   if(g==='bulk')     base+=500;
   if(g==='maintain') base+=200;
-  // Add today's actual workout calories (sum across sessions, rounded to nearest 50).
+  // Add today's actual activity calories (sum across entries, rounded to nearest 50).
   const burned=getTodaysWorkoutBurned();
   if(burned>0) base+=Math.round(burned/50)*50;
   return base;
 }
 function getCalBurnedAdj(){
-  // Returns only the burned-rounding adjustment for label display
   const burned=getTodaysWorkoutBurned();
   return burned>0?Math.round(burned/50)*50:0;
 }
@@ -1513,25 +1604,18 @@ function getDayContext(){
   // Morning recovery/sleep
   const morningLine = `Morning: Sleep ${ws[0]?.sleep??'—'}h, Recovery ${ws[0]?.recovery??'—'}%`;
 
-  // Today's workouts (strain + cals per workout, aggregated)
-  const hist = (typeof woHistory === 'function') ? woHistory() : [];
-  const today = todayKey();
-  const todaysWorkouts = hist.filter(s => {
-    if (!s || !s.date) return false;
-    return new Date(s.date).toISOString().slice(0,10) === today;
-  });
-  let workoutLines = '';
-  if (todaysWorkouts.length > 0){
-    workoutLines = todaysWorkouts.map(s =>
-      `  • ${s.splitName || 'Workout'}: strain ${s.strain??'—'}, ${s.calories??'—'} kcal burned, ${s.duration??'—'} min`
-    ).join('\n');
+  // Today's activities with strain + calories
+  const acts = whActivities();
+  let activityLines = '';
+  if (acts.length > 0){
+    activityLines = acts.map(a => `  • ${a.name}: strain ${a.strain??'—'}, ${a.calories??'—'} kcal`).join('\n');
     const totStrain = getTodaysWorkoutStrain();
     const totCals = getTodaysWorkoutBurned();
-    workoutLines = `Today's workouts:\n${workoutLines}\n  Total: ${totStrain} strain, ${totCals} kcal burned`;
+    activityLines = `Today's activities:\n${activityLines}\n  Total: ${totStrain} strain, ${totCals} kcal burned`;
   } else {
-    workoutLines = `Today's workouts: none yet`;
+    activityLines = `Today's activities: none logged yet`;
   }
-  const whoopSum = `${morningLine}\n${workoutLines}`;
+  const whoopSum = `${morningLine}\n${activityLines}`;
 
   let fastCtx='FASTING: no data';
   try{if(typeof getFastContext==='function')fastCtx=getFastContext();}catch(e){}
@@ -4511,13 +4595,11 @@ async function finishWorkout(){
 function showStrainRating(session) {
   // Estimate strain based on duration and volume (user-adjustable)
   const estStrain = Math.min(21, Math.max(5, Math.round(session.duration / 5 + (session.totalVolume / 5000))));
-  // Estimate calories: ~6 kcal/min lifting as a baseline
-  const estCals = Math.max(60, Math.round((session.duration || 0) * 6));
 
   const html = `<div class="wo-strain-modal" id="wo-strain-modal">
     <div class="wo-strain-inner">
-      <div class="wo-strain-title">Rate This Workout</div>
-      <div class="wo-strain-sub">Log strain and calories from your WHOOP (or use our estimates).</div>
+      <div class="wo-strain-title">Rate Your Workout Strain</div>
+      <div class="wo-strain-sub">How hard did this feel overall? (WHOOP scale 1-21)<br><span style="color:var(--text-3);font-size:11px">Log the strain & calories from your Whoop later under Activities.</span></div>
       <div class="wo-strain-value" id="strain-value">${estStrain}</div>
       <input type="range" class="wo-strain-slider" id="strain-slider" min="1" max="21" value="${estStrain}"
         oninput="document.getElementById('strain-value').textContent=this.value">
@@ -4529,14 +4611,6 @@ function showStrainRating(session) {
         <span class="zone z2">10-13</span>
         <span class="zone z3">14-17</span>
         <span class="zone z4">18-21</span>
-      </div>
-      <div class="wo-strain-cals-row">
-        <label class="wo-strain-cals-lbl">Calories burned</label>
-        <div class="wo-strain-cals-input-wrap">
-          <input type="number" class="wo-strain-cals-input" id="strain-cals-input"
-            value="${estCals}" min="0" step="10" inputmode="numeric">
-          <span class="wo-strain-cals-unit">kcal</span>
-        </div>
       </div>
       <button class="wo-strain-save" onclick="saveStrainAndFinish()">Save & Complete</button>
     </div>
@@ -4554,19 +4628,15 @@ function saveStrainAndFinish() {
   if (!session) return;
 
   const strain = parseInt(document.getElementById('strain-slider')?.value) || 10;
-  const calsRaw = document.getElementById('strain-cals-input')?.value;
-  const calories = (calsRaw && !isNaN(parseInt(calsRaw))) ? parseInt(calsRaw) : 0;
   session.strain = strain;
-  session.calories = calories;
 
-  // Save workout strain + calories to WHOOP logs
+  // Save workout strain to WHOOP logs (legacy — kept for backwards compat)
   const whoopLogsKey = `${KEY}_whoopLogs_${todayKey()}`;
   const logs = load(whoopLogsKey, { recovery: whoopSnaps[0]?.recovery || null, workouts: [] });
   logs.workouts.push({
     time: new Date().toISOString(),
     type: session.splitName,
     strain: strain,
-    calories: calories,
     duration: session.duration,
     volume: session.totalVolume
   });
