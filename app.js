@@ -504,6 +504,9 @@ const WO_HIST_KEY = `${KEY}_wo_history`;    // array of completed sessions
 const WO_PBS_KEY  = `${KEY}_wo_pbs`;        // personal bests per exercise
 const WO_NOTES_KEY = `${KEY}_wo_notes`;     // per-exercise persistent notes
 
+// WHOOP ACTIVITY KEY (must be declared before BOOT runs — renderWhoopSnap reads activities)
+const WH_ACT_KEY = (ds) => `${KEY}_whoopActivities_${ds || todayKey()}`;
+
 // BOOT
 const _n=new Date();
 const _hdrDate=gv('hdr-date');if(_hdrDate)_hdrDate.innerHTML=_n.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})+'<br>'+_n.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
@@ -765,7 +768,7 @@ function saveWhoop(){
 // Replaces the time-of-day snapshots for workouts. Works for ANY activity:
 // gym, football, run, lift, bike, etc. Each day has its own list.
 // ══════════════════════════════════════════════════════════════════════════════
-const WH_ACT_KEY = (ds) => `${KEY}_whoopActivities_${ds || todayKey()}`;
+// (WH_ACT_KEY declared above BOOT to prevent TDZ issues during renderAll.)
 
 function whActivities(ds) {
   return load(WH_ACT_KEY(ds), []);
