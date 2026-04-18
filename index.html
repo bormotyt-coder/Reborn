@@ -10,149 +10,215 @@
 <meta name="theme-color" content="#0A1220">
 <title>Project reBorn</title>
 <link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxODAgMTgwIj48cmVjdCB3aWR0aD0iMTgwIiBoZWlnaHQ9IjE4MCIgcng9IjQwIiBmaWxsPSIjMDkwYjEwIi8+PHRleHQgeD0iNTAlIiB5PSI1NCUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJHZW9yZ2lhLHNlcmlmIiBmb250LXNpemU9IjkwIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0iI2Q0ZjUzYyI+ckI8L3RleHQ+PC9zdmc+">
-<!-- fonts loaded via style.css @import -->
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div id="app">
 
-<!-- ═══ TODAY ═══ -->
+<!-- ═══════════════════════════════════════════════════
+     HOME — glance-first dashboard
+     (was "Today"; now absorbs Progress + Fast widget)
+═══════════════════════════════════════════════════ -->
 <div id="pg-today" class="page active">
-  <div class="hdr">
+
+  <header class="hdr">
     <div class="logo-wrap">
-      <div class="logo-icon"><span style="font-family:var(--font);font-size:15px;font-weight:800;color:#fff;letter-spacing:-1px">rB</span></div>
-      <div><div class="logo-main">reBorn</div></div>
+      <div class="logo-icon"><span>rB</span></div>
+      <div class="logo-text">
+        <div class="logo-main">reBorn</div>
+        <div class="logo-sub" id="hdr-date"></div>
+      </div>
     </div>
     <div class="hdr-right-pills">
-      <button class="hdr-progress-pill" onclick="showPage('progress',this)">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-        Progress
+      <button class="hdr-icon-btn hdr-streak-compact" onclick="openStreakModal()" aria-label="Streak">
+        <span class="hdr-streak-icon">🔥</span>
+        <span class="hdr-streak-val" id="smc-num">0</span>
       </button>
-      <button class="hdr-streak-btn" id="hdr-streak-btn" onclick="openStreakModal()">🔥 <span id="smc-num">0</span></button>
+      <button class="hdr-icon-btn" onclick="showPage('progress',this)" aria-label="Progress">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      </button>
     </div>
-  </div>
-  <!-- DAY CALENDAR NAV -->
+  </header>
+
+  <!-- DAY SCRUBBER -->
   <div class="day-cal-strip" id="day-cal-strip"></div>
-  <div class="scan-banner">
-    <div class="sb-label">🔬 Styku · Mar 4, 2026</div>
-    <div class="sb-row">
-      <div class="sb-s"><div class="sb-v" style="color:var(--blue)">25.1%</div><div class="sb-l">Body Fat</div></div>
-      <div class="sb-s"><div class="sb-v">64.0</div><div class="sb-l">Lean kg</div></div>
-      <div class="sb-s"><div class="sb-v">1,965</div><div class="sb-l">BMR</div></div>
-      <div class="sb-s"><div class="sb-v" style="color:var(--cyan)">2,340</div><div class="sb-l">Target kcal</div></div>
-      <div class="sb-s"><div class="sb-v">−5.6kg</div><div class="sb-l">Fat Goal</div></div>
-    </div>
-  </div>
 
-  <!-- WELCOME CARD -->
-  <div class="welcome-card" id="welcome-card">
-    <div class="wc-bg" id="wc-bg"><canvas id="wc-canvas"></canvas></div>
-    <div class="wc-overlay"></div>
-    <div class="wc-content">
-      <div class="wc-greeting" id="wc-greeting">Good morning, Borna</div>
-      <div class="wc-sub" id="wc-sub">Loading your day summary…</div>
-      <div class="wc-weather" id="wc-weather" style="display:none">
-        <span class="wc-weather-icon" id="wc-wicon">☀️</span>
-        <span class="wc-weather-text" id="wc-wtemp">—°C</span>
-        <span class="wc-weather-sub" id="wc-wdesc">Dubai</span>
+  <!-- FAST WIDGET (contextual, fasting only) -->
+  <section id="home-fast-widget" class="home-fast-widget" style="display:none" onclick="showPage('fast',this)">
+    <div class="hfw-left">
+      <div class="hfw-dot"></div>
+      <div>
+        <div class="hfw-label">Fasting · <span id="hfw-proto">16:8</span></div>
+        <div class="hfw-time" id="hfw-time">00:00:00</div>
       </div>
     </div>
-  </div>
+    <div class="hfw-right">
+      <svg class="hfw-ring" width="44" height="44" viewBox="0 0 48 48">
+        <circle cx="24" cy="24" r="20" fill="none" stroke="rgba(184,163,228,0.20)" stroke-width="3"/>
+        <circle id="hfw-ring-fill" cx="24" cy="24" r="20" fill="none" stroke="var(--accent-moon)" stroke-width="3" stroke-linecap="round" stroke-dasharray="125.66" stroke-dashoffset="125.66" transform="rotate(-90 24 24)"/>
+      </svg>
+      <svg class="hfw-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+    </div>
+  </section>
 
-  <!-- HERO: Calories + Rings unified -->
-  <div class="hero-card" style="margin:8px 14px 0">
-    <div class="gc-in">
-      <div class="cal-top">
-        <div>
-          <div class="cal-big" id="cal-num"><span class="cal-count-n">0</span></div>
-          <div class="cal-unit-lbl">kcal consumed</div>
-        </div>
-        <div class="cal-right">
-          <div class="cal-rem" id="cal-rem">— left</div>
-          <div class="cal-sub" id="cal-tlbl">Set Whoop data ↑</div>
-        </div>
-      </div>
-      <div class="pbar macro-tap" onclick="openMacroBreakdown('calories')" title="See calorie contributors"><div class="pbar-f" id="cal-bar" style="width:0%"></div></div>
-      <div class="rings-row">
-        <div class="ring-wrap macro-tap" onclick="openMacroBreakdown('protein')">
-          <div class="ring-svg-wrap">
-            <svg class="rsvg" width="88" height="88" viewBox="0 0 90 90"><circle class="rbg" cx="45" cy="45" r="37"/><circle class="rfill" cx="45" cy="45" r="37" stroke="var(--pc)" id="rp" stroke-dasharray="232.5" stroke-dashoffset="232.5"/></svg>
-            <div class="ring-pct" style="color:var(--pc)" id="rp-pct">0%</div>
-          </div>
-          <div class="ring-info"><div class="ring-v" style="color:var(--pc)" id="rp-v">0g</div><div class="ring-n">Protein</div><div class="ring-t">/ 128g</div></div>
-        </div>
-        <div class="ring-wrap macro-tap" onclick="openMacroBreakdown('carbs')">
-          <div class="ring-svg-wrap">
-            <svg class="rsvg" width="88" height="88" viewBox="0 0 90 90"><circle class="rbg" cx="45" cy="45" r="37"/><circle class="rfill" cx="45" cy="45" r="37" stroke="var(--cc)" id="rc" stroke-dasharray="232.5" stroke-dashoffset="232.5"/></svg>
-            <div class="ring-pct" style="color:var(--cc)" id="rc-pct">0%</div>
-          </div>
-          <div class="ring-info"><div class="ring-v" style="color:var(--cc)" id="rc-v">0g</div><div class="ring-n">Carbs</div><div class="ring-t">/ 200g</div></div>
-        </div>
-        <div class="ring-wrap macro-tap" onclick="openMacroBreakdown('fat')">
-          <div class="ring-svg-wrap">
-            <svg class="rsvg" width="88" height="88" viewBox="0 0 90 90"><circle class="rbg" cx="45" cy="45" r="37"/><circle class="rfill" cx="45" cy="45" r="37" stroke="var(--fc)" id="rf" stroke-dasharray="232.5" stroke-dashoffset="232.5"/></svg>
-            <div class="ring-pct" style="color:var(--fc)" id="rf-pct">0%</div>
-          </div>
-          <div class="ring-info"><div class="ring-v" style="color:var(--fc)" id="rf-v">0g</div><div class="ring-n">Fat</div><div class="ring-t">/ 65g</div></div>
-        </div>
-      </div>
-    </div>
-  </div>
-  <div class="sec-lbl">Today's Meals</div>
-  <div id="food-list" class="food-list"></div>
-  <!-- NUTRIENT BREAKDOWN -->
-  <div class="gc">
-    <div class="gc-in">
-      <div class="sec-lbl" style="padding:0 0 10px;font-size:10px">Nutrients</div>
-      <div id="nutrient-breakdown"></div>
-    </div>
-  </div>
+  <!-- ═══ HERO: SPLIT DASHBOARD ═══ -->
+  <section class="hero-split">
 
-  <div class="whoop-card">
-    <div class="wh-top">
-      <div class="wh-brand"><div class="wh-dot"></div><div class="wh-logo">WHOOP</div></div>
-    </div>
-    <div style="display:flex;gap:6px;margin-bottom:12px;position:relative;z-index:1">
-      <div class="wh-tab active" id="wh-tab-0" onclick="selectWhoopTab(0)">
-        <div class="wh-tab-label">Wake Up</div><div class="wh-tab-time">Sleep &amp; Recovery</div><div class="wh-tab-dot"></div>
+    <div class="hero-tile hero-cals" onclick="openMacroBreakdown('calories')">
+      <div class="ht-label">CALORIES</div>
+      <div class="ht-main">
+        <span class="cal-big" id="cal-num"><span class="cal-count-n">0</span></span>
+        <span class="ht-target">/ <span id="cal-target-disp">2,340</span></span>
       </div>
-      <div class="wh-tab" id="wh-tab-1" onclick="selectWhoopTab(1)">
-        <div class="wh-tab-label">1 PM</div><div class="wh-tab-time">Mid-day</div><div class="wh-tab-dot"></div>
+      <div class="cal-rem" id="cal-rem">— left</div>
+      <div class="pbar-slim"><div class="pbar-f" id="cal-bar" style="width:0%"></div></div>
+      <div class="hero-rings">
+        <div class="hero-ring-item" onclick="event.stopPropagation();openMacroBreakdown('protein')">
+          <svg class="mini-ring" viewBox="0 0 40 40"><circle cx="20" cy="20" r="16" fill="none" stroke="var(--hair)" stroke-width="3"/><circle class="rfill" cx="20" cy="20" r="16" fill="none" stroke="var(--pc)" stroke-width="3" stroke-linecap="round" stroke-dasharray="100.5" stroke-dashoffset="100.5" id="rp" transform="rotate(-90 20 20)"/></svg>
+          <div class="mr-txt"><div class="mr-val" id="rp-v">0g</div><div class="mr-pct" id="rp-pct">P · 0%</div></div>
+        </div>
+        <div class="hero-ring-item" onclick="event.stopPropagation();openMacroBreakdown('carbs')">
+          <svg class="mini-ring" viewBox="0 0 40 40"><circle cx="20" cy="20" r="16" fill="none" stroke="var(--hair)" stroke-width="3"/><circle class="rfill" cx="20" cy="20" r="16" fill="none" stroke="var(--cc)" stroke-width="3" stroke-linecap="round" stroke-dasharray="100.5" stroke-dashoffset="100.5" id="rc" transform="rotate(-90 20 20)"/></svg>
+          <div class="mr-txt"><div class="mr-val" id="rc-v">0g</div><div class="mr-pct" id="rc-pct">C · 0%</div></div>
+        </div>
+        <div class="hero-ring-item" onclick="event.stopPropagation();openMacroBreakdown('fat')">
+          <svg class="mini-ring" viewBox="0 0 40 40"><circle cx="20" cy="20" r="16" fill="none" stroke="var(--hair)" stroke-width="3"/><circle class="rfill" cx="20" cy="20" r="16" fill="none" stroke="var(--fc)" stroke-width="3" stroke-linecap="round" stroke-dasharray="100.5" stroke-dashoffset="100.5" id="rf" transform="rotate(-90 20 20)"/></svg>
+          <div class="mr-txt"><div class="mr-val" id="rf-v">0g</div><div class="mr-pct" id="rf-pct">F · 0%</div></div>
+        </div>
       </div>
-      <div class="wh-tab" id="wh-tab-2" onclick="selectWhoopTab(2)">
-        <div class="wh-tab-label">10 PM</div><div class="wh-tab-time">End of day</div><div class="wh-tab-dot"></div>
-      </div>
+      <div class="ht-hint" id="cal-tlbl">Tap for breakdown</div>
     </div>
-    <div id="wh-snap-display" style="position:relative;z-index:1;min-height:52px"></div>
-    <div style="display:flex;justify-content:flex-end;margin-top:10px;position:relative;z-index:1">
-      <button class="wh-btn" onclick="openWhoopModal()">+ Log Snapshot</button>
-    </div>
-  </div>
 
-  <div class="gc">
-    <div class="gc-in">
-      <div class="water-top">
-        <div class="water-lbl">💧 Hydration</div>
-        <div class="water-ct"><span id="water-cups">0</span><span style="font-size:12px;color:var(--muted)">&thinsp;/ 8 cups · <span id="water-ml-display">0</span> mL</span></div>
+    <div class="hero-tile hero-ready" onclick="showPage('workout',this)">
+      <div class="ht-label">READINESS</div>
+      <div class="hr-body">
+        <div class="hr-ring-wrap">
+          <svg class="hr-ring-svg" viewBox="0 0 90 90">
+            <circle cx="45" cy="45" r="38" fill="none" stroke="var(--hair)" stroke-width="5"/>
+            <circle id="home-ready-arc" cx="45" cy="45" r="38" fill="none" stroke="var(--accent-ember)" stroke-width="5" stroke-linecap="round" stroke-dasharray="238.76" stroke-dashoffset="238.76" transform="rotate(-90 45 45)"/>
+          </svg>
+          <div class="hr-ring-val" id="home-ready-pct">—</div>
+        </div>
+        <div class="hr-verdict" id="home-ready-verdict">Log recovery →</div>
       </div>
+      <div class="hr-stats">
+        <div class="hr-stat">
+          <div class="hr-stat-v" id="home-weight-v">—</div>
+          <div class="hr-stat-l">WEIGHT</div>
+        </div>
+        <div class="hr-stat-div"></div>
+        <div class="hr-stat">
+          <div class="hr-stat-v" id="home-streak-v">—</div>
+          <div class="hr-stat-l">STREAK</div>
+        </div>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ═══ THIS WEEK — inline progress glance ═══ -->
+  <section class="home-section home-section-tap" onclick="showPage('progress',this)">
+    <div class="hs-head">
+      <div class="hs-title">This Week</div>
+      <div class="hs-chev">
+        <span id="home-week-summary">—</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+    </div>
+    <div class="hs-body">
+      <div class="mini-week-bars" id="home-week-bars"></div>
+    </div>
+  </section>
+
+  <!-- ═══ TODAY'S MEALS ═══ -->
+  <section class="home-section-plain">
+    <div class="hs-head-plain">
+      <div class="hs-title">Today's Meals</div>
+      <button class="hs-inline-btn" onclick="openLogModal()">+ Add</button>
+    </div>
+    <div id="food-list" class="food-list"></div>
+  </section>
+
+  <!-- ═══ NUTRIENTS ═══ -->
+  <section class="home-section">
+    <div class="hs-head"><div class="hs-title">Nutrients</div></div>
+    <div class="hs-body" id="nutrient-breakdown"></div>
+  </section>
+
+  <!-- ═══ HYDRATION ═══ -->
+  <section class="home-section">
+    <div class="hs-head">
+      <div class="hs-title">Hydration</div>
+      <div class="hs-sub-inline">
+        <span id="water-cups">0</span>
+        <span class="hs-sub-dim">/ 8 cups · <span id="water-ml-display">0</span>&thinsp;mL</span>
+      </div>
+    </div>
+    <div class="hs-body">
       <div class="water-bar-bg"><div class="water-bar-fill" id="water-bar" style="width:0%"></div></div>
       <div class="cups-grid" id="cups-grid"></div>
       <button class="water-reset" onclick="resetWater()">Reset</button>
     </div>
-  </div>
-  <!-- AUTO-SUGGEST -->
-  <div class="gc">
-    <div class="gc-in">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-        <div class="sec-lbl" style="padding:0;font-size:10px">What to eat next</div>
-        <button id="suggest-btn" onclick="generateSuggestions()" style="background:rgba(74,124,126,0.07);border:1px solid rgba(74,124,126,0.14);border-radius:10px;padding:5px 12px;font-family:var(--font);font-size:12px;font-weight:700;color:var(--blue);cursor:pointer">✦ Suggest</button>
-      </div>
-      <div id="suggest-results"><div style="color:var(--muted);font-size:12px;line-height:1.6">Tap <strong style="color:var(--blue)">Suggest</strong> to get 3 AI-picked foods that fill your remaining macros for the day.</div></div>
+  </section>
+
+  <!-- ═══ SUGGEST ═══ -->
+  <section class="home-section">
+    <div class="hs-head">
+      <div class="hs-title">What to eat next</div>
+      <button class="hs-inline-btn" id="suggest-btn" onclick="generateSuggestions()">✦ Suggest</button>
     </div>
+    <div class="hs-body" id="suggest-results">
+      <div class="hs-empty-hint">Tap <strong>Suggest</strong> for 3 AI-picked foods that fill your remaining macros.</div>
+    </div>
+  </section>
+
+  <!-- ═══ BODY SCAN ═══ -->
+  <section class="home-section">
+    <div class="hs-head">
+      <div class="hs-title">Body Scan</div>
+      <div class="hs-sub-inline hs-sub-dim">Mar 4, 2026</div>
+    </div>
+    <div class="hs-body">
+      <div class="scan-row">
+        <div class="scan-s"><div class="scan-v" style="color:var(--accent-lake)">25.1%</div><div class="scan-l">Body Fat</div></div>
+        <div class="scan-s"><div class="scan-v">64.0</div><div class="scan-l">Lean kg</div></div>
+        <div class="scan-s"><div class="scan-v">1,965</div><div class="scan-l">BMR</div></div>
+        <div class="scan-s"><div class="scan-v" style="color:var(--mc)">2,340</div><div class="scan-l">Target</div></div>
+        <div class="scan-s"><div class="scan-v">−5.6kg</div><div class="scan-l">Goal</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ WHOOP ═══ -->
+  <section class="home-section whoop-section">
+    <div class="hs-head">
+      <div class="hs-title"><span class="whoop-dot"></span>WHOOP</div>
+      <button class="hs-inline-btn" onclick="openWhoopModal()">+ Log</button>
+    </div>
+    <div class="hs-body">
+      <div class="whoop-tab-row">
+        <div class="wh-tab active" id="wh-tab-0" onclick="selectWhoopTab(0)">
+          <div class="wh-tab-label">Wake Up</div><div class="wh-tab-time">Sleep &amp; Recovery</div><div class="wh-tab-dot"></div>
+        </div>
+        <div class="wh-tab" id="wh-tab-1" onclick="selectWhoopTab(1)">
+          <div class="wh-tab-label">1 PM</div><div class="wh-tab-time">Mid-day</div><div class="wh-tab-dot"></div>
+        </div>
+        <div class="wh-tab" id="wh-tab-2" onclick="selectWhoopTab(2)">
+          <div class="wh-tab-label">10 PM</div><div class="wh-tab-time">End of day</div><div class="wh-tab-dot"></div>
+        </div>
+      </div>
+      <div id="wh-snap-display" style="min-height:52px"></div>
+    </div>
+  </section>
+
+  <!-- Hidden IDs preserved for JS compatibility -->
+  <div style="display:none" aria-hidden="true">
+    <div id="welcome-card"><div class="wc-bg" id="wc-bg"><canvas id="wc-canvas"></canvas></div><div id="wc-greeting"></div><div id="wc-sub"></div><div id="wc-weather"><span id="wc-wicon"></span><span id="wc-wtemp"></span><span id="wc-wdesc"></span></div></div>
   </div>
 </div>
+<!-- END HOME -->
 
-<!-- ═══ WORKOUT ═══ -->
+<!-- ═══ WORKOUT (preserved) ═══ -->
 <div id="pg-workout" class="page">
   <div class="hdr">
     <div class="logo-wrap">
@@ -256,11 +322,13 @@
   </div>
 </div>
 
-<!-- ═══ WEEKLY + CALENDAR (merged) ═══ -->
+<!-- ═══ PROGRESS (preserved) ═══ -->
 <div id="pg-progress" class="page">
   <div class="hdr">
     <div class="logo-wrap">
-      <div class="logo-icon"><span style="font-family:var(--font);font-size:15px;font-weight:800;color:#fff;letter-spacing:-1px">rB</span></div>
+      <button class="hdr-back-btn" onclick="showPage('today',this)" aria-label="Back home">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
       <div><div class="logo-main">Progress</div><div class="logo-sub">Your journey</div></div>
     </div>
   </div>
@@ -294,7 +362,7 @@
   </div>
 </div>
 
-<!-- ═══ AI COACH PAGE ═══ -->
+<!-- ═══ COACH (preserved) ═══ -->
 <div id="pg-coach" class="page">
   <div class="coach-topbar">
     <div class="coach-tb-left">
@@ -322,8 +390,7 @@
   </div>
 </div>
 
-
-<!-- ═══ FASTING PAGE ═══ -->
+<!-- ═══ FAST (preserved) ═══ -->
 <div id="pg-fast" class="page">
   <div class="hdr">
     <div class="logo-wrap">
@@ -444,23 +511,24 @@
 
 </div><!-- #app -->
 
-<!-- BOTTOM NAV -->
+<!-- ═══ BOTTOM NAV — 3 tabs ═══ -->
 <nav class="bnav">
   <div class="bnav-inner">
     <button class="nb active" id="nb-today" onclick="showPage('today',this)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
-      <span>Log Meal</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12l9-9 9 9M5 10v10a1 1 0 001 1h4v-7h4v7h4a1 1 0 001-1V10"/></svg>
+      <span>Home</span>
     </button>
     <button class="nb" id="nb-workout" onclick="showPage('workout',this)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6.5 6.5h11M6.5 17.5h11M4 12h16M2 9l2 3-2 3M22 9l-2 3 2 3"/></svg>
-      <span>Workout</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6.5 6.5h11M6.5 17.5h11M4 12h16M2 9l2 3-2 3M22 9l-2 3 2 3"/></svg>
+      <span>Train</span>
     </button>
-    <button class="nb" id="nb-fast" onclick="showPage('fast',this)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
-      <span>Fast</span>
+    <button class="nb" id="nb-coach" onclick="showPage('coach',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+      <span>Coach</span>
     </button>
   </div>
-  <!-- FAB sits to the right of the tray pill -->
+  <button id="nb-fast" style="display:none" onclick="showPage('fast',this)"></button>
+
   <div id="fab-wrap" class="fab-wrap">
     <div id="fab-sub-btns" class="fab-sub-btns">
       <div class="fab-pill fab-today-pill" style="--i:4" onclick="fabClose();showPage('coach',document.getElementById('coach-fab'))">
@@ -500,6 +568,9 @@
     </div>
   </div>
 </nav>
+<div class="fab-dim" id="fab-dim" onclick="fabClose()"></div>
+
+<button id="coach-fab" style="display:none" onclick="showPage('coach',this)"></button>
 
 <!-- MODAL: LOG MEAL -->
 <div class="overlay" id="log-modal">
@@ -925,8 +996,183 @@
   </div>
 </div>
 
-
 <script src="data.js"></script>
 <script src="app.js"></script>
+<script>
+// ═══ v11 HOME GLUE — bridges new Home layout to existing app.js ═══
+(function() {
+  'use strict';
+
+  function updateHdrDate() {
+    var el = document.getElementById('hdr-date');
+    if (!el) return;
+    var now = new Date();
+    var days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    el.textContent = days[now.getDay()] + ' · ' + months[now.getMonth()] + ' ' + now.getDate();
+  }
+
+  function updateCalTarget() {
+    try {
+      if (typeof getCalTarget === 'function') {
+        var el = document.getElementById('cal-target-disp');
+        if (el) el.textContent = getCalTarget().toLocaleString();
+      }
+    } catch(e){}
+  }
+
+  function renderMiniWeekBars() {
+    var box = document.getElementById('home-week-bars');
+    if (!box) return;
+    try {
+      var KEY_LOCAL = (typeof KEY !== 'undefined') ? KEY : 'rb5';
+      var today = new Date();
+      var vals = [], maxCal = 0;
+      for (var i = 6; i >= 0; i--) {
+        var d = new Date(today); d.setDate(today.getDate() - i);
+        var key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+        var raw = localStorage.getItem(KEY_LOCAL + '_meals_' + key);
+        var cal = 0;
+        if (raw) { try { JSON.parse(raw).forEach(function(m){ cal += (m.calories||0); }); } catch(e){} }
+        vals.push({d:d, cal:cal});
+        if (cal > maxCal) maxCal = cal;
+      }
+      var target = (typeof getCalTarget === 'function') ? getCalTarget() : 2340;
+      var scale = Math.max(maxCal, target);
+      var dows = ['S','M','T','W','T','F','S'];
+      var total = 0, daysWithData = 0;
+      box.innerHTML = vals.map(function(v, i){
+        var pct = scale > 0 ? (v.cal / scale * 100) : 0;
+        var isToday = (i === 6);
+        var hasData = v.cal > 0;
+        if (hasData) { total += v.cal; daysWithData++; }
+        var cls = isToday ? 'mwb-today' : (hasData ? 'mwb-full' : 'mwb-empty');
+        return '<div class="mwb-col ' + cls + '"><div class="mwb-bar-wrap"><div class="mwb-bar" style="height:' + Math.max(3, pct) + '%"></div></div><div class="mwb-lbl">' + dows[v.d.getDay()] + '</div></div>';
+      }).join('');
+      var avg = daysWithData ? Math.round(total / daysWithData) : 0;
+      var sum = document.getElementById('home-week-summary');
+      if (sum) sum.textContent = avg > 0 ? (avg.toLocaleString() + ' avg') : '—';
+    } catch(e){ box.innerHTML = ''; }
+  }
+
+  function renderHomeStats() {
+    try {
+      var KEY_LOCAL = (typeof KEY !== 'undefined') ? KEY : 'rb5';
+      var entriesRaw = localStorage.getItem(KEY_LOCAL + '_entries');
+      var wEl = document.getElementById('home-weight-v');
+      if (wEl) {
+        var w = '—';
+        if (entriesRaw) {
+          try {
+            var arr = JSON.parse(entriesRaw);
+            if (arr.length) {
+              var latest = arr[arr.length - 1];
+              if (latest && latest.w) w = Number(latest.w).toFixed(1);
+            }
+          } catch(e){}
+        }
+        wEl.innerHTML = w !== '—' ? (w + '<span class="hr-stat-u">kg</span>') : '—';
+      }
+      var smNum = document.getElementById('smc-num');
+      var sEl = document.getElementById('home-streak-v');
+      if (sEl && smNum) sEl.innerHTML = (smNum.textContent || '0') + '<span class="hr-stat-u">d</span>';
+
+      var wArc = document.getElementById('wo-ready-arc');
+      var wPct = document.getElementById('wo-ready-pct');
+      var wVerd = document.getElementById('wo-ready-verdict');
+      var hArc = document.getElementById('home-ready-arc');
+      var hPct = document.getElementById('home-ready-pct');
+      var hVerd = document.getElementById('home-ready-verdict');
+      if (hArc && wArc) hArc.setAttribute('stroke-dashoffset', wArc.getAttribute('stroke-dashoffset') || 238.76);
+      if (hPct && wPct && wPct.textContent && wPct.textContent !== '—') hPct.textContent = wPct.textContent;
+      if (hVerd && wVerd && wVerd.textContent) hVerd.textContent = wVerd.textContent;
+    } catch(e){}
+  }
+
+  function renderHomeFastWidget() {
+    try {
+      var KEY_LOCAL = (typeof KEY !== 'undefined') ? KEY : 'rb5';
+      var raw = localStorage.getItem(KEY_LOCAL + '_fast_active');
+      var widget = document.getElementById('home-fast-widget');
+      if (!widget) return;
+      if (!raw) { widget.style.display = 'none'; return; }
+      var state = JSON.parse(raw);
+      if (!state || !state.start) { widget.style.display = 'none'; return; }
+      var now = Date.now();
+      var elapsed = now - state.start;
+      var goal = (state.goalH || 16) * 3600 * 1000;
+      var pct = Math.min(1, elapsed / goal);
+      var hours = Math.floor(elapsed / 3600000);
+      var mins = Math.floor((elapsed % 3600000) / 60000);
+      var secs = Math.floor((elapsed % 60000) / 1000);
+      var pad = function(n){ return String(n).padStart(2,'0'); };
+      widget.style.display = 'flex';
+      var pEl = document.getElementById('hfw-proto');
+      var tEl = document.getElementById('hfw-time');
+      var rEl = document.getElementById('hfw-ring-fill');
+      if (pEl) pEl.textContent = state.proto || ((state.goalH || 16) + ':' + (24 - (state.goalH || 16)));
+      if (tEl) tEl.textContent = pad(hours) + ':' + pad(mins) + ':' + pad(secs);
+      if (rEl) rEl.setAttribute('stroke-dashoffset', 125.66 * (1 - pct));
+    } catch(e){}
+  }
+
+  setInterval(renderHomeFastWidget, 1000);
+
+  if (typeof window.renderAll === 'function') {
+    var origRenderAll = window.renderAll;
+    window.renderAll = function() {
+      var r = origRenderAll.apply(this, arguments);
+      try {
+        updateHdrDate();
+        updateCalTarget();
+        renderMiniWeekBars();
+        renderHomeStats();
+        renderHomeFastWidget();
+      } catch(e){ console.warn('home-glue renderAll:', e); }
+      return r;
+    };
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(function(){
+      updateHdrDate();
+      updateCalTarget();
+      renderMiniWeekBars();
+      renderHomeStats();
+      renderHomeFastWidget();
+    }, 200);
+  });
+
+  // Context-aware FAB + 3-tab nav highlighting
+  var origShowPage = window.showPage;
+  if (typeof origShowPage === 'function') {
+    window.showPage = function(id, btn) {
+      var r = origShowPage.apply(this, arguments);
+      try {
+        var wrap = document.getElementById('fab-wrap');
+        if (wrap) {
+          if (id === 'workout') wrap.classList.add('fab-wo-mode');
+          else wrap.classList.remove('fab-wo-mode');
+        }
+        ['nb-today','nb-workout','nb-coach'].forEach(function(nid){
+          var b = document.getElementById(nid); if (b) b.classList.remove('active');
+        });
+        if (id === 'today') { var nt = document.getElementById('nb-today'); if (nt) nt.classList.add('active'); }
+        else if (id === 'workout') { var nw = document.getElementById('nb-workout'); if (nw) nw.classList.add('active'); }
+        else if (id === 'coach') { var nc = document.getElementById('nb-coach'); if (nc) nc.classList.add('active'); }
+        // fast & progress: no highlight (reached via inline entry points)
+      } catch(e){}
+      return r;
+    };
+  }
+
+  window.saveWoRecovery = function() {
+    try {
+      var v = parseInt(document.getElementById('wo-rec-val').value, 10);
+      if (!isNaN(v) && typeof setRecovery === 'function') setRecovery(v);
+    } catch(e){}
+  };
+})();
+</script>
 </body>
 </html>
