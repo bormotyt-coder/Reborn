@@ -4547,31 +4547,159 @@ function skipRestTimer() {
 }
 
 function playRestChime() {
+  // Approach 1 — Web Audio (desktop + when AudioContext is available)
+  // Uses triangle wave + higher gain to cut through background music.
   try {
-    const ac = new (window.AudioContext || window.webkitAudioContext)();
-    
-    // Pleasant two-tone chime (like a gentle notification)
-    const playTone = (freq, start, dur) => {
-      const o = ac.createOscillator();
-      const g = ac.createGain();
-      o.type = 'sine';
-      o.frequency.value = freq;
-      g.gain.setValueAtTime(0.3, ac.currentTime + start);
-      g.gain.exponentialRampToValueAtTime(0.01, ac.currentTime + start + dur);
-      o.connect(g);
-      g.connect(ac.destination);
-      o.start(ac.currentTime + start);
-      o.stop(ac.currentTime + start + dur);
-    };
-    
-    // Two ascending tones
-    playTone(523, 0, 0.15);     // C5
-    playTone(659, 0.12, 0.2);   // E5
-    playTone(784, 0.25, 0.25);  // G5
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (AC) {
+      const ac = window._restChimeCtx || (window._restChimeCtx = new AC());
+      // Suspended contexts (common in PWA background/foreground) do nothing silently.
+      // resume() returns a promise; we fire-and-forget.
+      if (ac.state === 'suspended') ac.resume().catch(()=>{});
+
+      const playTone = (freq, startOffset, dur, gain=0.7) => {
+        const o = ac.createOscillator();
+        const g = ac.createGain();
+        o.type = 'triangle'; // richer than sine, more audible than square
+        o.frequency.value = freq;
+        const t0 = ac.currentTime + startOffset;
+        g.gain.setValueAtTime(0.0001, t0);
+        g.gain.exponentialRampToValueAtTime(gain, t0 + 0.01);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+        o.connect(g);
+        g.connect(ac.destination);
+        o.start(t0);
+        o.stop(t0 + dur + 0.02);
+      };
+
+      // Three ascending tones — brighter "ding-ding-ding" pattern
+      playTone(880,  0.00, 0.18, 0.7);  // A5
+      playTone(1175, 0.15, 0.18, 0.7);  // D6
+      playTone(1568, 0.30, 0.28, 0.8);  // G6
+    }
   } catch (e) {
-    console.log('[reBorn] Audio not available');
+    console.log('[reBorn] Web Audio not available:', e);
   }
+
+  // Approach 2 — HTML5 <audio> fallback.
+  // On iOS, <audio> playback goes to MEDIA volume and ducks other media apps
+  // (Spotify) instead of being muted by the silent switch / other-audio-playing.
+  // This is the reliable path when Spotify is active.
+  try {
+    if (!window._restChimeAudio) {
+      // Short 3-tone chime baked as a base64 WAV, ~0.6s.
+      // 22050Hz mono 16-bit, three tones: A5, D6, G6.
+      window._restChimeAudio = _buildChimeAudioEl();
+    }
+    const a = window._restChimeAudio;
+    a.currentTime = 0;
+    a.volume = 1.0;
+    const p = a.play();
+    if (p && p.catch) p.catch(err => console.log('[reBorn] <audio> blocked:', err));
+  } catch (e) {
+    console.log('[reBorn] HTML5 audio fallback failed:', e);
+  }
+
+  // Approach 3 — Vibration (already present in caller, but belt & suspenders
+  // here too in case the timer's vibrate call gets ripped out later).
+  try { if (navigator.vibrate) navigator.vibrate([120, 60, 120, 60, 200]); } catch(e){}
 }
+
+// Synthesize a 3-tone chime WAV and return a playable <audio> element.
+// Runs once per page-load; the result is cached on window._restChimeAudio.
+function _buildChimeAudioEl() {
+  const sampleRate = 22050;
+  const tones = [
+    { freq: 880,  start: 0.00, dur: 0.18 }, // A5
+    { freq: 1175, start: 0.15, dur: 0.18 }, // D6
+    { freq: 1568, start: 0.30, dur: 0.30 }, // G6
+  ];
+  const totalDur = 0.70;
+  const totalSamples = Math.floor(sampleRate * totalDur);
+  const samples = new Float32Array(totalSamples);
+
+  tones.forEach(t => {
+    const startIdx = Math.floor(t.start * sampleRate);
+    const endIdx   = Math.min(totalSamples, Math.floor((t.start + t.dur) * sampleRate));
+    for (let i = startIdx; i < endIdx; i++) {
+      const localT = (i - startIdx) / sampleRate;
+      // Triangle wave — richer than sine, still smooth
+      const phase = (t.freq * localT) % 1;
+      const tri = phase < 0.5 ? (4*phase - 1) : (3 - 4*phase);
+      // Exponential decay envelope for a nice "ding"
+      const env = Math.exp(-4 * localT);
+      samples[i] += tri * env * 0.55;
+    }
+  });
+
+  // Soft clip anything over [-1, 1]
+  for (let i = 0; i < totalSamples; i++) {
+    if (samples[i] >  1) samples[i] =  1;
+    if (samples[i] < -1) samples[i] = -1;
+  }
+
+  // Encode as 16-bit PCM WAV
+  const buffer = new ArrayBuffer(44 + totalSamples * 2);
+  const view = new DataView(buffer);
+  const writeStr = (off, s) => { for (let i=0;i<s.length;i++) view.setUint8(off+i, s.charCodeAt(i)); };
+  writeStr(0, 'RIFF');
+  view.setUint32(4, 36 + totalSamples * 2, true);
+  writeStr(8, 'WAVE');
+  writeStr(12, 'fmt ');
+  view.setUint32(16, 16, true);        // PCM chunk size
+  view.setUint16(20, 1, true);         // PCM format
+  view.setUint16(22, 1, true);         // mono
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true); // byte rate
+  view.setUint16(32, 2, true);         // block align
+  view.setUint16(34, 16, true);        // bits per sample
+  writeStr(36, 'data');
+  view.setUint32(40, totalSamples * 2, true);
+  let off = 44;
+  for (let i = 0; i < totalSamples; i++) {
+    const s = Math.max(-1, Math.min(1, samples[i]));
+    view.setInt16(off, s * 0x7FFF, true);
+    off += 2;
+  }
+
+  const blob = new Blob([buffer], { type: 'audio/wav' });
+  const a = new Audio();
+  a.src = URL.createObjectURL(blob);
+  a.preload = 'auto';
+  // iOS: treat this as media (plays over Spotify at media volume rather than being silenced)
+  a.setAttribute('playsinline', '');
+  return a;
+}
+
+// Unlock audio on first user tap — required by iOS/Safari so Web Audio + <audio>
+// can both play mid-workout without a prior gesture in that session.
+(function primeAudioOnFirstTap(){
+  let primed = false;
+  const prime = () => {
+    if (primed) return;
+    primed = true;
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (AC) {
+        const ac = window._restChimeCtx || (window._restChimeCtx = new AC());
+        if (ac.state === 'suspended') ac.resume().catch(()=>{});
+        // Silent blip to fully unlock on iOS
+        const o = ac.createOscillator();
+        const g = ac.createGain();
+        g.gain.value = 0.0001;
+        o.connect(g); g.connect(ac.destination);
+        o.start(); o.stop(ac.currentTime + 0.02);
+      }
+      if (!window._restChimeAudio) window._restChimeAudio = _buildChimeAudioEl();
+      // Touch the <audio> element so iOS registers it as "user-initiated"
+      const a = window._restChimeAudio;
+      a.volume = 0;
+      const p = a.play();
+      if (p && p.then) p.then(()=>{ a.pause(); a.currentTime = 0; a.volume = 1.0; }).catch(()=>{});
+    } catch(e){}
+  };
+  ['touchstart','click','keydown'].forEach(ev => document.addEventListener(ev, prime, { once:false, passive:true }));
+})();
 
 // ── Finish workout ──
 async function finishWorkout(){
@@ -5710,3 +5838,77 @@ function _lntTipForNext(s){
 
 // Initial render in case renderAll already fired
 try { renderLantern(); } catch(e){ console.warn('[lantern init]', e); }
+
+/* ═══════════════════════════════════════════════════════════
+   HOME READINESS TILE — populates the placeholder elements
+   (home-ready-pct, home-ready-arc, home-ready-verdict,
+    home-weight-v, home-streak-v)
+═══════════════════════════════════════════════════════════ */
+function renderHomeReadiness(){
+  const pctEl    = gv('home-ready-pct');
+  const arcEl    = gv('home-ready-arc');
+  const verdictEl= gv('home-ready-verdict');
+  const wEl      = gv('home-weight-v');
+  const sEl      = gv('home-streak-v');
+  if(!pctEl && !wEl && !sEl) return; // tile not on page
+
+  const rec = whoopSnaps[0]?.recovery;
+  // Ring geometry matches the SVG in index.html: r=38, circ=2*PI*38 = 238.76
+  const CIRC_HOME = 238.76;
+
+  if(pctEl && arcEl){
+    if(rec != null){
+      const offset = CIRC_HOME - (CIRC_HOME * Math.min(rec,100) / 100);
+      arcEl.style.strokeDashoffset = offset;
+      const col = rec >= 67 ? 'var(--green)' : rec >= 34 ? 'var(--amber)' : 'var(--red)';
+      arcEl.style.stroke = col;
+      pctEl.textContent = rec;
+      pctEl.style.color = col;
+    } else {
+      arcEl.style.strokeDashoffset = CIRC_HOME;
+      pctEl.textContent = '—';
+      pctEl.style.color = '';
+    }
+  }
+
+  if(verdictEl){
+    if(rec == null){
+      verdictEl.textContent = 'Log recovery →';
+    } else if(rec >= 67){
+      verdictEl.textContent = 'Green day. Push the lift.';
+    } else if(rec >= 50){
+      verdictEl.textContent = 'Decent — moderate volume.';
+    } else if(rec >= 34){
+      verdictEl.textContent = 'Yellow — keep it controlled.';
+    } else {
+      verdictEl.textContent = 'Red — light work or rest.';
+    }
+  }
+
+  // Latest weight (from entries[])
+  if(wEl){
+    const wEntries = entries.filter(e => e && e.weight != null);
+    const latest = wEntries.length ? wEntries[wEntries.length-1].weight : null;
+    wEl.textContent = latest != null ? (+latest).toFixed(1) : '—';
+  }
+
+  // Streak
+  if(sEl){
+    try {
+      const s = calcStreak();
+      sEl.textContent = s > 0 ? s + 'd' : '—';
+    } catch(e){ sEl.textContent = '—'; }
+  }
+}
+
+// Hook into renderAll additively — same wrapper pattern as the Lantern.
+(function(){
+  const _prev = window.renderAll;
+  window.renderAll = function(){
+    _prev && _prev.apply(this, arguments);
+    try { renderHomeReadiness(); } catch(e){ console.warn('[home-readiness]', e); }
+  };
+})();
+
+// Initial render in case renderAll already fired
+try { renderHomeReadiness(); } catch(e){ console.warn('[home-readiness init]', e); }
