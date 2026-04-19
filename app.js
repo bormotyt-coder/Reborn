@@ -5297,3 +5297,416 @@ window.reBornDebug = {
 
 console.log('%c[reBorn] AI Infrastructure v2.0 loaded', 'color: #4ade80; font-weight: bold;');
 console.log('%c[reBorn] Debug: window.reBornDebug.showState()', 'color: #888;');
+
+/* ═══════════════════════════════════════════════════════════
+   THE LANTERN — companion object logic
+   Append to the end of app.js
+   Reads existing rb5_ state keys, writes nothing.
+═══════════════════════════════════════════════════════════ */
+
+// ── Ritual definitions — bite-sized daily goals derived from existing data ──
+const LNT_RITUALS = [
+  { id:'fuel',    label:'Break the fast',       test:()=>getTotals().cal > 0 },
+  { id:'protein', label:'Protein on pace',      test:()=>getTotals().p >= TARGETS.p*0.6 },
+  { id:'water',   label:'4+ cups of water',     test:()=>cups >= 4 },
+  { id:'move',    label:'Workout logged',       test:()=>_lntWorkoutToday() },
+  { id:'recovery',label:'WHOOP recorded',       test:()=>!!(whoopSnaps[0]&&whoopSnaps[0].recovery) },
+  { id:'window',  label:'Stayed in the window', test:()=>_lntEatingWindowOK() },
+];
+
+function _lntWorkoutToday(){
+  const hist = load(`${KEY}_wo_history`, []);
+  const today = todayKey();
+  return hist.some(s => s.date && s.date.slice(0,10) === today);
+}
+
+function _lntLastWorkoutMs(){
+  const hist = load(`${KEY}_wo_history`, []);
+  if(!hist.length) return null;
+  let latest = 0;
+  hist.forEach(s => {
+    if(s.date){
+      const t = new Date(s.date).getTime();
+      if(t > latest) latest = t;
+    }
+  });
+  return latest || null;
+}
+
+function _lntEatingWindowOK(){
+  // true if no meal logged outside 10h window from first meal
+  if(meals.length < 1) return true;
+  const times = meals.map(m => m.loggedAt ? new Date(m.loggedAt).getTime() : null).filter(Boolean);
+  if(times.length < 2) return true;
+  const span = (Math.max(...times) - Math.min(...times)) / 3600000;
+  return span <= 10;
+}
+
+function _lntHour(){ return new Date().getHours(); }
+
+// ═══ STATE COMPUTATION ═══
+// Returns { state, factors, rituals }
+function computeLanternState(){
+  const t = getTotals();
+  const protPct = t.p / TARGETS.p;
+  const calPct  = t.cal / getCalTarget();
+  const hour    = _lntHour();
+  const rec     = whoopSnaps[0]?.recovery;
+  const fastActive = fastState && !fastState.end;
+  const lastWoMs = _lntLastWorkoutMs();
+  const hoursSinceWo = lastWoMs ? (Date.now() - lastWoMs) / 3600000 : null;
+  const streak = calcStreak();
+
+  // Factors list — each is a signal that affects the lantern
+  const factors = [];
+
+  // Protein
+  if(t.p > 0){
+    const pFactor = {
+      icon: protPct >= 0.7 ? '🔥' : protPct >= 0.4 ? '◐' : '◯',
+      tone: protPct >= 0.7 ? 'pos' : protPct >= 0.4 ? 'neu' : 'neg',
+      title:'Protein',
+      desc: protPct >= 0.7 ? 'Strong — core burning warm'
+          : protPct >= 0.4 ? 'Building, needs more before evening'
+          : 'Low — the lantern can\'t catch',
+      val: Math.round(t.p)+'g'
+    };
+    factors.push(pFactor);
+  } else {
+    factors.push({ icon:'◯', tone:'neu', title:'Protein', desc:'Not yet logged today', val:'0g' });
+  }
+
+  // Calories
+  if(calPct > 0){
+    factors.push({
+      icon: calPct > 1.1 ? '▲' : calPct >= 0.7 ? '◆' : '◇',
+      tone: calPct > 1.1 ? 'neg' : calPct >= 0.7 ? 'pos' : 'neu',
+      title:'Calories',
+      desc: calPct > 1.1 ? 'Over target — burning through reserves'
+          : calPct >= 0.7 ? 'On pace for the day'
+          : 'Room to fuel',
+      val: Math.round(t.cal)+' kcal'
+    });
+  }
+
+  // Water
+  const wTone = cups >= 6 ? 'pos' : cups >= 3 ? 'neu' : 'neg';
+  factors.push({
+    icon: cups >= 6 ? '◉' : cups >= 3 ? '◍' : '◌',
+    tone: wTone,
+    title:'Hydration',
+    desc: cups >= 6 ? 'Flowing well'
+        : cups >= 3 ? 'Steady — keep sipping'
+        : hour >= 15 ? 'Thin — lantern is dimming' : 'Just starting',
+    val: cups+' / 8'
+  });
+
+  // Workout
+  if(hoursSinceWo !== null && hoursSinceWo < 24){
+    factors.push({
+      icon:'⚡',
+      tone:'pos',
+      title:'Movement',
+      desc: hoursSinceWo < 4 ? 'Still glowing from your session'
+          : 'Trained earlier — afterburn active',
+      val: hoursSinceWo < 1 ? 'just now' : Math.round(hoursSinceWo)+'h ago'
+    });
+  } else {
+    factors.push({
+      icon:'○', tone:'neu', title:'Movement',
+      desc:'No session logged today', val:'—'
+    });
+  }
+
+  // WHOOP recovery
+  if(rec !== undefined && rec !== null){
+    factors.push({
+      icon: rec >= 67 ? '●' : rec >= 34 ? '◐' : '○',
+      tone: rec >= 67 ? 'pos' : rec >= 34 ? 'neu' : 'neg',
+      title:'Recovery',
+      desc: rec >= 67 ? 'Body is ready — push today'
+          : rec >= 34 ? 'Yellow — move with care'
+          : 'Red — the lantern flickers',
+      val: rec+'%'
+    });
+  }
+
+  // Fast
+  if(fastActive){
+    const startMs = new Date(fastState.start).getTime();
+    const hrs = (Date.now() - startMs)/3600000;
+    factors.push({
+      icon:'☾', tone:'neu', title:'Fasting',
+      desc: hrs >= 14 ? 'Deep in the window — lantern cooled to moon'
+          : hrs >= 8  ? 'Halfway in — metabolism shifting'
+          : 'Early in the fast',
+      val: hrs.toFixed(1)+'h'
+    });
+  }
+
+  // Streak
+  if(streak >= 3){
+    factors.push({
+      icon:'🔥', tone:'pos', title:'Consistency',
+      desc: streak >= 30 ? 'A month of keeping the flame' : streak >= 7 ? 'The routine is holding' : 'Building momentum',
+      val: streak+'d'
+    });
+  }
+
+  // ═══ STATE — precedence order ═══
+  let state = 'still';
+
+  if(hoursSinceWo !== null && hoursSinceWo < 4){
+    state = 'kindled';
+  } else if(fastActive){
+    state = 'moonlit';
+  } else if(rec !== undefined && rec < 34 && (meals.length === 0 || cups < 2)){
+    state = 'guttering';
+  } else if(
+    (hour >= 15 && cups < 4) ||
+    (hour >= 18 && protPct < 0.4)
+  ){
+    state = 'banked';
+  } else if(
+    protPct >= 0.7 &&
+    (_lntWorkoutToday() || streak >= 7)
+  ){
+    state = 'ember';
+  }
+
+  // Rituals — how many done
+  const rituals = LNT_RITUALS.map(r => ({ id:r.id, label:r.label, done:!!r.test() }));
+
+  return { state, factors, rituals };
+}
+
+// ═══ CAPTION GENERATION — procedural, no AI needed ═══
+function _lntCaption(s){
+  const t = getTotals();
+  const rec = whoopSnaps[0]?.recovery;
+  const hour = _lntHour();
+
+  const primary = {
+    kindled:   'Still glowing from your session.',
+    moonlit:   'Cooled to moonlight. The fast is holding.',
+    guttering: 'Flickering. The lantern needs fuel.',
+    banked:    hour >= 18 ? 'Dimmed through the evening.' : 'Cooling — hydration is thin.',
+    ember:     'Warm since your last lift.',
+    still:     meals.length === 0 ? 'Waiting for the first spark.' : 'Steady. The day is holding its shape.',
+  }[s.state];
+
+  // One small supporting line — varies by what's most "off"
+  const bits = [];
+  if(t.p > 0) bits.push(`Protein ${Math.round((t.p/TARGETS.p)*100)}%`);
+  if(cups > 0) bits.push(`${cups} cup${cups===1?'':'s'}`);
+  if(rec) bits.push(`Recovery ${rec}`);
+  if(s.state === 'moonlit' && fastState){
+    const hrs = ((Date.now()-new Date(fastState.start).getTime())/3600000).toFixed(1);
+    bits.unshift(`${hrs}h in`);
+  }
+  const sub = bits.slice(0,3).join(' · ');
+
+  return { primary, sub };
+}
+
+// ═══ ORB SVG — single component, state-driven ═══
+// Returns an SVG string. Two palettes: warm (ember/kindled/still) and cool (moonlit/banked/guttering)
+function _lntOrbSvg(state, size){
+  size = size || 220;
+  const h = Math.round(size * 0.77);
+  const cx = size/2, cy = h/2;
+
+  // Per-state palette and dims
+  const cfg = {
+    ember:    { haloA:'#E8A87C', haloO:0.40, coreA:'#F4C29A', coreB:'#E8A87C', core:38, hot:11, center:'#FFE8D4', ringO:0.12, haloR:78 },
+    kindled:  { haloA:'#F4C29A', haloO:0.55, coreA:'#FFE8D4', coreB:'#E8A87C', core:42, hot:13, center:'#FFF5E8', ringO:0.18, haloR:88 },
+    still:    { haloA:'#8FC9B5', haloO:0.28, coreA:'#B8E0CF', coreB:'#8FC9B5', core:34, hot:9,  center:'#E8F5EE', ringO:0.10, haloR:70 },
+    moonlit:  { haloA:'#B8A3E4', haloO:0.32, coreA:'#D4C5F0', coreB:'#B8A3E4', core:36, hot:9,  center:'#F0E8FA', ringO:0.12, haloR:72 },
+    banked:   { haloA:'#7FB0D4', haloO:0.22, coreA:'#A8C8E0', coreB:'#7FB0D4', core:30, hot:7,  center:'#D4E4F0', ringO:0.08, haloR:60 },
+    guttering:{ haloA:'#E88A82', haloO:0.18, coreA:'#E8A8A2', coreB:'#B8625A', core:22, hot:5,  center:'#F0C8C4', ringO:0.06, haloR:48 },
+  }[state] || { haloA:'#8FC9B5', haloO:0.28, coreA:'#B8E0CF', coreB:'#8FC9B5', core:34, hot:9, center:'#E8F5EE', ringO:0.10, haloR:70 };
+
+  // Unique IDs so multiple orbs (home + modal) don't collide
+  const uid = 'lnt_' + Math.random().toString(36).slice(2,8);
+
+  return `
+    <svg class="lnt-orb-svg lnt-${state}" width="${size}" height="${h}" viewBox="0 0 ${size} ${h}" aria-hidden="true">
+      <defs>
+        <radialGradient id="${uid}_halo" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="${cfg.haloA}" stop-opacity="${cfg.haloO}"/>
+          <stop offset="60%" stop-color="${cfg.haloA}" stop-opacity="${cfg.haloO*0.3}"/>
+          <stop offset="100%" stop-color="${cfg.haloA}" stop-opacity="0"/>
+        </radialGradient>
+        <radialGradient id="${uid}_core" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="${cfg.coreA}" stop-opacity="1"/>
+          <stop offset="40%" stop-color="${cfg.coreB}" stop-opacity="0.9"/>
+          <stop offset="100%" stop-color="${cfg.coreB}" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+      <circle cx="${cx}" cy="${cy}" r="${cfg.haloR}" fill="url(#${uid}_halo)"/>
+      <circle cx="${cx}" cy="${cy}" r="${cfg.core+24}" fill="none" stroke="${cfg.haloA}" stroke-opacity="${cfg.ringO*0.7}" stroke-width="0.5"/>
+      <circle cx="${cx}" cy="${cy}" r="${cfg.core+10}" fill="none" stroke="${cfg.haloA}" stroke-opacity="${cfg.ringO}" stroke-width="0.5"/>
+      <g class="lnt-core-anim">
+        <circle cx="${cx}" cy="${cy}" r="${cfg.core}" fill="url(#${uid}_core)"/>
+        <circle cx="${cx}" cy="${cy}" r="${cfg.hot}" fill="${cfg.coreA}"/>
+        <circle cx="${cx}" cy="${cy-2}" r="${Math.max(3,cfg.hot/2.5)}" fill="${cfg.center}"/>
+      </g>
+    </svg>
+  `;
+}
+
+// ═══ RENDER — called from renderAll() ═══
+function renderLantern(){
+  const host = gv('lantern-home');
+  if(!host) return;
+
+  const s = computeLanternState();
+  const cap = _lntCaption(s);
+
+  host.className = 'lnt-section lnt-'+s.state;
+
+  const ritualsHtml = s.rituals.map(r =>
+    `<div class="lnt-ritual-dot ${r.done?'done':''}" title="${r.label}"></div>`
+  ).join('');
+  const doneCount = s.rituals.filter(r=>r.done).length;
+
+  host.innerHTML = `
+    <div class="lnt-head">
+      <span class="lnt-kicker">THE LANTERN</span>
+      <span class="lnt-state-pill">
+        <span class="lnt-state-dot"></span>
+        <span>${s.state.toUpperCase()}</span>
+      </span>
+    </div>
+    <div class="lnt-orb-wrap">${_lntOrbSvg(s.state, 220)}</div>
+    <div class="lnt-caption">
+      ${cap.primary}
+      ${cap.sub ? `<span class="lnt-caption-sub">${cap.sub}</span>` : ''}
+    </div>
+    <div class="lnt-rituals">
+      ${ritualsHtml}
+      <span class="lnt-ritual-count">${doneCount} / ${s.rituals.length} RITUALS</span>
+    </div>
+  `;
+
+  // Cache for modal
+  host._lntState = s;
+}
+
+// ═══ MODAL — click-through insights ═══
+function openLanternModal(){
+  const modal = gv('lantern-modal');
+  if(!modal) return;
+  const host = gv('lantern-home');
+  const s = (host && host._lntState) || computeLanternState();
+
+  const stateBlurb = {
+    kindled:   'You\'ve just finished a session — the afterburn is still active and recovery is beginning.',
+    ember:     'Protein is landing, your training is present in the week. The flame holds itself.',
+    still:     'Nothing is wrong. Nothing is exceptional. The day is quiet.',
+    moonlit:   'You\'re inside a fasting window. The lantern waits with you.',
+    banked:    'Hydration is thin or protein hasn\'t caught up to the hour. The lantern is cooling.',
+    guttering: 'The day is running low on inputs. The lantern needs something — water, food, or rest logged.',
+  }[s.state];
+
+  // Figure out what would push toward the next "better" state
+  const tip = _lntTipForNext(s);
+
+  const factorsHtml = s.factors.map(f => `
+    <div class="lnm-factor">
+      <div class="lnm-factor-icon ${f.tone}">${f.icon}</div>
+      <div class="lnm-factor-body">
+        <div class="lnm-factor-title">${f.title}</div>
+        <div class="lnm-factor-desc">${f.desc}</div>
+      </div>
+      <div class="lnm-factor-val">${f.val}</div>
+    </div>
+  `).join('');
+
+  const ritualsHtml = s.rituals.map(r => `
+    <div class="lnm-factor">
+      <div class="lnm-factor-icon ${r.done?'pos':'neu'}">${r.done?'✓':'○'}</div>
+      <div class="lnm-factor-body">
+        <div class="lnm-factor-title">${r.label}</div>
+        <div class="lnm-factor-desc">${r.done?'Complete':'Open'}</div>
+      </div>
+    </div>
+  `).join('');
+
+  const tipHtml = tip ? `
+    <div class="lnm-tip">
+      <div class="lnm-tip-icon">✦</div>
+      <div class="lnm-tip-body">${tip}</div>
+    </div>` : '';
+
+  const body = gv('lnm-body');
+  body.innerHTML = `
+    <div class="lnm-hero">
+      <div class="lnm-hero-orb">${_lntOrbSvg(s.state, 70)}</div>
+      <div class="lnm-hero-txt">
+        <div class="lnm-hero-kicker">THE LANTERN IS</div>
+        <div class="lnm-hero-state">${s.state[0].toUpperCase()+s.state.slice(1)}</div>
+        <div class="lnm-hero-sub">${stateBlurb}</div>
+      </div>
+    </div>
+    ${tipHtml}
+    <div class="lnm-section-lbl">WHAT'S SHAPING IT</div>
+    ${factorsHtml}
+    <div class="lnm-section-lbl">TODAY'S RITUALS</div>
+    ${ritualsHtml}
+  `;
+
+  modal.classList.add('open');
+}
+function closeLanternModal(){ gv('lantern-modal').classList.remove('open'); }
+
+// Suggests the smallest input change that would warm the lantern
+function _lntTipForNext(s){
+  const t = getTotals();
+  const rec = whoopSnaps[0]?.recovery;
+  const hour = _lntHour();
+
+  if(s.state === 'ember' || s.state === 'kindled') return null; // already there
+
+  if(s.state === 'guttering'){
+    if(t.cal === 0) return 'Log anything — even water — to get the lantern back to <strong>Still</strong>.';
+    if(cups < 2) return 'Two more cups of water pulls you out of <strong>Guttering</strong>.';
+    return 'Log a meal and the lantern catches again.';
+  }
+  if(s.state === 'moonlit'){
+    const hrs = fastState ? ((Date.now()-new Date(fastState.start).getTime())/3600000) : 0;
+    const target = fastState?.targetHours || 16;
+    const left = Math.max(0, target - hrs);
+    return left > 0
+      ? `${left.toFixed(1)}h left in the window. Break it with protein to jump to <strong>Ember</strong>.`
+      : 'Window complete. Break the fast with protein.';
+  }
+  if(s.state === 'banked'){
+    if(cups < 4) return `${4-cups} more cup${4-cups===1?'':'s'} of water clears <strong>Banked</strong>.`;
+    const need = Math.max(0, Math.round(TARGETS.p*0.7 - t.p));
+    return `Another ${need}g of protein today pushes you to <strong>Ember</strong>.`;
+  }
+  if(s.state === 'still'){
+    const protPct = t.p / TARGETS.p;
+    if(protPct < 0.7){
+      const need = Math.max(0, Math.round(TARGETS.p*0.7 - t.p));
+      return `${need}g more protein and a session today → <strong>Ember</strong>.`;
+    }
+    if(!_lntWorkoutToday()) return 'A workout today would push you to <strong>Ember</strong>.';
+    return 'You\'re close. A workout + protein = <strong>Ember</strong>.';
+  }
+  return null;
+}
+
+// ═══ HOOK INTO renderAll ═══
+// Wrap the existing renderAll so we don't have to edit it.
+(function(){
+  const _prev = window.renderAll;
+  window.renderAll = function(){
+    _prev && _prev.apply(this, arguments);
+    try { renderLantern(); } catch(e){ console.warn('[lantern]', e); }
+  };
+})();
+
+// Initial render in case renderAll already fired
+try { renderLantern(); } catch(e){ console.warn('[lantern init]', e); }

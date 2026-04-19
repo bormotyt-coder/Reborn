@@ -116,6 +116,11 @@
 
   </section>
 
+  <!-- ═══ THE LANTERN — companion object ═══ -->
+  <section id="lantern-home" class="lnt-section" onclick="openLanternModal()">
+    <!-- populated by renderLantern() in app.js -->
+  </section>
+
   <!-- ═══ THIS WEEK — inline progress glance ═══ -->
   <section class="home-section home-section-tap" onclick="showPage('progress',this)">
     <div class="hs-head">
@@ -895,6 +900,15 @@
 
 <!-- Hidden anchor for coach active state tracking -->
 <button id="coach-fab" style="display:none" onclick="showPage('coach',this)"></button>
+
+<!-- MODAL: LANTERN INSIGHTS -->
+<div class="overlay" id="lantern-modal" onclick="closeLanternModal()">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="m-handle"></div>
+    <button class="lnm-close-btn" onclick="closeLanternModal()" aria-label="Close">✕</button>
+    <div id="lnm-body"></div>
+  </div>
+</div>
 
 <div class="overlay" id="streak-modal" onclick="closeStreakModal()">
   <div class="modal streak-modal-inner" onclick="event.stopPropagation()">
