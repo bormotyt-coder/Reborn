@@ -3251,16 +3251,17 @@ body::before { opacity: 0.8; }
 .lnt-section{
   position:relative;
   background:var(--surface);
-  border:0.5px solid var(--hair);
-  border-radius:var(--r-md);
+  border:1px solid var(--hair);
+  border-radius:20px;
+  margin:16px 16px 0;
   padding:22px 14px 16px;
-  margin:0 0 14px;
   overflow:hidden;
+  backdrop-filter:blur(10px);
   cursor:pointer;
-  transition:background .3s var(--ease-calm), border-color .3s var(--ease-calm);
+  transition:all .2s var(--ease-calm);
   -webkit-tap-highlight-color:transparent;
 }
-.lnt-section:active{ background:var(--surface-2); }
+.lnt-section:active{ transform:scale(0.997); background:var(--surface-2); }
 
 .lnt-head{
   position:absolute;
@@ -3307,10 +3308,18 @@ body::before { opacity: 0.8; }
   margin-top:4px;
   position:relative;
 }
-.lnt-orb-svg{
+/* Home orb — halo is allowed to spill within the section (section has overflow:hidden) */
+.lnt-orb-wrap .lnt-orb-svg{
   overflow:visible;
   width:220px;
   height:170px;
+}
+/* Hero orb in the modal — strictly clipped to its 70px box */
+.lnm-hero-orb .lnt-orb-svg{
+  width:70px;
+  height:54px;
+  overflow:hidden;
+  display:block;
 }
 
 /* Breathing animation on the core — very subtle, 4s cycle */
@@ -3409,6 +3418,12 @@ body::before { opacity: 0.8; }
   width:70px;
   height:70px;
   flex-shrink:0;
+  border-radius:50%;
+  overflow:hidden;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:rgba(255,255,255,0.02);
 }
 .lnm-hero-txt{ flex:1; min-width:0; }
 .lnm-hero-kicker{
