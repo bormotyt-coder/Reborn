@@ -3317,7 +3317,7 @@ body::before { opacity: 0.8; }
 /* Hero orb in the modal — strictly clipped to its 70px box */
 .lnm-hero-orb .lnt-orb-svg{
   width:70px;
-  height:54px;
+  height:70px;
   overflow:hidden;
   display:block;
 }
