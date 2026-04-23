@@ -4502,7 +4502,7 @@ body.v11 #pg-today .nut-sub {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   HYDRATION — wave slider
+   HYDRATION — wave slider (v11 red-orange theme)
 ═══════════════════════════════════════════════════════════ */
 body.v11 #pg-today .water-wave-wrap {
   position: relative;
@@ -4513,10 +4513,11 @@ body.v11 #pg-today .water-wave-wrap {
   background:
     linear-gradient(180deg, rgba(255,255,255,0.025) 0%, rgba(255,255,255,0.005) 100%),
     rgba(10, 18, 32, 0.85);
-  border: 1px solid rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,45,0,0.18);
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.04),
-    inset 0 -10px 24px rgba(0,0,0,0.35);
+    inset 0 -10px 24px rgba(0,0,0,0.45),
+    0 0 0 1px rgba(255,45,0,0.04);
   touch-action: none;      /* prevent browser scroll stealing horizontal drag */
   user-select: none;
   -webkit-user-select: none;
@@ -4526,11 +4527,11 @@ body.v11 #pg-today .water-wave-wrap {
 }
 body.v11 #pg-today .water-wave-wrap.is-dragging { cursor: grabbing; }
 body.v11 #pg-today .water-wave-wrap:focus-visible {
-  border-color: rgba(127,176,212,0.55);
+  border-color: rgba(255,45,0,0.55);
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.04),
-    inset 0 -10px 24px rgba(0,0,0,0.35),
-    0 0 0 2px rgba(127,176,212,0.25);
+    inset 0 -10px 24px rgba(0,0,0,0.45),
+    0 0 0 2px rgba(255,45,0,0.25);
 }
 body.v11 #pg-today .water-wave-svg {
   position: absolute;
@@ -4552,6 +4553,8 @@ body.v11 #pg-today .water-wave-ticks {
   color: rgba(255,255,255,0.22);
   pointer-events: none;
   z-index: 2;
+  /* make sure ticks read over any water level */
+  text-shadow: 0 1px 3px rgba(0,0,0,0.65);
 }
 body.v11 #pg-today .water-wave-thumb {
   position: absolute;
@@ -4559,32 +4562,35 @@ body.v11 #pg-today .water-wave-thumb {
   width: 52px;
   height: 52px;
   border-radius: 50%;
+  /* Dark navy core with a subtle red-orange inner glow, matching the streak pill style */
   background:
-    radial-gradient(circle at 30% 28%, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0) 55%),
-    linear-gradient(180deg, #DCEFFA 0%, #A5CFE6 45%, #6FA4C4 100%);
-  border: 1.5px solid rgba(255,255,255,0.65);
+    radial-gradient(circle at 30% 28%, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0) 55%),
+    linear-gradient(180deg, #1a2642 0%, #0E1729 100%);
+  border: 1.5px solid rgba(255,45,0,0.55);
   box-shadow:
-    0 4px 14px rgba(0,0,0,0.45),
-    0 0 0 1px rgba(0,0,0,0.12),
-    inset 0 1px 2px rgba(255,255,255,0.6);
+    0 4px 14px rgba(0,0,0,0.55),
+    0 0 0 1px rgba(0,0,0,0.35),
+    0 0 14px rgba(255,45,0,0.28),
+    inset 0 1px 1px rgba(255,255,255,0.08);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: #0A1220;
+  color: var(--v11-accent);
   z-index: 3;
   pointer-events: none; /* drag is handled on the wrapper; thumb just reflects state */
   will-change: transform;
-  transition: width .12s ease, height .12s ease;
+  transition: width .12s ease, height .12s ease, box-shadow .15s ease;
 }
 body.v11 #pg-today .water-wave-wrap.is-dragging .water-wave-thumb {
   width: 56px;
   height: 56px;
   box-shadow:
-    0 6px 20px rgba(0,0,0,0.55),
-    0 0 0 1px rgba(0,0,0,0.12),
-    0 0 0 4px rgba(127,176,212,0.18),
-    inset 0 1px 2px rgba(255,255,255,0.6);
+    0 6px 20px rgba(0,0,0,0.6),
+    0 0 0 1px rgba(0,0,0,0.35),
+    0 0 22px rgba(255,45,0,0.45),
+    0 0 0 4px rgba(255,45,0,0.15),
+    inset 0 1px 1px rgba(255,255,255,0.08);
 }
 body.v11 #pg-today .water-wave-thumb-val {
   font-family: var(--v11-font-display);
@@ -4592,14 +4598,15 @@ body.v11 #pg-today .water-wave-thumb-val {
   font-size: 17px;
   line-height: 1;
   letter-spacing: -0.03em;
+  color: var(--v11-accent);
 }
 body.v11 #pg-today .water-wave-thumb-unit {
   font-family: var(--v11-font-body);
-  font-weight: 600;
+  font-weight: 700;
   font-size: 8px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  opacity: 0.55;
+  color: rgba(255,255,255,0.55);
   margin-top: 2px;
 }
 body.v11 #pg-today .water-wave-hint {
@@ -4609,13 +4616,14 @@ body.v11 #pg-today .water-wave-hint {
   text-align: center;
   font-family: var(--v11-font-body);
   font-size: 10px;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.2em;
   text-transform: uppercase;
   color: rgba(255,255,255,0.32);
   pointer-events: none;
   z-index: 2;
   transition: opacity .25s ease;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.65);
 }
 body.v11 #pg-today .water-reset {
   background: transparent;

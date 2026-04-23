@@ -479,6 +479,21 @@ let ingredients=[];
 let activeTab  =0;
 const _mealThumbs=new Map(); // session-only thumb storage (keyed by loggedAt)
 
+// Hydration wave slider state (declared early so renderCups() — invoked from the
+// boot-time renderAll() below — doesn't hit a TDZ error when it references this.)
+const _waveState = {
+  mounted: false,
+  displayCups: 0,
+  p1: 0,
+  p2: Math.PI,
+  animTarget: null,
+  animStart: 0,
+  animFrom: 0,
+  animDur: 160,
+  lastW: 0,
+  lastH: 0,
+};
+
 // FASTING STATE (must be declared before BOOT runs to avoid TDZ crashes)
 const FAST_LOG_KEY   = 'fasting_log';
 const FAST_STATE_KEY = `${KEY}_fast_state`;
@@ -919,24 +934,7 @@ function setRing(id,vid,pid,cur,tgt,unit,delay){
   })(performance.now());
 }
 
-// CUPS — water wave slider
-const _waveState = {
-  mounted: false,
-  // displayed fill in cups (0..CUPS). Follows `cups` but can glide during snap animation.
-  displayCups: 0,
-  // phase offsets for the two waves, incremented every frame
-  p1: 0,
-  p2: Math.PI,
-  // transient target during post-drag snap animation
-  animTarget: null,
-  animStart: 0,
-  animFrom: 0,
-  animDur: 160,
-  // reusable buffers
-  lastW: 0,
-  lastH: 0,
-};
-
+// CUPS — water wave slider (state object hoisted to top of file to avoid TDZ)
 function _waveBuildPath(w, h, fill01, phase, freq, amp, baseOffset){
   // fill01: 0..1 of the container. 0 = dry (water at bottom), 1 = full.
   // Build a path sampling N points across the width, then close along the bottom.
