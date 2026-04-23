@@ -1228,11 +1228,14 @@
   function updateLogoForScroll(scrollTop) {
     var hdr = document.querySelector('#pg-today .hdr-v11');
     var wm  = document.querySelector('#pg-today .rb-wordmark');
+    var img = document.querySelector('#pg-today .rb-logo-img');
     var pg  = document.getElementById('pg-today');
     if (!hdr || !wm || !pg) return;
     var t = Math.min(1, Math.max(0, scrollTop / SHRINK_RANGE));
     var h = LOGO_MAX - (LOGO_MAX - LOGO_MIN) * t;
-    wm.style.setProperty('--logo-h', h.toFixed(1) + 'px');
+    var hStr = h.toFixed(1) + 'px';
+    wm.style.setProperty('--logo-h', hStr);
+    if (img) img.style.height = hStr;  // belt-and-braces direct set
     if (scrollTop > SCROLLED_THRESHOLD) {
       hdr.classList.add('hdr-scrolled');
       pg.classList.add('hdr-is-scrolled');
@@ -1246,21 +1249,31 @@
     var page = document.getElementById('pg-today');
     if (!page) return;
     var ticking = false;
-    page.addEventListener('scroll', function() {
+    function onScroll() {
       if (ticking) return;
       ticking = true;
       requestAnimationFrame(function() {
-        updateLogoForScroll(page.scrollTop);
+        // Use whichever scroll position is greater — handles cases where
+        // either .page or window/body is the actual scrolling element.
+        var st = Math.max(page.scrollTop || 0, window.pageYOffset || 0, document.documentElement.scrollTop || 0);
+        updateLogoForScroll(st);
         ticking = false;
       });
-    }, { passive: true });
+    }
+    page.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('scroll', onScroll, { passive: true });
     // init
-    updateLogoForScroll(page.scrollTop || 0);
+    onScroll();
   }
 
-  document.addEventListener('DOMContentLoaded', function() {
+  function initScrollShrink() {
     setTimeout(attachScrollShrink, 250);
-  });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initScrollShrink);
+  } else {
+    initScrollShrink();
+  }
 })();
 </script>
 </body>
