@@ -10,9 +10,13 @@
 <meta name="theme-color" content="#0A1220">
 <title>Project reBorn</title>
 <link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxODAgMTgwIj48cmVjdCB3aWR0aD0iMTgwIiBoZWlnaHQ9IjE4MCIgcng9IjQwIiBmaWxsPSIjMDkwYjEwIi8+PHRleHQgeD0iNTAlIiB5PSI1NCUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJHZW9yZ2lhLHNlcmlmIiBmb250LXNpemU9IjkwIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0iI2Q0ZjUzYyI+ckI8L3RleHQ+PC9zdmc+">
+<!-- v11 fonts: Dancing Script (logo 're'), Outfit (logo 'BORN' + headlines/numbers), DM Sans (body) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@600;700&family=Outfit:wght@300;400;500;600;700;800;900&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body class="v11">
 <div id="app">
 
 <!-- ═══════════════════════════════════════════════════
@@ -21,22 +25,19 @@
 ═══════════════════════════════════════════════════ -->
 <div id="pg-today" class="page active">
 
-  <header class="hdr">
-    <div class="logo-wrap">
-      <div class="logo-icon"><span>rB</span></div>
-      <div class="logo-text">
-        <div class="logo-main">reBorn</div>
-        <div class="logo-sub" id="hdr-date"></div>
+  <header class="hdr hdr-v11">
+    <div class="hdr-v11-inner">
+      <div class="rb-wordmark" aria-label="reBORN">
+        <span class="rb-wm-re">re</span><span class="rb-wm-born">BORN</span><span class="rb-wm-dot">.</span>
       </div>
-    </div>
-    <div class="hdr-right-pills">
-      <button class="hdr-icon-btn hdr-streak-compact" onclick="openStreakModal()" aria-label="Streak">
-        <span class="hdr-streak-icon">🔥</span>
-        <span class="hdr-streak-val" id="smc-num">0</span>
+      <button class="streak-pill-v11" onclick="openStreakModal()" aria-label="Streak">
+        <span class="sp-num" id="smc-num">0</span>
+        <span class="sp-sep">DAY STREAK</span>
+        <span class="sp-divider">|</span>
+        <span class="sp-best">best <span id="smc-best">0</span></span>
       </button>
-      <button class="hdr-icon-btn" onclick="showPage('progress',this)" aria-label="Progress">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-      </button>
+      <!-- hidden compat: preserves element referenced elsewhere -->
+      <span id="hdr-date" style="display:none"></span>
     </div>
   </header>
 
@@ -61,65 +62,94 @@
     </div>
   </section>
 
-  <!-- ═══ HERO: SPLIT DASHBOARD ═══ -->
-  <section class="hero-split">
+  <!-- ═══ HERO v11 rev2: canvas particle orb + gradient ring ═══ -->
+  <section class="hero-v11">
+    <div class="hero-v11-ring-wrap" onclick="openMacroBreakdown('calories')">
+      <svg class="hero-v11-ring" viewBox="0 0 260 260" aria-hidden="true">
+        <defs>
+          <linearGradient id="v11-arc-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%"   stop-color="var(--v11-accent)" stop-opacity="0.30"/>
+            <stop offset="70%"  stop-color="var(--v11-accent)" stop-opacity="0.85"/>
+            <stop offset="100%" stop-color="var(--v11-accent)" stop-opacity="1"/>
+          </linearGradient>
+          <filter id="v11-ring-glow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="3" result="blur"/>
+            <feMerge>
+              <feMergeNode in="blur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+        </defs>
+        <!-- track ring (faint) -->
+        <circle cx="130" cy="130" r="112" fill="none" stroke="rgba(255,255,255,0.04)" stroke-width="8"/>
+        <!-- progress arc with gradient + glow -->
+        <circle id="hero-v11-arc" cx="130" cy="130" r="112" fill="none"
+                stroke="url(#v11-arc-grad)" stroke-width="8" stroke-linecap="round"
+                stroke-dasharray="703.72" stroke-dashoffset="703.72"
+                transform="rotate(-90 130 130)" filter="url(#v11-ring-glow)"/>
+        <!-- end-cap dot: 3 layered circles (halo + core + white tip) -->
+        <g id="hero-v11-dot-group" style="transform-origin:130px 130px;">
+          <circle id="hero-v11-dot-halo" cx="130" cy="18" r="8"  fill="var(--v11-accent)" opacity="0.28"/>
+          <circle id="hero-v11-dot-core" cx="130" cy="18" r="5"  fill="var(--v11-accent)" filter="url(#v11-ring-glow)"/>
+          <circle id="hero-v11-dot-tip"  cx="130" cy="18" r="2.2" fill="#fff" opacity="0.92"/>
+        </g>
+      </svg>
 
-    <div class="hero-tile hero-cals" onclick="openMacroBreakdown('calories')">
-      <div class="ht-label">CALORIES</div>
-      <div class="ht-main">
-        <span class="cal-big" id="cal-num"><span class="cal-count-n">0</span></span>
-        <span class="ht-target">/ <span id="cal-target-disp">2,340</span></span>
+      <!-- canvas-based particle orb (drawn by JS) -->
+      <canvas id="hero-v11-canvas" class="hero-v11-canvas" aria-hidden="true"></canvas>
+
+      <div class="hero-v11-center">
+        <div class="hero-v11-num" id="cal-num"><span class="cal-count-n">0</span></div>
+        <div class="hero-v11-sub">KCAL TODAY</div>
       </div>
-      <div class="cal-rem" id="cal-rem">— left</div>
-      <div class="pbar-slim"><div class="pbar-f" id="cal-bar" style="width:0%"></div></div>
-      <div class="hero-rings">
-        <div class="hero-ring-item" onclick="event.stopPropagation();openMacroBreakdown('protein')">
-          <svg class="mini-ring" viewBox="0 0 40 40"><circle cx="20" cy="20" r="16" fill="none" stroke="var(--hair)" stroke-width="3"/><circle class="rfill" cx="20" cy="20" r="16" fill="none" stroke="var(--pc)" stroke-width="3" stroke-linecap="round" stroke-dasharray="100.5" stroke-dashoffset="100.5" id="rp" transform="rotate(-90 20 20)"/></svg>
-          <div class="mr-txt"><div class="mr-val" id="rp-v">0g</div><div class="mr-pct" id="rp-pct">P · 0%</div></div>
-        </div>
-        <div class="hero-ring-item" onclick="event.stopPropagation();openMacroBreakdown('carbs')">
-          <svg class="mini-ring" viewBox="0 0 40 40"><circle cx="20" cy="20" r="16" fill="none" stroke="var(--hair)" stroke-width="3"/><circle class="rfill" cx="20" cy="20" r="16" fill="none" stroke="var(--cc)" stroke-width="3" stroke-linecap="round" stroke-dasharray="100.5" stroke-dashoffset="100.5" id="rc" transform="rotate(-90 20 20)"/></svg>
-          <div class="mr-txt"><div class="mr-val" id="rc-v">0g</div><div class="mr-pct" id="rc-pct">C · 0%</div></div>
-        </div>
-        <div class="hero-ring-item" onclick="event.stopPropagation();openMacroBreakdown('fat')">
-          <svg class="mini-ring" viewBox="0 0 40 40"><circle cx="20" cy="20" r="16" fill="none" stroke="var(--hair)" stroke-width="3"/><circle class="rfill" cx="20" cy="20" r="16" fill="none" stroke="var(--fc)" stroke-width="3" stroke-linecap="round" stroke-dasharray="100.5" stroke-dashoffset="100.5" id="rf" transform="rotate(-90 20 20)"/></svg>
-          <div class="mr-txt"><div class="mr-val" id="rf-v">0g</div><div class="mr-pct" id="rf-pct">F · 0%</div></div>
-        </div>
-      </div>
-      <div class="ht-hint" id="cal-tlbl">Tap for breakdown</div>
     </div>
 
-    <div class="hero-tile hero-ready" onclick="showPage('workout',this)">
-      <div class="ht-label">READINESS</div>
-      <div class="hr-body">
-        <div class="hr-ring-wrap">
-          <svg class="hr-ring-svg" viewBox="0 0 90 90">
-            <circle cx="45" cy="45" r="38" fill="none" stroke="var(--hair)" stroke-width="5"/>
-            <circle id="home-ready-arc" cx="45" cy="45" r="38" fill="none" stroke="var(--accent-ember)" stroke-width="5" stroke-linecap="round" stroke-dasharray="238.76" stroke-dashoffset="238.76" transform="rotate(-90 45 45)"/>
-          </svg>
-          <div class="hr-ring-val" id="home-ready-pct">—</div>
-        </div>
-        <div class="hr-verdict" id="home-ready-verdict">Log recovery →</div>
+    <div class="hero-v11-rem">
+      <span class="hv-rem-num" id="cal-rem">—</span>
+    </div>
+
+    <!-- LANTERN pill -->
+    <section id="lantern-home" class="lnt-section lantern-pill-v11" onclick="openLanternModal()">
+      <!-- populated by patched renderLantern() in app.js -->
+    </section>
+
+    <!-- MACRO STAT ROW -->
+    <div class="macro-row-v11">
+      <div class="mrow-cell mrow-p" onclick="openMacroBreakdown('protein')">
+        <div class="mrow-lbl">PROTEIN</div>
+        <div class="mrow-val"><span id="rp-v-big">0</span><span class="mrow-unit">g</span></div>
+        <div class="mrow-target">/ <span id="rp-target">128</span>g</div>
+        <div class="mrow-bar"><div class="mrow-bar-fill" id="rp-bar" style="width:0%"></div></div>
       </div>
-      <div class="hr-stats">
-        <div class="hr-stat">
-          <div class="hr-stat-v" id="home-weight-v">—</div>
-          <div class="hr-stat-l">WEIGHT</div>
-        </div>
-        <div class="hr-stat-div"></div>
-        <div class="hr-stat">
-          <div class="hr-stat-v" id="home-streak-v">—</div>
-          <div class="hr-stat-l">STREAK</div>
-        </div>
+      <div class="mrow-cell mrow-c" onclick="openMacroBreakdown('carbs')">
+        <div class="mrow-lbl">CARBS</div>
+        <div class="mrow-val"><span id="rc-v-big">0</span><span class="mrow-unit">g</span></div>
+        <div class="mrow-target">/ <span id="rc-target">200</span>g</div>
+        <div class="mrow-bar"><div class="mrow-bar-fill" id="rc-bar" style="width:0%"></div></div>
+      </div>
+      <div class="mrow-cell mrow-f" onclick="openMacroBreakdown('fat')">
+        <div class="mrow-lbl">FAT</div>
+        <div class="mrow-val"><span id="rf-v-big">0</span><span class="mrow-unit">g</span></div>
+        <div class="mrow-target">/ <span id="rf-target">65</span>g</div>
+        <div class="mrow-bar"><div class="mrow-bar-fill" id="rf-bar" style="width:0%"></div></div>
       </div>
     </div>
 
   </section>
 
-  <!-- ═══ THE LANTERN — companion object ═══ -->
-  <section id="lantern-home" class="lnt-section" onclick="openLanternModal()">
-    <!-- populated by renderLantern() in app.js -->
-  </section>
+  <!-- Hidden compat: preserves old hero-split IDs that JS expects -->
+  <div style="display:none" aria-hidden="true">
+    <span id="cal-target-disp">2,340</span>
+    <div id="cal-bar"></div>
+    <div id="cal-tlbl"></div>
+    <svg><circle id="rp"/><circle id="rc"/><circle id="rf"/></svg>
+    <span id="rp-v"></span><span id="rp-pct"></span>
+    <span id="rc-v"></span><span id="rc-pct"></span>
+    <span id="rf-v"></span><span id="rf-pct"></span>
+    <svg><circle id="home-ready-arc"/></svg>
+    <span id="home-ready-pct"></span><span id="home-ready-verdict"></span>
+    <span id="home-weight-v"></span><span id="home-streak-v"></span>
+  </div>
 
   <!-- ═══ THIS WEEK — inline progress glance ═══ -->
   <section class="home-section home-section-tap" onclick="showPage('progress',this)">
@@ -136,12 +166,12 @@
   </section>
 
   <!-- ═══ TODAY'S MEALS ═══ -->
-  <section class="home-section-plain">
+  <section class="home-section-plain meals-section-v11">
     <div class="hs-head-plain">
       <div class="hs-title">Today's Meals</div>
-      <button class="hs-inline-btn" onclick="openLogModal()">+ Add</button>
+      <button class="meals-add-pill-v11" onclick="openLogModal()">+ ADD</button>
     </div>
-    <div id="food-list" class="food-list"></div>
+    <div id="food-list" class="food-list food-list-v11"></div>
   </section>
 
   <!-- ═══ NUTRIENTS ═══ -->
@@ -527,6 +557,10 @@
     <button class="nb" id="nb-coach" onclick="showPage('coach',this)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
       <span>Coach</span>
+    </button>
+    <button class="nb" id="nb-fast-tab" onclick="showPage('fast',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      <span>Fast</span>
     </button>
   </div>
   <button id="nb-fast" style="display:none" onclick="showPage('fast',this)"></button>

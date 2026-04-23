@@ -5912,3 +5912,803 @@ function renderHomeReadiness(){
 
 // Initial render in case renderAll already fired
 try { renderHomeReadiness(); } catch(e){ console.warn('[home-readiness init]', e); }
+
+
+/* ═══════════════════════════════════════════════════════════
+   v11 rev3 — reBORN Home redesign · JS patches
+   - Canvas-based particle orb (breathing glow + drifting particles)
+   - Signal-driven intensity (sleep, recovery, workout, water, protein)
+   - v4-style compact meal cards (120px with inline macro chips)
+   - Expanded food photo map (100+ entries including ethnic cuisines)
+   - All existing app logic preserved — this layer only patches renderAll
+     and renderFoodList/renderLantern via the wrapper pattern.
+═══════════════════════════════════════════════════════════ */
+(function(){
+  'use strict';
+
+  // ─── 1. HERO RING: big calorie arc + 3-layer end-cap dot ───
+  const V11_HERO_R = 112;
+  const V11_HERO_CIRC = 2 * Math.PI * V11_HERO_R; // ≈ 703.72
+
+  function renderHeroV11(){
+    try {
+      const t = getTotals();
+      const tgt = getCalTarget();
+      const pct = Math.max(0, Math.min(t.cal / tgt, 1.15));
+      const arc = document.getElementById('hero-v11-arc');
+      const dotGroup = document.getElementById('hero-v11-dot-group');
+      if (arc) {
+        const clamped = Math.min(pct, 1);
+        const offset = V11_HERO_CIRC - clamped * V11_HERO_CIRC;
+        arc.setAttribute('stroke-dashoffset', offset);
+      }
+      if (dotGroup) {
+        const angle = Math.min(pct, 1) * 360;
+        dotGroup.style.transform = `rotate(${angle}deg)`;
+      }
+
+      const remEl = document.getElementById('cal-rem');
+      const rem = Math.round(tgt - t.cal);
+      if (remEl) {
+        if (rem >= 0) {
+          remEl.innerHTML = `<span class="hv-rem-num">${rem.toLocaleString()}</span> kcal remaining`;
+        } else {
+          remEl.innerHTML = `<span class="hv-rem-num">${Math.abs(rem).toLocaleString()}</span> kcal over`;
+        }
+      }
+
+      // Feed the current signal score into the particle animation
+      _updateParticleSignals();
+    } catch(e){ console.warn('[v11-hero]', e); }
+  }
+
+  function _startCalNumberFormatter(){
+    const calEl = document.getElementById('cal-num');
+    if (!calEl) return;
+    const numSpan = calEl.querySelector('.cal-count-n') || calEl;
+    if (numSpan._v11_formatter_bound) return;
+    numSpan._v11_formatter_bound = true;
+
+    const observer = new MutationObserver(() => {
+      const raw = numSpan.textContent.replace(/,/g, '');
+      if (/^\d+$/.test(raw)) {
+        const formatted = Number(raw).toLocaleString();
+        if (formatted !== numSpan.textContent) {
+          numSpan.textContent = formatted;
+        }
+      }
+    });
+    observer.observe(numSpan, { characterData: true, childList: true, subtree: true });
+    const raw = numSpan.textContent.replace(/,/g, '');
+    if (/^\d+$/.test(raw)) {
+      numSpan.textContent = Number(raw).toLocaleString();
+    }
+  }
+
+  // ─── 1b. CANVAS-BASED PARTICLE ORB ───
+  //
+  // Continuous requestAnimationFrame loop. Each particle orbits at a random
+  // radius with its own rotation speed and pulses in brightness. The overall
+  // intensity (particle count, brightness, orbit speed) is driven by daily
+  // signals via _readDailySignals().
+  let _particleAnim = null;
+  let _particles = [];
+  let _canvasCtx = null;
+  let _canvasSize = 0;
+  let _signalScore = 0;  // 0..5
+  let _signalBreakdown = { sleep:0, rec:0, workout:0, water:0, protein:0 };
+
+  function _readDailySignals(){
+    let sleep = 0, rec = 0, workout = 0, water = 0, protein = 0;
+
+    try {
+      const w0 = (typeof whoopSnaps !== 'undefined' && whoopSnaps) ? whoopSnaps[0] : null;
+      if (w0) {
+        if (w0.sleep != null)    sleep = Math.max(0, Math.min(w0.sleep / 8, 1));
+        if (w0.recovery != null) rec   = Math.max(0, Math.min(w0.recovery / 100, 1));
+      }
+    } catch(e){}
+
+    try {
+      if (typeof whActivities === 'function') {
+        const acts = whActivities();
+        workout = acts && acts.length > 0 ? 1 : 0;
+      }
+      if (!workout && typeof WO_HIST_KEY !== 'undefined') {
+        const hist = (typeof load === 'function') ? (load(WO_HIST_KEY, []) || []) : [];
+        const todayStr = (typeof todayKey === 'function') ? todayKey() : (new Date()).toISOString().slice(0,10);
+        if (hist.some(h => {
+          const d = h.date || h.endedAt || h.startedAt;
+          return d && String(d).slice(0,10) === todayStr;
+        })) workout = 1;
+      }
+    } catch(e){}
+
+    try {
+      if (typeof cups !== 'undefined' && typeof CUPS !== 'undefined' && CUPS > 0) {
+        water = Math.max(0, Math.min(cups / CUPS, 1));
+      }
+    } catch(e){}
+
+    try {
+      const t = getTotals();
+      const ptgt = (typeof TARGETS !== 'undefined') ? TARGETS.p : 128;
+      if (ptgt > 0) protein = Math.max(0, Math.min(t.p / ptgt, 1));
+    } catch(e){}
+
+    const score = sleep + rec + workout + water + protein;
+    return { sleep, rec, workout, water, protein, score };
+  }
+
+  function _updateParticleSignals(){
+    const sig = _readDailySignals();
+    _signalScore = sig.score;
+    _signalBreakdown = sig;
+  }
+
+  function _initParticleCanvas(){
+    const canvas = document.getElementById('hero-v11-canvas');
+    if (!canvas) return false;
+
+    // Size the canvas to its rendered dimensions
+    const rect = canvas.getBoundingClientRect();
+    const size = Math.max(rect.width, 1);
+    const dpr  = window.devicePixelRatio || 1;
+
+    if (canvas._v11_size === size && canvas._v11_dpr === dpr && _canvasCtx) {
+      // already initialised at correct size
+      return true;
+    }
+
+    canvas.width  = size * dpr;
+    canvas.height = size * dpr;
+    canvas.style.width  = size + 'px';
+    canvas.style.height = size + 'px';
+    canvas._v11_size = size;
+    canvas._v11_dpr  = dpr;
+
+    _canvasCtx = canvas.getContext('2d');
+    _canvasCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    _canvasSize = size;
+
+    // Build particle pool (22 particles, randomised)
+    _particles = Array.from({ length: 22 }, () => {
+      return {
+        angle: Math.random() * Math.PI * 2,
+        dist:  (size / 2) * (0.22 + Math.random() * 0.62),
+        sz:    0.6 + Math.random() * 2.2,
+        baseOp:0.12 + Math.random() * 0.38,
+        dAngle:(Math.random() > 0.5 ? 1 : -1) * (0.0005 + Math.random() * 0.0012),
+        pulse: Math.random() * Math.PI * 2,
+        pulseSpeed: 0.008 + Math.random() * 0.018,
+      };
+    });
+
+    return true;
+  }
+
+  function _drawParticles(){
+    if (!_canvasCtx || !_canvasSize) return;
+    const ctx = _canvasCtx;
+    const size = _canvasSize;
+    const cx = size / 2;
+    const cy = size / 2;
+    const r  = size / 2 - 4;
+
+    // Signal-driven intensity: 0..1 gate that modulates count + brightness
+    // score 0   → intensity ~0.30  (just a whisper of particles)
+    // score 2.5 → intensity ~0.65
+    // score 5   → intensity 1.0
+    const intensity = Math.max(0.30, Math.min(_signalScore / 5, 1));
+    const activeCount = Math.max(6, Math.round(_particles.length * intensity));
+
+    ctx.clearRect(0, 0, size, size);
+
+    // Breathing radial glow
+    const t = performance.now() / 1000;
+    const breathe = 0.88 + Math.sin(t * 0.55) * 0.12;
+    const grd = ctx.createRadialGradient(cx, cy, r * 0.05, cx, cy, r * breathe);
+    const ar = 255, ag = 45, ab = 0;  // #FF2D00
+    grd.addColorStop(0,    `rgba(${ar},${ag},${ab},0.00)`);
+    grd.addColorStop(0.45, `rgba(${ar},${ag},${ab},${(0.05 * intensity).toFixed(3)})`);
+    grd.addColorStop(0.80, `rgba(${ar},${ag},${ab},${(0.14 * intensity).toFixed(3)})`);
+    grd.addColorStop(1,    `rgba(${ar},${ag},${ab},0.00)`);
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.fillStyle = grd;
+    ctx.fillRect(0, 0, size, size);
+    ctx.restore();
+
+    // Particles
+    for (let i = 0; i < activeCount; i++) {
+      const p = _particles[i];
+      p.angle += p.dAngle * (0.6 + 0.4 * intensity);
+      p.pulse += p.pulseSpeed;
+
+      const x = cx + Math.cos(p.angle) * p.dist;
+      const y = cy + Math.sin(p.angle) * p.dist;
+      const op = p.baseOp * (0.55 + 0.45 * Math.sin(p.pulse)) * (0.55 + 0.45 * intensity);
+
+      // Soft halo
+      const halo = ctx.createRadialGradient(x, y, 0, x, y, p.sz * 4.5);
+      halo.addColorStop(0, `rgba(255,255,255,${(op * 0.7).toFixed(3)})`);
+      halo.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = halo;
+      ctx.beginPath();
+      ctx.arc(x, y, p.sz * 4.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Bright core
+      ctx.fillStyle = `rgba(255,255,255,${Math.min(op * 1.6, 0.9).toFixed(3)})`;
+      ctx.beginPath();
+      ctx.arc(x, y, p.sz, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  function _startParticleLoop(){
+    if (!_initParticleCanvas()) return;
+    _updateParticleSignals();
+    if (_particleAnim) return; // already running
+
+    const tick = () => {
+      _drawParticles();
+      _particleAnim = requestAnimationFrame(tick);
+    };
+    _particleAnim = requestAnimationFrame(tick);
+  }
+
+  function _stopParticleLoop(){
+    if (_particleAnim) {
+      cancelAnimationFrame(_particleAnim);
+      _particleAnim = null;
+    }
+  }
+
+  // Pause when tab is hidden to conserve battery
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) _stopParticleLoop();
+    else _startParticleLoop();
+  });
+
+  // Re-init on resize
+  window.addEventListener('resize', () => {
+    const canvas = document.getElementById('hero-v11-canvas');
+    if (canvas) {
+      canvas._v11_size = 0; // force reinit
+      _initParticleCanvas();
+    }
+  });
+
+  // ─── 2. MACRO ROW ───
+  function renderMacrosV11(){
+    try {
+      const t = getTotals();
+      const T = (typeof TARGETS !== 'undefined') ? TARGETS : {p:128,c:200,f:65};
+
+      const rows = [
+        { id: 'rp', cur: t.p, tgt: T.p },
+        { id: 'rc', cur: t.c, tgt: T.c },
+        { id: 'rf', cur: t.f, tgt: T.f },
+      ];
+
+      rows.forEach(r => {
+        const valEl = document.getElementById(r.id + '-v-big');
+        const tgtEl = document.getElementById(r.id + '-target');
+        const barEl = document.getElementById(r.id + '-bar');
+        const cellEl = barEl ? barEl.closest('.mrow-cell') : null;
+
+        if (valEl) valEl.textContent = Math.round(r.cur);
+        if (tgtEl) tgtEl.textContent = r.tgt;
+        if (barEl) {
+          const pct = Math.min((r.cur / r.tgt) * 100, 100);
+          barEl.style.width = pct + '%';
+        }
+        if (cellEl) cellEl.classList.toggle('over', r.cur > r.tgt);
+      });
+    } catch(e){ console.warn('[v11-macros]', e); }
+  }
+
+  // ─── 3. STREAK PILL ───
+  function renderStreakPillV11(){
+    try {
+      const streak = (typeof calcStreak === 'function') ? calcStreak() : 0;
+      const numEl = document.getElementById('smc-num');
+      const bestEl = document.getElementById('smc-best');
+      if (numEl) numEl.textContent = streak;
+
+      if (bestEl) {
+        let maxStreak = 0, cur = 0;
+        for (let i = 0; i < 365; i++) {
+          const d = new Date();
+          d.setDate(d.getDate() - i);
+          const key = d.toISOString().slice(0, 10);
+          const ms = (typeof load === 'function') ? (load(`${KEY}_meals_${key}`) || []) : [];
+          if (ms.length > 0) { cur++; if (cur > maxStreak) maxStreak = cur; }
+          else cur = 0;
+        }
+        maxStreak = Math.max(maxStreak, streak);
+        bestEl.textContent = maxStreak;
+      }
+    } catch(e){ console.warn('[v11-streak]', e); }
+  }
+
+  // ─── 4. LANTERN PILL ───
+  const LANTERN_STATE_RANK = {
+    moonlit: 1, still: 2, ember: 3, kindled: 4, radiant: 5, banked: 3
+  };
+
+  function renderLanternPillV11(){
+    try {
+      const host = document.getElementById('lantern-home');
+      if (!host) return;
+      if (typeof computeLanternState !== 'function') return;
+
+      const s = computeLanternState();
+      const stateName = (s.state || 'still').toUpperCase();
+      const pctBase = Math.min((LANTERN_STATE_RANK[s.state] || 2) / 5, 1);
+      let pct = pctBase;
+      if (Array.isArray(s.rituals) && s.rituals.length) {
+        const ritualDone = s.rituals.filter(r => r.done).length / s.rituals.length;
+        pct = Math.max(pctBase, 0.5 * pctBase + 0.5 * ritualDone);
+      }
+      pct = Math.max(0.08, Math.min(pct, 1));
+
+      host.innerHTML = `
+        <div class="lpv11-row">
+          <span class="lpv11-kicker">LANTERN</span>
+          <span class="lpv11-state">${stateName}</span>
+          <div class="lpv11-bar-wrap"><div class="lpv11-bar-fill" style="width:${Math.round(pct * 100)}%"></div></div>
+          <span class="lpv11-tap">TAP ›</span>
+        </div>
+      `;
+      host.classList.add('lantern-pill-v11');
+    } catch(e){ console.warn('[v11-lantern-pill]', e); }
+  }
+
+  // ─── 5. MEAL PHOTO LOOKUP (expanded, ethnic/local foods) ───
+  const V11_PHOTO_CACHE_KEY = 'v11_meal_photo_cache_v3';
+  const V11_PHOTO_BASE = 'https://images.unsplash.com/';
+  const V11_PHOTO_PARAMS = '?w=800&h=300&fit=crop&auto=format';
+
+  const V11_PHOTO_MAP = [
+    // Breakfast
+    { kws: ['eggs benedict', 'benedict'],                      id: 'photo-1608039829572-78524f79c4c7' },
+    { kws: ['egg', 'sourdough', 'avocado toast', 'toast'],     id: 'photo-1525351484163-7529414344d8' },
+    { kws: ['omelette', 'omelet', 'frittata', 'scrambled'],    id: 'photo-1510693206972-df098062cb71' },
+    { kws: ['pancake', 'waffle', 'french toast'],              id: 'photo-1528207776546-365bb710ee93' },
+    { kws: ['oatmeal', 'oats', 'porridge', 'granola'],         id: 'photo-1517673132405-a56a62b18caf' },
+    { kws: ['yogurt', 'parfait'],                              id: 'photo-1488477181946-6428a0291777' },
+    { kws: ['smoothie bowl', 'acai'],                          id: 'photo-1501746877-14782df58970' },
+    { kws: ['smoothie', 'juice', 'shake'],                     id: 'photo-1610970881699-44a5587cabec' },
+    { kws: ['cereal'],                                         id: 'photo-1521483451569-e33803c0330c' },
+    { kws: ['bagel', 'cream cheese'],                          id: 'photo-1585478259715-1c195acdcd2b' },
+    { kws: ['muffin', 'croissant', 'pastry', 'danish'],        id: 'photo-1608198093002-ad4e005484ec' },
+    { kws: ['donut', 'doughnut'],                              id: 'photo-1551024601-bec78aea704b' },
+
+    // South Asian / Indian / Pakistani
+    { kws: ['biryani', 'biriyani'],                            id: 'photo-1633945274405-b6c8069047b0' },
+    { kws: ['butter chicken', 'chicken tikka', 'tikka masala'],id: 'photo-1585937421612-70a008356fbe' },
+    { kws: ['paneer', 'palak paneer', 'shahi paneer'],         id: 'photo-1631452180519-c014fe946bc7' },
+    { kws: ['dal', 'daal', 'lentil curry'],                    id: 'photo-1546833999-b9f581a1996d' },
+    { kws: ['naan', 'roti', 'chapati', 'paratha'],             id: 'photo-1585937421612-70a008356fbe' },
+    { kws: ['samosa', 'pakora', 'bhaji', 'pakoda'],            id: 'photo-1601050690597-df0568f70950' },
+    { kws: ['dosa', 'idli', 'sambar', 'uttapam'],              id: 'photo-1589301760014-d929f3979dbc' },
+    { kws: ['chole', 'chana', 'chickpea curry'],               id: 'photo-1565557623262-b51c2513a641' },
+    { kws: ['kebab', 'kabab', 'seekh'],                        id: 'photo-1529193591184-b1d58069ecdd' },
+    { kws: ['nihari', 'haleem'],                               id: 'photo-1574484284002-952d92456975' },
+    { kws: ['curry'],                                          id: 'photo-1585937421612-70a008356fbe' },
+    { kws: ['masala'],                                         id: 'photo-1585937421612-70a008356fbe' },
+
+    // Middle Eastern
+    { kws: ['shawarma'],                                       id: 'photo-1529006557810-274b9b2fc783' },
+    { kws: ['falafel'],                                        id: 'photo-1540189549336-e6e99c3679fe' },
+    { kws: ['hummus'],                                         id: 'photo-1617161318376-cd5c9b1c54a8' },
+    { kws: ['kabob', 'shish'],                                 id: 'photo-1529193591184-b1d58069ecdd' },
+    { kws: ['manakish', 'manaqish', 'manoushe', 'zaatar'],     id: 'photo-1593560708920-61dd98c46a4e' },
+    { kws: ['fattoush', 'tabbouleh'],                          id: 'photo-1512621776951-a57141f2eefd' },
+    { kws: ['machboos', 'kabsa', 'mandi'],                     id: 'photo-1603133872878-684f208fb84b' },
+    { kws: ['baklava'],                                        id: 'photo-1625944525533-473f1b3d9684' },
+    { kws: ['mezze', 'mezzeh'],                                id: 'photo-1540189549336-e6e99c3679fe' },
+    { kws: ['karak', 'chai tea', 'masala chai'],               id: 'photo-1544787219-7f47ccb76574' },
+
+    // East Asian
+    { kws: ['sushi', 'nigiri', 'maki', 'sashimi'],             id: 'photo-1579871494447-9811cf80d66c' },
+    { kws: ['ramen'],                                          id: 'photo-1569718212165-3a8278d5f624' },
+    { kws: ['pho'],                                            id: 'photo-1569562211093-4ed0d0758f12' },
+    { kws: ['udon', 'soba'],                                   id: 'photo-1569718212165-3a8278d5f624' },
+    { kws: ['dumpling', 'dim sum', 'gyoza', 'potsticker'],     id: 'photo-1496116218417-1a781b1c416c' },
+    { kws: ['fried rice'],                                     id: 'photo-1603133872878-684f208fb84b' },
+    { kws: ['bibimbap', 'korean bowl'],                        id: 'photo-1553163147-622ab57be1c7' },
+    { kws: ['bulgogi', 'kalbi', 'korean bbq'],                 id: 'photo-1553163147-622ab57be1c7' },
+    { kws: ['kimchi'],                                         id: 'photo-1583224964978-2257b960c3d3' },
+    { kws: ['pad thai'],                                       id: 'photo-1559314809-0d155014e29e' },
+    { kws: ['thai', 'green curry', 'red curry'],               id: 'photo-1559314809-0d155014e29e' },
+    { kws: ['noodle'],                                         id: 'photo-1495521821757-a1efb6729352' },
+
+    // Latin / Mexican
+    { kws: ['taco', 'al pastor', 'carnitas'],                  id: 'photo-1565299585323-38d6b0865b47' },
+    { kws: ['burrito', 'chimichanga'],                         id: 'photo-1626700051175-6818013e1d4f' },
+    { kws: ['quesadilla', 'enchilada'],                        id: 'photo-1618040996337-11c5b61cf8f2' },
+    { kws: ['guac', 'guacamole'],                              id: 'photo-1584538061257-aaff03e27b6a' },
+    { kws: ['nachos'],                                         id: 'photo-1513456852971-30c0b8199d4d' },
+    { kws: ['ceviche'],                                        id: 'photo-1548078949-cab75c41ad28' },
+
+    // Mediterranean / Italian / Greek
+    { kws: ['pizza', 'margherita', 'pepperoni'],               id: 'photo-1513104890138-7c749659a591' },
+    { kws: ['carbonara', 'spaghetti'],                         id: 'photo-1551183053-bf91a1d81141' },
+    { kws: ['lasagna', 'lasagne'],                             id: 'photo-1574894709920-11b28e7367e3' },
+    { kws: ['pasta', 'penne', 'rigatoni', 'fettuccine'],       id: 'photo-1551183053-bf91a1d81141' },
+    { kws: ['risotto', 'arancini'],                            id: 'photo-1603133872878-684f208fb84b' },
+    { kws: ['bruschetta', 'caprese'],                          id: 'photo-1525351484163-7529414344d8' },
+    { kws: ['gyro', 'souvlaki'],                               id: 'photo-1529006557810-274b9b2fc783' },
+    { kws: ['greek salad'],                                    id: 'photo-1540420773420-3366772f4999' },
+
+    // American / proteins
+    { kws: ['burger', 'cheeseburger'],                         id: 'photo-1568901346375-23c9450c58cd' },
+    { kws: ['steak', 'ribeye', 'sirloin', 'filet', 'tenderloin'], id: 'photo-1558030006-450675393462' },
+    { kws: ['salmon'],                                         id: 'photo-1467003909585-2f8a72700288' },
+    { kws: ['tuna'],                                           id: 'photo-1582845512747-e42001c95638' },
+    { kws: ['shrimp', 'prawn'],                                id: 'photo-1625943553852-781c6dd46faa' },
+    { kws: ['fish', 'cod', 'tilapia', 'snapper', 'bass'],      id: 'photo-1467003909585-2f8a72700288' },
+    { kws: ['grilled chicken', 'chicken breast', 'chicken salad', 'chicken caesar'], id: 'photo-1546069901-ba9599a7e63c' },
+    { kws: ['chicken wings', 'wings'],                         id: 'photo-1608039755401-742074f0548d' },
+    { kws: ['chicken'],                                        id: 'photo-1598103442097-8b74394b95c6' },
+    { kws: ['turkey'],                                         id: 'photo-1574672280600-4accfa5b6f98' },
+    { kws: ['beef', 'stew'],                                   id: 'photo-1558030006-450675393462' },
+    { kws: ['pork', 'bacon', 'ham'],                           id: 'photo-1528607929212-2636ec44253e' },
+    { kws: ['lamb'],                                           id: 'photo-1558030006-450675393462' },
+    { kws: ['tofu', 'tempeh', 'seitan'],                       id: 'photo-1546069901-d5bfd2cbfb1f' },
+
+    // Salads / bowls / sides
+    { kws: ['caesar salad', 'caesar'],                         id: 'photo-1546069901-ba9599a7e63c' },
+    { kws: ['poke', 'poke bowl'],                              id: 'photo-1553621042-f6e147245754' },
+    { kws: ['grain bowl', 'buddha bowl', 'quinoa bowl'],       id: 'photo-1540189549336-e6e99c3679fe' },
+    { kws: ['salad'],                                          id: 'photo-1512621776951-a57141f2eefd' },
+    { kws: ['soup', 'broth', 'bisque'],                        id: 'photo-1547592166-23ac45744acd' },
+    { kws: ['sandwich', 'sub', 'hoagie', 'panini', 'wrap'],    id: 'photo-1528735602780-2552fd46c7af' },
+    { kws: ['rice'],                                           id: 'photo-1603133872878-684f208fb84b' },
+
+    // Snacks / fruit / nuts
+    { kws: ['apple'],                                          id: 'photo-1568702846914-96b305d2aaeb' },
+    { kws: ['banana'],                                         id: 'photo-1481349518771-20055b2a7b24' },
+    { kws: ['strawberry', 'berries', 'blueberry', 'raspberry'],id: 'photo-1464965911861-746a04b4bca6' },
+    { kws: ['mango'],                                          id: 'photo-1553279768-865429fa0078' },
+    { kws: ['orange', 'tangerine', 'clementine'],              id: 'photo-1547514701-42782101795e' },
+    { kws: ['grape'],                                          id: 'photo-1596363505729-4190a9506133' },
+    { kws: ['watermelon'],                                     id: 'photo-1587049352846-4a222e784d38' },
+    { kws: ['fruit'],                                          id: 'photo-1490474418585-ba9bad8fd0ea' },
+    { kws: ['date', 'ajwa', 'medjool'],                        id: 'photo-1609501676725-7186f017c0c8' },
+    { kws: ['almond', 'cashew', 'pistachio', 'walnut', 'pecan', 'nut'], id: 'photo-1508747703725-719777637510' },
+    { kws: ['chocolate', 'cocoa'],                             id: 'photo-1511381939415-e44015466834' },
+    { kws: ['protein bar', 'cliff bar', 'granola bar', 'ghost bar'], id: 'photo-1606914501449-5a96b6ce24ca' },
+    { kws: ['cheese', 'cheddar', 'brie', 'feta', 'mozzarella'],id: 'photo-1486297678162-eb2a19b0a32d' },
+    { kws: ['cookie', 'biscuit'],                              id: 'photo-1499636136210-6f4ee915583e' },
+    { kws: ['cake', 'cheesecake', 'brownie'],                  id: 'photo-1606313564200-e75d5e30476c' },
+    { kws: ['ice cream', 'gelato', 'sorbet'],                  id: 'photo-1501443762994-82bd5dace89a' },
+    { kws: ['popcorn'],                                        id: 'photo-1578849278619-e73505e9610f' },
+
+    // Drinks
+    { kws: ['coffee', 'latte', 'espresso', 'cappuccino', 'americano', 'mocha'], id: 'photo-1509042239860-f550ce710b93' },
+    { kws: ['matcha'],                                         id: 'photo-1536256263959-770b48d82b0a' },
+    { kws: ['tea', 'green tea', 'chamomile'],                  id: 'photo-1544787219-7f47ccb76574' },
+    { kws: ['water', 'sparkling water'],                       id: 'photo-1548839140-29a749e1cf4d' },
+    { kws: ['beer'],                                           id: 'photo-1608270586620-248524c67de9' },
+    { kws: ['wine'],                                           id: 'photo-1474722883778-792e7990302f' },
+    { kws: ['cocktail'],                                       id: 'photo-1558645836-e44122a743ee' },
+
+    // Supplements
+    { kws: ['whey', 'protein shake', 'protein powder', 'protein drink'], id: 'photo-1579722821273-0f6c1c4a5a56' },
+    { kws: ['ghost', 'pre workout', 'pre-workout'],            id: 'photo-1579722820308-d74e571900a9' },
+    { kws: ['nada', 'quest', 'oikos', 'chobani'],              id: 'photo-1488477181946-6428a0291777' },
+
+    // Vegetables
+    { kws: ['veggie', 'vegetable', 'roasted veg', 'broccoli', 'cauliflower'], id: 'photo-1540420773420-3366772f4999' },
+  ];
+
+  const V11_PHOTO_FALLBACKS = [
+    'photo-1504674900247-0877df9cc836',
+    'photo-1540189549336-e6e99c3679fe',
+    'photo-1484723091739-30a097e8f929',
+    'photo-1495521821757-a1efb6729352',
+    'photo-1498579809087-ef1e558fd1da',
+    'photo-1467003909585-2f8a72700288',
+    'photo-1473093295043-cdd812d0e601',
+  ];
+
+  let _photoCache = {};
+  try { _photoCache = JSON.parse(localStorage.getItem(V11_PHOTO_CACHE_KEY) || '{}'); }
+  catch(e) { _photoCache = {}; }
+
+  function _savePhotoCache(){
+    try { localStorage.setItem(V11_PHOTO_CACHE_KEY, JSON.stringify(_photoCache)); }
+    catch(e) { /* quota */ }
+  }
+
+  function _mealKeywords(name){
+    if (!name) return 'food';
+    return name.toLowerCase()
+      .replace(/[^\w\s&-]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim() || 'food';
+  }
+
+  function _hashStr(s){
+    let h = 0;
+    for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+    return Math.abs(h);
+  }
+
+  function getMealPhotoUrl(name){
+    const cleaned = _mealKeywords(name);
+    if (_photoCache[cleaned]) return _photoCache[cleaned];
+
+    let photoId = null;
+    for (const entry of V11_PHOTO_MAP) {
+      for (const kw of entry.kws) {
+        if (cleaned.includes(kw)) { photoId = entry.id; break; }
+      }
+      if (photoId) break;
+    }
+    if (!photoId) {
+      const idx = _hashStr(cleaned) % V11_PHOTO_FALLBACKS.length;
+      photoId = V11_PHOTO_FALLBACKS[idx];
+    }
+
+    const url = V11_PHOTO_BASE + photoId + V11_PHOTO_PARAMS;
+    _photoCache[cleaned] = url;
+    _savePhotoCache();
+    return url;
+  }
+
+  // ─── 6. FOOD LIST — v4-style compact 120px cards ───
+  const CATEGORY_CONFIG_V11 = {
+    'breakfast':    { label: 'BREAKFAST',    order: 0 },
+    'lunch':        { label: 'LUNCH',        order: 1 },
+    'snack':        { label: 'SNACK',        order: 2 },
+    'dinner':       { label: 'DINNER',       order: 3 },
+    'pre-workout':  { label: 'PRE-WORKOUT',  order: 4 },
+    'post-workout': { label: 'POST-WORKOUT', order: 5 },
+  };
+
+  function _inferCategory(m){
+    if (m.category) return m.category;
+    if (m.loggedAt) {
+      const d = new Date(m.loggedAt);
+      const mins = d.getHours() * 60 + d.getMinutes();
+      if (mins < 630) return 'breakfast';
+      if (mins < 870) return 'lunch';
+      if (mins < 1080) return 'snack';
+      return 'dinner';
+    }
+    return 'snack';
+  }
+
+  function _formatMealTime(loggedAt){
+    if (!loggedAt) return '';
+    try {
+      return new Date(loggedAt).toLocaleTimeString('en-US', {
+        hour: 'numeric', minute: '2-digit', hour12: true
+      });
+    } catch(e){ return ''; }
+  }
+
+  function _mealDescription(m){
+    if (m.ingredients && m.ingredients.length > 0) {
+      const names = m.ingredients.slice(0, 3).map(i => i.name || '').filter(Boolean);
+      if (names.length) return names.join(' · ');
+    }
+    if (m.description) return m.description;
+    return '';
+  }
+
+  function _escapeHtml(s){
+    if (s == null) return '';
+    return String(s).replace(/[&<>"']/g, c => ({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    }[c]));
+  }
+
+  function renderFoodListV11(){
+    const el = document.getElementById('food-list');
+    if (!el) return;
+    if (!el.classList.contains('food-list-v11')) return false;
+    if (typeof meals === 'undefined' || !meals) return;
+
+    if (!meals.length) {
+      el.innerHTML = `
+        <div class="empty-st">
+          <div class="empty-icon">🍽️</div>
+          <div>No meals logged yet.<br>Tap <strong>+ ADD</strong> to log one.</div>
+        </div>`;
+      return true;
+    }
+
+    const groups = {};
+    meals.forEach((m, i) => {
+      const cat = _inferCategory(m);
+      if (!groups[cat]) groups[cat] = [];
+      groups[cat].push({ m, i });
+    });
+
+    const frag = document.createDocumentFragment();
+
+    Object.keys(groups)
+      .sort((a, b) => (CATEGORY_CONFIG_V11[a]?.order ?? 99) - (CATEGORY_CONFIG_V11[b]?.order ?? 99))
+      .forEach(cat => {
+        const entries = groups[cat];
+        if (!entries.length) return;
+
+        const groupCal = entries.reduce((s, {m}) => s + Math.round(m.calories || 0), 0);
+        const label = CATEGORY_CONFIG_V11[cat]?.label || cat.toUpperCase();
+
+        const hdr = document.createElement('div');
+        hdr.className = 'meal-group-lbl';
+        hdr.innerHTML = `<span>${label}</span><span>${groupCal} kcal</span>`;
+        frag.appendChild(hdr);
+
+        entries.forEach(({m, i}) => {
+          const card = document.createElement('div');
+          card.className = 'fi fi-v11';
+          card.setAttribute('data-idx', i);
+
+          const time = _formatMealTime(m.loggedAt);
+          const desc = _mealDescription(m);
+          const photoUrl = getMealPhotoUrl(m.name);
+
+          const sessionThumb = (typeof _mealThumbs !== 'undefined' && _mealThumbs.get)
+            ? _mealThumbs.get(m.loggedAt)
+            : null;
+          const bgUrl = sessionThumb || photoUrl;
+
+          const fibre = m.fibre != null ? Math.round(m.fibre) : (m.fiber != null ? Math.round(m.fiber) : 0);
+
+          const tgt = (typeof getCalTarget === 'function') ? getCalTarget() : 2340;
+          const mealPct = Math.max(3, Math.min(((m.calories || 0) / tgt) * 100, 100));
+
+          card.innerHTML = `
+            <div class="fiv11-bg" data-emoji="${m.emoji || '🍽️'}" style="background-image:url('${bgUrl}')"></div>
+
+            <div class="fiv11-top">
+              <span class="fiv11-kcal">${Math.round(m.calories || 0)}<span class="fiv11-kcal-unit">kcal</span></span>
+              <span class="fiv11-time">${time || ''}</span>
+            </div>
+
+            <div class="fiv11-body">
+              <div class="fiv11-body-text">
+                <div class="fiv11-name">${_escapeHtml(m.name || 'Meal')}</div>
+                ${desc ? `<div class="fiv11-desc">${_escapeHtml(desc)}</div>` : ''}
+              </div>
+              <div class="fiv11-chips">
+                <div class="fiv11-chip protein">
+                  <span class="fiv11-chip-lbl">Protein</span>
+                  <span class="fiv11-chip-val">${Math.round(m.protein || 0)}<span class="fiv11-chip-unit">g</span></span>
+                </div>
+                <div class="fiv11-chip carbs">
+                  <span class="fiv11-chip-lbl">Carbs</span>
+                  <span class="fiv11-chip-val">${Math.round(m.carbs || 0)}<span class="fiv11-chip-unit">g</span></span>
+                </div>
+                <div class="fiv11-chip fat">
+                  <span class="fiv11-chip-lbl">Fat</span>
+                  <span class="fiv11-chip-val">${Math.round(m.fat || 0)}<span class="fiv11-chip-unit">g</span></span>
+                </div>
+                <div class="fiv11-chip fiber">
+                  <span class="fiv11-chip-lbl">Fiber</span>
+                  <span class="fiv11-chip-val">${fibre}<span class="fiv11-chip-unit">g</span></span>
+                </div>
+              </div>
+            </div>
+
+            <div class="fiv11-progress-track">
+              <div class="fiv11-progress-fill" style="width:${mealPct}%"></div>
+            </div>
+
+            <button class="fi-del" aria-label="Delete">✕</button>
+          `;
+
+          card.addEventListener('click', (e) => {
+            if (e.target.classList.contains('fi-del')) return;
+            if (typeof openMealDetail === 'function') openMealDetail(i);
+          });
+
+          const delBtn = card.querySelector('.fi-del');
+          if (delBtn) {
+            delBtn.addEventListener('click', (e) => {
+              e.stopPropagation();
+              if (typeof deleteMeal === 'function') deleteMeal(i);
+            });
+          }
+
+          const bgDiv = card.querySelector('.fiv11-bg');
+          const probe = new Image();
+          probe.onerror = () => {
+            bgDiv.classList.add('fiv11-bg-fallback');
+            bgDiv.style.backgroundImage = '';
+          };
+          probe.src = bgUrl;
+
+          frag.appendChild(card);
+        });
+      });
+
+    el.innerHTML = '';
+    el.appendChild(frag);
+    return true;
+  }
+
+  // ─── 7. HOOK INTO renderAll ───
+  (function(){
+    const _prev = window.renderAll;
+    window.renderAll = function(){
+      _prev && _prev.apply(this, arguments);
+      renderHeroV11();
+      renderMacrosV11();
+      renderStreakPillV11();
+      renderLanternPillV11();
+      renderFoodListV11();
+    };
+  })();
+
+  (function(){
+    const _origRenderFoodList = window.renderFoodList;
+    window.renderFoodList = function(){
+      const v11Handled = renderFoodListV11();
+      if (v11Handled === false) {
+        _origRenderFoodList && _origRenderFoodList.apply(this, arguments);
+      }
+    };
+  })();
+
+  (function(){
+    const _origRenderLantern = window.renderLantern;
+    window.renderLantern = function(){
+      const host = document.getElementById('lantern-home');
+      if (host && host.classList.contains('lantern-pill-v11')) {
+        renderLanternPillV11();
+        return;
+      }
+      _origRenderLantern && _origRenderLantern.apply(this, arguments);
+    };
+  })();
+
+  // Expose helpers
+  window.v11 = {
+    renderHero: renderHeroV11,
+    renderMacros: renderMacrosV11,
+    renderStreak: renderStreakPillV11,
+    renderLanternPill: renderLanternPillV11,
+    renderFoodList: renderFoodListV11,
+    readSignals: _readDailySignals,
+    getMealPhotoUrl,
+    startParticles: _startParticleLoop,
+    stopParticles: _stopParticleLoop,
+    clearPhotoCache(){ _photoCache = {}; localStorage.removeItem(V11_PHOTO_CACHE_KEY); }
+  };
+
+  // Initial render + start particle loop once the DOM is ready
+  function _boot(){
+    try {
+      _startCalNumberFormatter();
+      renderHeroV11();
+      renderMacrosV11();
+      renderStreakPillV11();
+      renderLanternPillV11();
+      renderFoodListV11();
+      _startParticleLoop();
+    } catch(e) {
+      console.warn('[v11 init]', e);
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', _boot);
+  } else {
+    _boot();
+  }
+
+  // Refresh signals every 60s
+  setInterval(_updateParticleSignals, 60000);
+
+})();
