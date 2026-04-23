@@ -3660,10 +3660,18 @@ body.v11 .hdr-v11-inner {
 
 .rb-wordmark {
   display: inline-flex;
-  align-items: baseline;
+  align-items: center;
   line-height: 1;
   user-select: none;
   gap: 0;
+}
+.rb-logo-img {
+  height: 32px;
+  width: auto;
+  display: block;
+  -webkit-user-drag: none;
+  user-select: none;
+  pointer-events: none;
 }
 .rb-wm-re {
   font-family: var(--v11-font-logo-re);
