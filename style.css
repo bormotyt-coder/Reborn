@@ -3643,23 +3643,33 @@ body.v11 #pg-today .day-cal-strip { display: none; }
 /* ═══════════════════════════════════════════════════════════
    HEADER
 ═══════════════════════════════════════════════════════════ */
-body.v11 .hdr-v11 {
-  padding: 26px 20px 12px;
-  position: sticky;
+body.v11 #pg-today.active .hdr-v11 {
+  padding: calc(26px + env(safe-area-inset-top, 0px)) 20px 12px;
+  position: fixed;
   top: 0;
+  left: 0;
+  right: 0;
   z-index: 50;
-  background: transparent;
-  border: none;
-  display: block;
-  transition: padding .2s ease, background .25s ease, backdrop-filter .25s ease;
-}
-body.v11 .hdr-v11.hdr-scrolled {
-  padding: 10px 20px 10px;
   background: rgba(10, 18, 32, 0.72);
   backdrop-filter: blur(14px) saturate(140%);
   -webkit-backdrop-filter: blur(14px) saturate(140%);
+  border: none;
+  display: block;
+  transition: padding .2s ease, background .25s ease;
+}
+/* At the very top of the page: hide the blurred bg so header feels weightless */
+body.v11 #pg-today.active .hdr-v11:not(.hdr-scrolled) {
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+body.v11 #pg-today.active .hdr-v11.hdr-scrolled {
+  padding: calc(10px + env(safe-area-inset-top, 0px)) 20px 10px;
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04);
 }
+/* Push page content below the fixed header */
+body.v11 #pg-today.active { padding-top: var(--hdr-pad-top, 148px); transition: padding-top .2s ease; }
+body.v11 #pg-today.active.hdr-is-scrolled { --hdr-pad-top: 94px; }
 body.v11 .hdr-v11-inner {
   display: flex;
   flex-direction: column;
