@@ -469,7 +469,7 @@ const DEFAULT_QA=[
 // STATE
 let meals      =load(`${KEY}_meals_${todayKey()}`,[]);
 let whoopSnaps =load(`${KEY}_whoopsnaps_${todayKey()}`,[null,null,null]);
-let cups       =parseInt(localStorage.getItem(`${KEY}_cups_${todayKey()}`)||'0');
+let cups       =parseFloat(localStorage.getItem(`${KEY}_cups_${todayKey()}`)||'0')||0;
 let entries    =load(`${KEY}_entries`,[]);
 let quickItems =load(`${KEY}_quickitems`,DEFAULT_QA);
 let calViewDate=new Date();
@@ -919,21 +919,237 @@ function setRing(id,vid,pid,cur,tgt,unit,delay){
   })(performance.now());
 }
 
-// CUPS
-function renderCups(){
-  const grid=gv('cups-grid');grid.innerHTML='';
-  for(let i=0;i<CUPS;i++){
-    const btn=document.createElement('button');
-    btn.className='cup-btn'+(i<cups?' filled':'');
-    btn.innerHTML=i<cups?'💧':'○';
-    btn.addEventListener('click',()=>{cups=i<cups?i:i+1;localStorage.setItem(`${KEY}_cups_${todayKey()}`,cups);renderCups();});
-    grid.appendChild(btn);
+// CUPS — water wave slider
+const _waveState = {
+  mounted: false,
+  // displayed fill in cups (0..CUPS). Follows `cups` but can glide during snap animation.
+  displayCups: 0,
+  // phase offsets for the two waves, incremented every frame
+  p1: 0,
+  p2: Math.PI,
+  // transient target during post-drag snap animation
+  animTarget: null,
+  animStart: 0,
+  animFrom: 0,
+  animDur: 160,
+  // reusable buffers
+  lastW: 0,
+  lastH: 0,
+};
+
+function _waveBuildPath(w, h, fill01, phase, freq, amp, baseOffset){
+  // fill01: 0..1 of the container. 0 = dry (water at bottom), 1 = full.
+  // Build a path sampling N points across the width, then close along the bottom.
+  // Output is a smooth-looking polyline (plenty of samples, no bezier needed for this size).
+  const baseY = h * (1 - fill01) + baseOffset;
+  const N = Math.max(24, Math.ceil(w / 8));
+  let d = '';
+  for (let i = 0; i <= N; i++){
+    const x = (i / N) * w;
+    const y = baseY + Math.sin((x / w) * freq * Math.PI * 2 + phase) * amp;
+    d += (i === 0 ? 'M ' : 'L ') + x.toFixed(2) + ' ' + y.toFixed(2) + ' ';
   }
-  gv('water-cups').textContent=cups;
-  gv('water-ml-display').textContent=(cups*ML_PER_CUP).toLocaleString();
-  gv('water-bar').style.width=Math.min((cups/CUPS)*100,100)+'%';
+  d += 'L ' + w.toFixed(2) + ' ' + h.toFixed(2) + ' ';
+  d += 'L 0 ' + h.toFixed(2) + ' Z';
+  return d;
 }
-function resetWater(){cups=0;localStorage.setItem(`${KEY}_cups_${todayKey()}`,0);renderCups();}
+
+function _waveMeasureSurface(w, h, fill01, phase, freq, amp, baseOffset){
+  // Return y-coord of the foreground wave at a given x (for bobbing the thumb).
+  const baseY = h * (1 - fill01) + baseOffset;
+  return function(x){
+    return baseY + Math.sin((x / w) * freq * Math.PI * 2 + phase) * amp;
+  };
+}
+
+function _waveLevelFromCups(c){
+  // Map cups -> fill01 with a small floor so even at 0 there's a thin puddle visible.
+  if (c <= 0) return 0;
+  const f = Math.min(c / CUPS, 1);
+  // soft nonlinearity: feels more satisfying (small fills appear instantly, tapers at top)
+  return 0.03 + f * 0.97;
+}
+
+function _waveCommitCups(newCups, persist){
+  // Called during drag (persist=false) and on release (persist=true).
+  cups = newCups;
+  if (persist){
+    localStorage.setItem(`${KEY}_cups_${todayKey()}`, String(cups));
+  }
+  // Update compact readouts in the section header
+  const a = gv('water-cups'); if (a) a.textContent = _waveFormatCups(cups);
+  const b = gv('water-ml-display'); if (b) b.textContent = Math.round(cups * ML_PER_CUP).toLocaleString();
+  const c = gv('water-wave-cups-lbl'); if (c) c.textContent = _waveFormatCups(cups);
+  const wrap = gv('water-wave-wrap');
+  if (wrap) wrap.setAttribute('aria-valuenow', String(cups));
+  const hint = gv('water-wave-hint');
+  if (hint) hint.style.opacity = cups <= 0.01 ? '' : '0';
+}
+
+function _waveFormatCups(c){
+  // 4, 4.5, 0 etc. — trim trailing .0
+  const r = Math.round(c * 2) / 2;
+  return (r % 1 === 0) ? String(r) : r.toFixed(1);
+}
+
+function _waveMountOnce(){
+  if (_waveState.mounted) return;
+  const wrap = gv('water-wave-wrap');
+  const svg  = gv('water-wave-svg');
+  const clipRect = gv('water-wave-clip-rect');
+  const bgPath = gv('water-wave-bg-path');
+  const fgPath = gv('water-wave-fg-path');
+  const thumb  = gv('water-wave-thumb');
+  if (!wrap || !svg || !bgPath || !fgPath || !thumb) return;
+  _waveState.mounted = true;
+
+  _waveState.displayCups = cups;
+
+  // --- Sizing ---
+  let W = 0, H = 0;
+  const measure = () => {
+    const r = wrap.getBoundingClientRect();
+    W = Math.max(1, Math.round(r.width));
+    H = Math.max(1, Math.round(r.height));
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    svg.setAttribute('width', W);
+    svg.setAttribute('height', H);
+    clipRect.setAttribute('width', W);
+    clipRect.setAttribute('height', H);
+    _waveState.lastW = W;
+    _waveState.lastH = H;
+  };
+  measure();
+  if (typeof ResizeObserver !== 'undefined'){
+    new ResizeObserver(measure).observe(wrap);
+  } else {
+    window.addEventListener('resize', measure, { passive: true });
+  }
+
+  // --- Drag / tap interaction ---
+  let dragging = false;
+  let lastPointerX = 0;
+  const setFromClientX = (clientX, commit) => {
+    const r = wrap.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (clientX - r.left) / r.width));
+    // Map ratio -> cups, snap to 0.5 on commit, free during drag for smooth feel.
+    let newCups = ratio * CUPS;
+    if (commit) newCups = Math.round(newCups * 2) / 2;
+    else        newCups = Math.round(newCups * 20) / 20; // 0.05 cup resolution during drag
+    _waveState.displayCups = newCups;
+    _waveCommitCups(newCups, commit);
+  };
+
+  const onDown = (e) => {
+    dragging = true;
+    wrap.classList.add('is-dragging');
+    lastPointerX = e.clientX;
+    if (wrap.setPointerCapture && e.pointerId != null){
+      try { wrap.setPointerCapture(e.pointerId); } catch(_){}
+    }
+    setFromClientX(e.clientX, false);
+    e.preventDefault();
+  };
+  const onMove = (e) => {
+    if (!dragging) return;
+    lastPointerX = e.clientX;
+    setFromClientX(e.clientX, false);
+  };
+  const onUp = (e) => {
+    if (!dragging) return;
+    dragging = false;
+    wrap.classList.remove('is-dragging');
+    // Snap to nearest 0.5 cup with a small glide animation for tactile feedback.
+    const snapped = Math.round(_waveState.displayCups * 2) / 2;
+    _waveState.animFrom = _waveState.displayCups;
+    _waveState.animTarget = snapped;
+    _waveState.animStart = performance.now();
+    // Persist committed value right away so refreshes keep it.
+    _waveCommitCups(snapped, true);
+  };
+
+  wrap.addEventListener('pointerdown', onDown);
+  wrap.addEventListener('pointermove', onMove);
+  wrap.addEventListener('pointerup', onUp);
+  wrap.addEventListener('pointercancel', onUp);
+
+  // Keyboard support (←/→ = -/+ 0.5 cup, Home/End = 0 / 8)
+  wrap.addEventListener('keydown', (e) => {
+    let step = null;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowUp') step = 0.5;
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') step = -0.5;
+    else if (e.key === 'Home') { cups = 0; _waveCommitCups(0, true); _waveState.displayCups = 0; e.preventDefault(); return; }
+    else if (e.key === 'End')  { cups = CUPS; _waveCommitCups(CUPS, true); _waveState.displayCups = CUPS; e.preventDefault(); return; }
+    if (step !== null){
+      const next = Math.max(0, Math.min(CUPS, (Math.round(cups * 2)/2) + step));
+      _waveState.displayCups = next;
+      _waveCommitCups(next, true);
+      e.preventDefault();
+    }
+  });
+
+  // --- Animation loop ---
+  let lastT = performance.now();
+  const loop = (now) => {
+    const dt = Math.min(64, now - lastT); lastT = now;
+    // Wave phase advance — subtle speeds so it never feels hectic.
+    _waveState.p1 += dt * 0.0011;   // ~one cycle per ~5.7s
+    _waveState.p2 -= dt * 0.00075;  // opposite direction, slower
+    // Snap glide animation after drag release
+    if (_waveState.animTarget !== null){
+      const t = Math.min(1, (now - _waveState.animStart) / _waveState.animDur);
+      // easeOutCubic
+      const e = 1 - Math.pow(1 - t, 3);
+      _waveState.displayCups = _waveState.animFrom + (_waveState.animTarget - _waveState.animFrom) * e;
+      if (t >= 1){
+        _waveState.displayCups = _waveState.animTarget;
+        _waveState.animTarget = null;
+      }
+    }
+
+    const w = _waveState.lastW, h = _waveState.lastH;
+    if (w > 0 && h > 0){
+      const fill = _waveLevelFromCups(_waveState.displayCups);
+      // Two overlapping waves: background (slower, wider, offset down), foreground (sharper)
+      const ampBg = 3.0, ampFg = 4.2;
+      bgPath.setAttribute('d', _waveBuildPath(w, h, fill, _waveState.p1, 1.6, ampBg, 3));
+      fgPath.setAttribute('d', _waveBuildPath(w, h, fill, _waveState.p2, 2.2, ampFg, 0));
+
+      // Position the thumb so it bobs on the foreground surface
+      const thumbX = (Math.round(_waveState.displayCups * 20) / 20 / CUPS) * w;
+      const surfaceY = _waveMeasureSurface(w, h, fill, _waveState.p2, 2.2, ampFg, 0)(thumbX);
+      // Clamp so the thumb never clips the container edges
+      const thumbW = thumb.offsetWidth || 52;
+      const thumbH = thumb.offsetHeight || 52;
+      const clampedX = Math.max(thumbW / 2 + 2, Math.min(w - thumbW / 2 - 2, thumbX));
+      const clampedY = Math.max(thumbH / 2 + 2, Math.min(h - thumbH / 2 - 2, surfaceY));
+      thumb.style.transform = `translate(${clampedX - thumbW/2}px, ${clampedY - thumbH/2}px)`;
+    }
+
+    requestAnimationFrame(loop);
+  };
+  requestAnimationFrame(loop);
+}
+
+function renderCups(){
+  // Mount once, then sync the target level to the current `cups` value.
+  _waveMountOnce();
+  // If not currently in a drag-snap animation, align displayed level to stored cups.
+  if (_waveState.animTarget === null){
+    _waveState.displayCups = cups;
+  }
+  // Sync readouts (idempotent)
+  _waveCommitCups(cups, false);
+}
+function resetWater(){
+  // Smooth glide back to 0 rather than a hard snap — feels more tactile.
+  _waveState.animFrom = _waveState.displayCups;
+  _waveState.animTarget = 0;
+  _waveState.animStart = performance.now();
+  cups = 0;
+  localStorage.setItem(`${KEY}_cups_${todayKey()}`, '0');
+  _waveCommitCups(0, false);
+}
 
 // QUICK ADD
 function renderQuickAdd(){ /* qa-scroll removed — QA lives in FAB menu now */ }
@@ -2116,7 +2332,7 @@ function selectDayCalDay(ds){
   // Reload meals and whoop data for selected day
   meals=load(`${KEY}_meals_${ds}`,[]);
   whoopSnaps=load(`${KEY}_whoopsnaps_${ds}`,[null,null,null]);
-  cups=parseInt(localStorage.getItem(`${KEY}_cups_${ds}`)||'0');
+  cups=parseFloat(localStorage.getItem(`${KEY}_cups_${ds}`)||'0')||0;
   renderAll();
   buildDayCalStrip();
 }
