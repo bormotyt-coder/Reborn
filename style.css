@@ -3644,12 +3644,21 @@ body.v11 #pg-today .day-cal-strip { display: none; }
    HEADER
 ═══════════════════════════════════════════════════════════ */
 body.v11 .hdr-v11 {
-  padding: 26px 20px 0;
-  position: relative;
-  z-index: 2;
+  padding: 26px 20px 12px;
+  position: sticky;
+  top: 0;
+  z-index: 50;
   background: transparent;
   border: none;
   display: block;
+  transition: padding .2s ease, background .25s ease, backdrop-filter .25s ease;
+}
+body.v11 .hdr-v11.hdr-scrolled {
+  padding: 10px 20px 10px;
+  background: rgba(10, 18, 32, 0.72);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 body.v11 .hdr-v11-inner {
   display: flex;
@@ -3664,14 +3673,17 @@ body.v11 .hdr-v11-inner {
   line-height: 1;
   user-select: none;
   gap: 0;
+  /* --logo-h is updated by JS on scroll: 64px at top, shrinks to 32px */
+  --logo-h: 64px;
 }
 .rb-logo-img {
-  height: 32px;
+  height: var(--logo-h);
   width: auto;
   display: block;
   -webkit-user-drag: none;
   user-select: none;
   pointer-events: none;
+  transition: height .05s linear;
 }
 .rb-wm-re {
   font-family: var(--v11-font-logo-re);
