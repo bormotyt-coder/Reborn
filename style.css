@@ -4090,7 +4090,7 @@ body.v11 #pg-today .hs-chev {
 }
 body.v11 #pg-today .hs-chev svg { width: 12px; height: 12px; stroke-width: 2; }
 body.v11 #pg-today .hs-sub-dim { color: rgba(255,255,255,0.22); }
-body.v11 #pg-today .hs-body { padding-top: 12px; }
+body.v11 #pg-today .hs-body { padding: 12px 0 0; }
 
 .meals-add-pill-v11 {
   display: inline-flex;
@@ -4256,12 +4256,21 @@ body.v11 #pg-today .fi-top { display: none; }
 
 .fiv11-body {
   position: absolute;
+  top: 42px;              /* reserve space for the kcal + time pill row above */
   bottom: 4px;
   left: 0; right: 0;
   z-index: 2;
   padding: 0 10px 8px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 0;          /* let inner content clip, not stretch the box */
 }
-.fiv11-body-text { margin-bottom: 6px; }
+.fiv11-body-text {
+  margin-bottom: 6px;
+  min-height: 0;
+  overflow: hidden;
+}
 .fiv11-name {
   font-family: var(--v11-font-display);
   font-weight: 700;
@@ -4284,6 +4293,9 @@ body.v11 #pg-today .fi-top { display: none; }
   margin-top: 2px;
   font-weight: 400;
   letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .fiv11-chips {

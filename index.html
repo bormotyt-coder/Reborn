@@ -62,6 +62,20 @@
     </div>
   </section>
 
+  <!-- ═══ THIS WEEK — inline progress glance (moved above the hero orb) ═══ -->
+  <section class="home-section home-section-tap" onclick="showPage('progress',this)">
+    <div class="hs-head">
+      <div class="hs-title">This Week</div>
+      <div class="hs-chev">
+        <span id="home-week-summary">—</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+    </div>
+    <div class="hs-body">
+      <div class="mini-week-bars" id="home-week-bars"></div>
+    </div>
+  </section>
+
   <!-- ═══ HERO v11 rev2: canvas particle orb + gradient ring ═══ -->
   <section class="hero-v11">
     <div class="hero-v11-ring-wrap" onclick="openMacroBreakdown('calories')">
@@ -150,20 +164,6 @@
     <span id="home-ready-pct"></span><span id="home-ready-verdict"></span>
     <span id="home-weight-v"></span><span id="home-streak-v"></span>
   </div>
-
-  <!-- ═══ THIS WEEK — inline progress glance ═══ -->
-  <section class="home-section home-section-tap" onclick="showPage('progress',this)">
-    <div class="hs-head">
-      <div class="hs-title">This Week</div>
-      <div class="hs-chev">
-        <span id="home-week-summary">—</span>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
-      </div>
-    </div>
-    <div class="hs-body">
-      <div class="mini-week-bars" id="home-week-bars"></div>
-    </div>
-  </section>
 
   <!-- ═══ TODAY'S MEALS ═══ -->
   <section class="home-section-plain meals-section-v11">
