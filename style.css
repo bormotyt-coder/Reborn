@@ -4190,14 +4190,30 @@ body.v11 #pg-today .fi-top { display: none; }
   inset: 0;
   background: linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.6) 48%, rgba(0,0,0,0.08) 100%);
 }
+/* Dark top-corner vignette so the kcal pill (top-left) and time pill (top-right)
+   stay legible over any meal photo — fades to transparent by ~55px down. */
+.fiv11-bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(to bottom, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.20) 38%, rgba(0,0,0,0) 62%);
+  pointer-events: none;
+  z-index: 1;
+}
 
+/* Top row is absolutely positioned so long meal names can flow beneath it
+   without being pushed down and without collision. */
 .fiv11-top {
-  position: relative;
-  z-index: 2;
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  z-index: 3;
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  padding: 10px 10px 0;
+  pointer-events: none; /* the pills themselves don't need clicks; card click still works */
 }
 .fiv11-kcal {
   display: inline-flex;
@@ -4214,6 +4230,8 @@ body.v11 #pg-today .fi-top { display: none; }
   font-size: 11px;
   color: var(--v11-accent);
   letter-spacing: -0.02em;
+  /* extra contrast halo so the pill pops on bright images */
+  box-shadow: 0 2px 10px rgba(0,0,0,0.55);
 }
 .fiv11-kcal-unit {
   font-size: 8px;
@@ -4224,15 +4242,16 @@ body.v11 #pg-today .fi-top { display: none; }
   display: inline-flex;
   align-items: center;
   padding: 3px 9px;
-  background: rgba(0,0,0,0.55);
+  background: rgba(0,0,0,0.65);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   border-radius: 99px;
   font-family: var(--v11-font-body);
   font-weight: 700;
   font-size: 9px;
-  color: rgba(255,255,255,0.65);
+  color: rgba(255,255,255,0.72);
   letter-spacing: 0.08em;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.5);
 }
 
 .fiv11-body {
@@ -4251,6 +4270,12 @@ body.v11 #pg-today .fi-top { display: none; }
   letter-spacing: -0.01em;
   line-height: 1.2;
   text-shadow: 0 1px 6px rgba(0,0,0,0.8);
+  /* clamp to 2 lines so long titles never intrude on the top row */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .fiv11-desc {
   font-family: var(--v11-font-body);
