@@ -3718,6 +3718,20 @@ const AVAILABLE_SLUGS = new Set([
   'bench-barbell-flat','bench-barbell-incline','bench-db-flat','bench-db-incline','bench-smith-incline',
   // Batch 2 — chest/back
   'cable-fly','pec-deck','pullup','lat-pulldown','row-cable-seated',
+  // Batch 3 — back
+  'row-tbar','row-db-single-arm','row-barbell-bent','row-machine','pullover-cable',
+  // Batch 4 — shoulders
+  'ohp-barbell','press-db-seated','lateral-raise-db','lateral-raise-cable','rear-delt-fly',
+  // Batch 5 — biceps + 1 triceps
+  'curl-db-incline','curl-barbell','curl-preacher','curl-cable-bayesian','pushdown-cable-rope',
+  // Batch 6 — triceps + quads
+  'extension-overhead-cable','skullcrusher','dip','squat-barbell-back','squat-front',
+  // Batch 7 — quads + hams
+  'leg-press','hack-squat','leg-extension','rdl-barbell','leg-curl-seated',
+  // Batch 8 — hams/glutes/deadlifts
+  'leg-curl-lying','hip-thrust-barbell','back-extension-45','deadlift-conventional','deadlift-sumo',
+  // Batch 9 — lunge + core
+  'lunge-db','plank','cable-crunch','hanging-leg-raise','ab-wheel',
 ]);
 
 // Ordered keyword → slug map. Longer/more specific keys FIRST because matching
@@ -3900,13 +3914,51 @@ const EX_ICONS={
   'walk':'🚶',
 };
 
-// Look up a slug for a given exercise name. Returns a string slug if there's
-// a match AND the PNG exists in AVAILABLE_SLUGS; otherwise null.
+// Some exercises are visually close enough that it's fine to render a more
+// general icon when the specific one isn't available. e.g. a "Single-Arm Lat
+// Pulldown" looks enough like a "Lat Pulldown" that using the latter's icon
+// is more helpful than falling back to a generic emoji.
+// Conversely, a "Spanish Squat" (quad-dominant, heels elevated) renders with
+// radically different equipment than a "Back Squat" (barbell) — those must
+// NOT silently downgrade. The default behavior is "no downgrade"; only the
+// mappings below are allowed to resolve to a different slug.
+const SAFE_DOWNGRADES = {
+  'pulldown-single-arm': 'lat-pulldown',
+  'pulldown-hammer':     'lat-pulldown',
+  'row-meadows':         'row-db-single-arm',
+  'curl-hammer-db':      'curl-barbell',
+  'curl-hammer-cable':   'curl-cable-bayesian',
+  'lunge-reverse':       'lunge-db',
+  'step-up-db':          'lunge-db',
+  'rdl-single-leg':      'rdl-barbell',
+  'squat-goblet':        'squat-front',     // both front-loaded, upright torso
+  'lateral-raise-machine': 'lateral-raise-db',
+  'lateral-raise-prone': 'rear-delt-fly',   // both rear-delt-focused
+  'press-machine-shoulder': 'press-db-seated',
+  'press-smith-flat':    'bench-barbell-flat',
+  'dip-machine':         'dip',
+  'plank-side':          'plank',
+};
+
+// Look up a slug for a given exercise name. Returns a string slug (guaranteed
+// to be in AVAILABLE_SLUGS) or null.
+// Logic:
+//   1. Find the first keyword match in EX_SLUG_MAP (most specific wins).
+//   2. If that slug is available → return it.
+//   3. If not, check SAFE_DOWNGRADES → return the fallback slug if available.
+//   4. Otherwise return null (caller renders emoji).
+// This prevents e.g. "Spanish Squat" from silently matching a generic 'squat'
+// keyword and rendering as a barbell back squat.
 function getExIconSlug(name){
   if(!name) return null;
   const n = String(name).toLowerCase();
   for(const [kw, slug] of EX_SLUG_MAP){
-    if(n.includes(kw) && AVAILABLE_SLUGS.has(slug)) return slug;
+    if(n.includes(kw)){
+      if(AVAILABLE_SLUGS.has(slug)) return slug;
+      const downgrade = SAFE_DOWNGRADES[slug];
+      if(downgrade && AVAILABLE_SLUGS.has(downgrade)) return downgrade;
+      return null; // first match wins — don't silently fall through to wrong art
+    }
   }
   return null;
 }
