@@ -2333,9 +2333,135 @@ function selectDayCalDay(ds){
   cups=parseFloat(localStorage.getItem(`${KEY}_cups_${ds}`)||'0')||0;
   renderAll();
   buildDayCalStrip();
+  renderDayPill();
+}
+
+// ─── DAY PILL (WHOOP-style day navigator in the header) ─────────
+// The pill's center label reads TODAY / YESTERDAY / "APR 22" based on
+// how far back we are from today. Arrows step by one day; the right
+// arrow is disabled when _dayCalSelected is already today (no future).
+// Tapping the label opens the month-picker modal. When viewing a past
+// day, a read-only banner appears under the header.
+function renderDayPill(){
+  const pill=document.getElementById('day-pill');
+  const labelEl=document.getElementById('dp-label');
+  const nextBtn=document.getElementById('dp-next');
+  const banner=document.getElementById('past-day-banner');
+  const bannerLbl=document.getElementById('past-day-lbl');
+  const pgToday=document.getElementById('pg-today');
+  if(!pill||!labelEl||!nextBtn||!pgToday)return;
+
+  const tKey=todayKey();
+  const sel=_dayCalSelected||tKey;
+  const isToday=sel===tKey;
+
+  // Compute "yesterday" by subtracting one day from today (not from sel)
+  const yest=new Date(); yest.setDate(yest.getDate()-1);
+  const yKey=yest.toISOString().slice(0,10);
+
+  // Label text: TODAY / YESTERDAY / "APR 22" (or "APR 22, 2025" if a prior year)
+  let label;
+  if(isToday){label='TODAY';}
+  else if(sel===yKey){label='YESTERDAY';}
+  else{
+    const d=new Date(sel+'T12:00:00');
+    const now=new Date();
+    const sameYear=d.getFullYear()===now.getFullYear();
+    label=SHORT_MONTHS[d.getMonth()].toUpperCase()+' '+d.getDate()+(sameYear?'':', '+d.getFullYear());
+  }
+  labelEl.textContent=label;
+
+  // Disable the right arrow when on today
+  if(isToday){nextBtn.setAttribute('disabled','');nextBtn.setAttribute('aria-disabled','true');}
+  else{nextBtn.removeAttribute('disabled');nextBtn.removeAttribute('aria-disabled');}
+
+  // Today-state class (for any future styling hooks)
+  pill.classList.toggle('dp-is-today',isToday);
+
+  // Read-only banner under the header when viewing a past day
+  pgToday.classList.toggle('viewing-past',!isToday);
+  if(!isToday&&banner&&bannerLbl){
+    // Use a longer friendly format for the banner (e.g. "Thursday, Apr 24")
+    const d=new Date(sel+'T12:00:00');
+    const dowLong=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][d.getDay()];
+    bannerLbl.textContent=dowLong+', '+SHORT_MONTHS[d.getMonth()]+' '+d.getDate();
+  }
+}
+function _dayPillShift(deltaDays){
+  const d=new Date((_dayCalSelected||todayKey())+'T12:00:00');
+  d.setDate(d.getDate()+deltaDays);
+  const next=d.toISOString().slice(0,10);
+  // Clamp to today — never step into the future
+  const clamped=next>todayKey()?todayKey():next;
+  if(clamped!==_dayCalSelected)selectDayCalDay(clamped);
+}
+function dayPillPrev(){_dayPillShift(-1);}
+function dayPillNext(){_dayPillShift(1);}
+
+// ─── Day-picker month modal ─────────────────────────────────────
+// A lightweight standalone month grid; tapping any past-or-today cell
+// switches the whole home page to that day via selectDayCalDay.
+let _dayCalViewDate=new Date();
+function openDayCalendar(){
+  _dayCalViewDate=new Date(); // reset to current month each open
+  // If selected day is in a different month, show that month instead
+  if(_dayCalSelected){
+    const d=new Date(_dayCalSelected+'T12:00:00');
+    _dayCalViewDate=new Date(d.getFullYear(),d.getMonth(),1);
+  }
+  buildDayCalendarGrid();
+  const m=document.getElementById('daycal-modal');
+  if(m)m.classList.add('open');
+}
+function closeDayCalendar(){
+  const m=document.getElementById('daycal-modal');
+  if(m)m.classList.remove('open');
+}
+function dayCalChangeMonth(dir){
+  _dayCalViewDate.setMonth(_dayCalViewDate.getMonth()+dir);
+  buildDayCalendarGrid();
+}
+function dayCalJumpToToday(){
+  selectDayCalDay(todayKey());
+  closeDayCalendar();
+}
+function dayCalPick(ds){
+  // Guard against future dates (shouldn't be clickable, but belt-and-braces)
+  if(ds>todayKey())return;
+  selectDayCalDay(ds);
+  closeDayCalendar();
+}
+function buildDayCalendarGrid(){
+  const lbl=document.getElementById('dcal-month-lbl');
+  const grid=document.getElementById('dcal-grid');
+  if(!lbl||!grid)return;
+  const y=_dayCalViewDate.getFullYear(),m=_dayCalViewDate.getMonth();
+  lbl.textContent=['January','February','March','April','May','June','July','August','September','October','November','December'][m]+' '+y;
+  const firstDow=new Date(y,m,1).getDay();
+  const daysInMonth=new Date(y,m+1,0).getDate();
+  const tKey=todayKey();
+  const sel=_dayCalSelected||tKey;
+  let html='';
+  for(let i=0;i<firstDow;i++)html+=`<div class="dcal-cell empty"></div>`;
+  for(let d=1;d<=daysInMonth;d++){
+    const ds=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isFuture=ds>tKey;
+    const isToday=ds===tKey;
+    const isSelected=ds===sel;
+    const hasData=load(`${KEY}_meals_${ds}`,[]).length>0;
+    const cls=['dcal-cell'];
+    if(isFuture)cls.push('future');
+    if(isToday)cls.push('today');
+    if(isSelected)cls.push('selected');
+    if(hasData)cls.push('has-data');
+    const onClick=isFuture?'':` onclick="dayCalPick('${ds}')"`;
+    html+=`<div class="${cls.join(' ')}"${onClick}><span>${d}</span>${hasData?'<span class="dcal-dot"></span>':''}</div>`;
+  }
+  grid.innerHTML=html;
 }
 // Build strip on boot
 buildDayCalStrip();
+renderDayPill();
 
 // CALENDAR
 function buildCalendar(){

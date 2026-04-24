@@ -3716,6 +3716,20 @@ body.v11 .hdr-v11-inner {
   flex-direction: column;
   align-items: center;
   gap: 10px;
+  /* Shared scroll progress (0 = fully expanded, 1 = fully compact).
+     Set by the scroll handler in index.html and inherited by both the
+     streak pill and the day pill so they collapse in lockstep. */
+  --hdr-progress: 0;
+}
+
+/* The row beneath the logo: [streak pill] [day pill] side by side.
+   Gap also tightens as progress → 1 so the compacted pills pack close. */
+.hdr-v11-pills {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(8px - 4px * var(--hdr-progress));
+  width: 100%;
 }
 
 .rb-wordmark {
@@ -3768,30 +3782,32 @@ body.v11 .hdr-v11-inner {
 }
 
 /* ─── Streak pill ──────────────────────────────────────────────
-   Drives a smooth expand → compact transition via --streak-progress
-   (0 = full "N DAY STREAK | best N" pill, 1 = compact "🔥 N" pill),
-   set by the same scroll handler that shrinks the logo. The pill's
-   width, padding, and the visibility of each inner element all
-   interpolate off that single variable, so the pill stays in perfect
-   sync with the logo as the user scrolls — and remains that way
-   whether they're mid-scroll or resting at any point in between.
+   Drives a smooth expand → compact transition via --hdr-progress
+   (inherited from .hdr-v11-inner; 0 = full "N DAY STREAK | best N"
+   pill, 1 = compact "🔥 N" pill). The scroll handler sets the
+   variable; width, padding, and the visibility of each inner
+   element all interpolate off it so the pill stays in perfect sync
+   with the logo — and with its sibling day pill — as the user
+   scrolls.
 ─────────────────────────────────────────────────────────────── */
 .streak-pill-v11 {
-  --streak-progress: 0;
-  /* Expanded width matches the logo at its 64px height (~240px).
-     Compact width is narrower than the shrunk logo (~120px). */
-  --streak-w-max: 240px;
-  --streak-w-min: 78px;
-  --streak-pad-x-max: 14px;
+  /* Expanded width fits "N DAY STREAK | best N" comfortably; compact
+     stays just wide enough for [🔥 N]. The day pill lives next to it;
+     together the row is a touch wider than the logo, which reads as
+     intentional rather than cramped. */
+  --streak-w-max: 170px;
+  --streak-w-min: 72px;
+  --streak-pad-x-max: 12px;
   --streak-pad-x-min: 10px;
 
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 6px;
+  height: 28px; /* matches the day pill for a flush pill-row baseline */
   /* Interpolate width + padding between expanded and compact via calc() */
-  width: calc(var(--streak-w-max) - (var(--streak-w-max) - var(--streak-w-min)) * var(--streak-progress));
-  padding: 6px calc(var(--streak-pad-x-max) - (var(--streak-pad-x-max) - var(--streak-pad-x-min)) * var(--streak-progress));
+  width: calc(var(--streak-w-max) - (var(--streak-w-max) - var(--streak-w-min)) * var(--hdr-progress));
+  padding: 0 calc(var(--streak-pad-x-max) - (var(--streak-pad-x-max) - var(--streak-pad-x-min)) * var(--hdr-progress));
   background: var(--v11-accent-soft);
   border: 1px solid rgba(255,45,0,0.40);
   border-radius: 99px;
@@ -3801,7 +3817,8 @@ body.v11 .hdr-v11-inner {
   -webkit-backdrop-filter: blur(8px);
   overflow: hidden;
   white-space: nowrap;
-  /* Smooth any direct style changes (e.g. active press), width/padding
+  flex: 0 0 auto;
+  /* Smooth any direct style changes (e.g. active press); width/padding
      are driven by the scroll handler so they don't need a transition. */
   transition: transform .15s ease, background .25s ease, border-color .25s ease;
 }
@@ -3812,9 +3829,9 @@ body.v11 .hdr-v11-inner {
   font-size: 13px;
   line-height: 1;
   /* Collapse horizontally when expanded, expand when compact */
-  max-width: calc(18px * var(--streak-progress));
-  margin-right: calc(-8px * (1 - var(--streak-progress))); /* kill gap when hidden */
-  opacity: var(--streak-progress);
+  max-width: calc(18px * var(--hdr-progress));
+  margin-right: calc(-6px * (1 - var(--hdr-progress))); /* kill gap when hidden */
+  opacity: var(--hdr-progress);
   overflow: hidden;
   display: inline-flex;
   align-items: center;
@@ -3840,10 +3857,10 @@ body.v11 .hdr-v11-inner {
 .streak-pill-v11 .sp-sep,
 .streak-pill-v11 .sp-divider,
 .streak-pill-v11 .sp-best {
-  opacity: calc(1 - var(--streak-progress));
-  max-width: calc((1 - var(--streak-progress)) * 200px);
+  opacity: calc(1 - var(--hdr-progress));
+  max-width: calc((1 - var(--hdr-progress)) * 200px);
   overflow: hidden;
-  margin-left: calc(-8px * var(--streak-progress));
+  margin-left: calc(-6px * var(--hdr-progress));
 }
 
 .streak-pill-v11 .sp-sep {
@@ -3871,6 +3888,253 @@ body.v11 .hdr-v11-inner {
   color: rgba(255,255,255,0.55);
   font-weight: 600;
 }
+
+/* ─── Day pill (WHOOP-style day navigator) ────────────────────
+   Lives next to the streak pill. Expanded: [‹] TODAY [›]. Compact:
+   [‹] [›] (label collapses to zero width). Both arrow zones are
+   independent tap targets; tapping the center label opens the full
+   calendar. Shares --hdr-progress with the streak pill so they
+   collapse in perfect lockstep as the user scrolls.
+─────────────────────────────────────────────────────────────── */
+.day-pill-v11 {
+  --day-w-max: 138px;
+  --day-w-min: 66px;
+
+  display: inline-flex;
+  align-items: stretch;
+  justify-content: center;
+  padding: 0;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 99px;
+  cursor: default;
+  font-family: var(--v11-font-body);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  overflow: hidden;
+  white-space: nowrap;
+  width: calc(var(--day-w-max) - (var(--day-w-max) - var(--day-w-min)) * var(--hdr-progress));
+  height: 28px; /* matches the streak pill's natural height */
+  flex: 0 0 auto;
+  transition: background .25s ease, border-color .25s ease;
+}
+
+/* Arrow buttons — always visible, tap-targets sized for thumbs */
+.day-pill-v11 .dp-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  flex: 0 0 auto;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  color: rgba(255,255,255,0.70);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  transition: color .15s ease, transform .1s ease, opacity .2s ease;
+}
+.day-pill-v11 .dp-arrow:active { transform: scale(0.90); }
+.day-pill-v11 .dp-arrow:hover { color: #fff; }
+/* Disabled right-arrow when already on today (can't navigate into future) */
+.day-pill-v11 .dp-arrow[disabled] {
+  opacity: 0.25;
+  cursor: not-allowed;
+}
+.day-pill-v11 .dp-arrow svg {
+  width: 14px;
+  height: 14px;
+  display: block;
+}
+
+/* Center label — "TODAY" / "YESTERDAY" / "APR 22". Collapses to 0
+   width as --hdr-progress → 1, so the compact pill is just [‹][›]. */
+.day-pill-v11 .dp-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: calc((1 - var(--hdr-progress)) * 120px);
+  opacity: calc(1 - var(--hdr-progress));
+  overflow: hidden;
+  background: transparent;
+  border: 0;
+  padding: 0 2px;
+  color: rgba(255,255,255,0.92);
+  font-family: var(--v11-font-body);
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color .15s ease;
+  line-height: 1;
+}
+.day-pill-v11 .dp-label:active { transform: scale(0.97); }
+.day-pill-v11 .dp-label:hover { color: #fff; }
+
+/* When viewing today the center reads "TODAY" in the accent color
+   so it matches the streak pill's visual rhythm */
+.day-pill-v11.dp-is-today .dp-label { color: #fff; }
+
+/* ─── Day-picker calendar modal ───────────────────────────────
+   Opened by tapping the center label of the day pill. Lets the user
+   jump to any past day (or today). Future days are visibly disabled.
+─────────────────────────────────────────────────────────────── */
+.dcal-modal-inner {
+  max-width: 420px;
+  padding: 20px 18px 24px;
+}
+.dcal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.dcal-month-lbl {
+  font-family: var(--v11-font-display);
+  font-weight: 700;
+  font-size: 18px;
+  color: #fff;
+  letter-spacing: -0.01em;
+  flex: 1;
+  text-align: center;
+}
+.dcal-navbtn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.10);
+  color: rgba(255,255,255,0.80);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .15s ease, transform .1s ease;
+  flex: 0 0 auto;
+}
+.dcal-navbtn:active { transform: scale(0.93); }
+.dcal-navbtn:hover { background: rgba(255,255,255,0.10); }
+.dcal-dow-row {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.dcal-dow {
+  text-align: center;
+  font-family: var(--v11-font-body);
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.35);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 6px 0;
+}
+.dcal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+.dcal-cell {
+  aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 2px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.02);
+  color: rgba(255,255,255,0.80);
+  font-family: var(--v11-font-body);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  user-select: none;
+  transition: background .15s ease, transform .1s ease, border-color .15s ease;
+  border: 1px solid transparent;
+  position: relative;
+}
+.dcal-cell:active { transform: scale(0.94); }
+.dcal-cell:hover { background: rgba(255,255,255,0.06); }
+.dcal-cell.empty {
+  background: transparent;
+  cursor: default;
+  pointer-events: none;
+}
+.dcal-cell.future {
+  opacity: 0.22;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+.dcal-cell.has-data {
+  background: rgba(255,45,0,0.08);
+}
+.dcal-cell.today {
+  border-color: rgba(255,45,0,0.50);
+  color: #fff;
+}
+.dcal-cell.selected {
+  background: var(--v11-accent);
+  color: #fff;
+  border-color: var(--v11-accent);
+  box-shadow: 0 0 14px rgba(255,45,0,0.45);
+}
+.dcal-cell.selected.has-data { background: var(--v11-accent); }
+.dcal-cell .dcal-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--v11-accent);
+  opacity: 0.75;
+}
+.dcal-cell.selected .dcal-dot { background: #fff; opacity: 1; }
+.dcal-foot {
+  margin-top: 14px;
+  display: flex;
+  justify-content: center;
+}
+.dcal-today-btn {
+  padding: 8px 18px;
+  border-radius: 99px;
+  background: var(--v11-accent-soft);
+  border: 1px solid rgba(255,45,0,0.40);
+  color: var(--v11-accent);
+  font-family: var(--v11-font-body);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: transform .1s ease;
+}
+.dcal-today-btn:active { transform: scale(0.96); }
+
+/* ─── Viewing-a-past-day indicator ────────────────────────────
+   When _dayCalSelected != today, a subtle banner appears under the
+   header explaining the state is read-only. Stays out of the way
+   visually but makes it clear you're not on today.
+─────────────────────────────────────────────────────────────── */
+body.v11 #pg-today .past-day-banner {
+  display: none;
+  margin: 0 20px 8px;
+  padding: 8px 14px;
+  border-radius: 14px;
+  background: rgba(255,45,0,0.06);
+  border: 1px solid rgba(255,45,0,0.18);
+  color: rgba(255,255,255,0.70);
+  font-family: var(--v11-font-body);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  text-align: center;
+}
+body.v11 #pg-today.viewing-past .past-day-banner { display: block; }
 
 /* ═══════════════════════════════════════════════════════════
    HERO — calorie ring + canvas particle orb

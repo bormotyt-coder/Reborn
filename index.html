@@ -30,13 +30,24 @@
       <div class="rb-wordmark" aria-label="reBORN">
         <img src="reborn-logo.png" alt="reBORN" class="rb-logo-img" />
       </div>
-      <button class="streak-pill-v11" onclick="openStreakModal()" aria-label="Streak">
-        <span class="sp-fire" aria-hidden="true">🔥</span>
-        <span class="sp-num" id="smc-num">0</span>
-        <span class="sp-sep">DAY STREAK</span>
-        <span class="sp-divider">|</span>
-        <span class="sp-best">best <span id="smc-best">0</span></span>
-      </button>
+      <div class="hdr-v11-pills">
+        <button class="streak-pill-v11" onclick="openStreakModal()" aria-label="Streak">
+          <span class="sp-fire" aria-hidden="true">🔥</span>
+          <span class="sp-num" id="smc-num">0</span>
+          <span class="sp-sep">DAY STREAK</span>
+          <span class="sp-divider">|</span>
+          <span class="sp-best">best <span id="smc-best">0</span></span>
+        </button>
+        <div class="day-pill-v11" id="day-pill" role="group" aria-label="Day navigator">
+          <button type="button" class="dp-arrow dp-prev" onclick="dayPillPrev()" aria-label="Previous day">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <button type="button" class="dp-label" id="dp-label" onclick="openDayCalendar()">TODAY</button>
+          <button type="button" class="dp-arrow dp-next" id="dp-next" onclick="dayPillNext()" aria-label="Next day">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+        </div>
+      </div>
       <!-- hidden compat: preserves element referenced elsewhere -->
       <span id="hdr-date" style="display:none"></span>
     </div>
@@ -63,19 +74,12 @@
     </div>
   </section>
 
-  <!-- ═══ THIS WEEK — inline progress glance (moved above the hero orb) ═══ -->
-  <section class="home-section home-section-tap" onclick="showPage('progress',this)">
-    <div class="hs-head">
-      <div class="hs-title">This Week</div>
-      <div class="hs-chev">
-        <span id="home-week-summary">—</span>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
-      </div>
-    </div>
-    <div class="hs-body">
-      <div class="mini-week-bars" id="home-week-bars"></div>
-    </div>
-  </section>
+  <!-- Read-only banner when viewing a past day via the day pill.
+       Visibility toggled by renderDayPill() adding/removing
+       `.viewing-past` on #pg-today. -->
+  <div class="past-day-banner" id="past-day-banner">
+    Viewing <span id="past-day-lbl">—</span> · read-only
+  </div>
 
   <!-- ═══ HERO v11 rev2: canvas particle orb + gradient ring ═══ -->
   <section class="hero-v11">
@@ -1075,6 +1079,25 @@
   </div>
 </div>
 
+<!-- ═══ DAY PICKER (opens from day pill center-label) ═══ -->
+<div class="overlay" id="daycal-modal" onclick="closeDayCalendar()">
+  <div class="modal dcal-modal-inner" onclick="event.stopPropagation()">
+    <div class="m-handle"></div>
+    <div class="dcal-head">
+      <button type="button" class="dcal-navbtn" onclick="dayCalChangeMonth(-1)" aria-label="Previous month">‹</button>
+      <div class="dcal-month-lbl" id="dcal-month-lbl">—</div>
+      <button type="button" class="dcal-navbtn" onclick="dayCalChangeMonth(1)" aria-label="Next month">›</button>
+    </div>
+    <div class="dcal-dow-row">
+      <div class="dcal-dow">S</div><div class="dcal-dow">M</div><div class="dcal-dow">T</div><div class="dcal-dow">W</div><div class="dcal-dow">T</div><div class="dcal-dow">F</div><div class="dcal-dow">S</div>
+    </div>
+    <div class="dcal-grid" id="dcal-grid"></div>
+    <div class="dcal-foot">
+      <button type="button" class="dcal-today-btn" onclick="dayCalJumpToToday()">Jump to today</button>
+    </div>
+  </div>
+</div>
+
 <script src="data.js"></script>
 <script src="app.js"></script>
 <script>
@@ -1263,7 +1286,7 @@
     var hdr = document.querySelector('#pg-today .hdr-v11');
     var wm  = document.querySelector('#pg-today .rb-wordmark');
     var img = document.querySelector('#pg-today .rb-logo-img');
-    var pill = document.querySelector('#pg-today .streak-pill-v11');
+    var inner = document.querySelector('#pg-today .hdr-v11-inner');
     var pg  = document.getElementById('pg-today');
     if (!hdr || !wm || !pg) return;
     var t = Math.min(1, Math.max(0, scrollTop / SHRINK_RANGE));
@@ -1271,9 +1294,10 @@
     var hStr = h.toFixed(1) + 'px';
     wm.style.setProperty('--logo-h', hStr);
     if (img) img.style.height = hStr;  // belt-and-braces direct set
-    // Drive the streak pill's expand→compact transition off the same t
-    // (0 = full "DAY STREAK | best N" pill, 1 = compact "🔥 N" pill).
-    if (pill) pill.style.setProperty('--streak-progress', t.toFixed(3));
+    // Drive both pills (streak + day) off one inherited variable on the
+    // shared parent. 0 = fully expanded (full labels visible), 1 = fully
+    // compact (streak → "🔥 N", day → just [‹][›] arrows).
+    if (inner) inner.style.setProperty('--hdr-progress', t.toFixed(3));
     if (scrollTop > SCROLLED_THRESHOLD) {
       hdr.classList.add('hdr-scrolled');
       pg.classList.add('hdr-is-scrolled');
