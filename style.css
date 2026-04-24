@@ -1550,6 +1550,27 @@ input:focus, textarea:focus, select:focus { border-color: var(--page-accent); ba
 .wo-cardio-hdr { display: flex; align-items: center; gap: 11px; }
 .wo-cardio-icon { font-size: 18px; }
 .wo-cardio-icon-big { font-size: 24px; }
+
+/* ── PNG exercise icons (injected by getExIcon → <img class="wo-ex-img">) ── */
+/* The <img> sits inside existing emoji slots (.wo-ex-icon, .wo-ex-card-icon, etc.).
+   We set display:block so it doesn't inherit text-baseline quirks, and override
+   size per context. Keep containers flex-aligned so the slot width adjusts
+   cleanly whether the child is an <img> or an emoji. */
+.wo-ex-img { display: block; object-fit: contain; flex-shrink: 0; }
+.wo-ex-icon .wo-ex-img      { width: 34px; height: 34px; }   /* plan preview slot */
+.wo-ex-card-icon .wo-ex-img { width: 40px; height: 40px; }   /* active workout card */
+.wo-suggest-card-icon .wo-ex-img { width: 36px; height: 36px; } /* AI-suggested card */
+.wo-cardio-icon .wo-ex-img      { width: 30px; height: 30px; } /* cardio preview */
+.wo-cardio-icon-big .wo-ex-img  { width: 40px; height: 40px; } /* cardio active card */
+.wo-det-ex-name .wo-ex-img  { width: 22px; height: 22px; vertical-align: middle; margin-right: 4px; display: inline-block; } /* history list — inline with text */
+
+/* When the icon slot holds a PNG, drop the emoji font-size so container height
+   collapses to the image height (no stray line-box height pushing layout). */
+.wo-ex-icon:has(.wo-ex-img),
+.wo-ex-card-icon:has(.wo-ex-img),
+.wo-suggest-card-icon:has(.wo-ex-img),
+.wo-cardio-icon:has(.wo-ex-img),
+.wo-cardio-icon-big:has(.wo-ex-img) { font-size: 0; line-height: 0; }
 .wo-cardio-info { flex: 1; }
 .wo-cardio-title { font-family: var(--font); font-size: 14px; font-weight: 500; color: var(--text); }
 .wo-cardio-card-title { font-family: var(--font); font-size: 14px; font-weight: 500; color: var(--text); }

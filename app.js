@@ -3704,7 +3704,187 @@ function saveNoteFromModal(ei) {
   renderExercises();
 }
 
-// ── Exercise icon map ──
+// ── Exercise icon system ──
+// Two-tier lookup:
+//   1. Slug match → returns an <img> tag pointing at icons/<slug>.png (if available)
+//   2. Emoji fallback from EX_ICONS keyword map
+//
+// AVAILABLE_SLUGS is the gate. As PNGs are added to the icons/ folder,
+// also add their slug here and the system picks them up automatically.
+// Slugs listed in EX_SLUG_MAP but NOT in AVAILABLE_SLUGS fall through to emoji,
+// so it's safe to pre-populate the map with slugs whose art isn't ready yet.
+const AVAILABLE_SLUGS = new Set([
+  // Batch 1 — chest
+  'bench-barbell-flat','bench-barbell-incline','bench-db-flat','bench-db-incline','bench-smith-incline',
+  // Batch 2 — chest/back
+  'cable-fly','pec-deck','pullup','lat-pulldown','row-cable-seated',
+]);
+
+// Ordered keyword → slug map. Longer/more specific keys FIRST because matching
+// is first-hit-wins (e.g. 'incline dumbbell press' must match before 'press').
+// Keys are lowercase substrings tested against exercise name.
+const EX_SLUG_MAP = [
+  // ── Chest ──
+  ['smith incline',            'bench-smith-incline'],
+  ['incline smith',            'bench-smith-incline'],
+  ['smith flat',               'press-smith-flat'],
+  ['incline dumbbell press',   'bench-db-incline'],
+  ['incline db press',         'bench-db-incline'],
+  ['incline dumbbell',         'bench-db-incline'],
+  ['incline bench',            'bench-barbell-incline'],
+  ['incline barbell',          'bench-barbell-incline'],
+  ['dumbbell bench',           'bench-db-flat'],
+  ['db bench',                 'bench-db-flat'],
+  ['flat dumbbell',            'bench-db-flat'],
+  ['bench press',              'bench-barbell-flat'],
+  ['flat bench',               'bench-barbell-flat'],
+  ['barbell bench',            'bench-barbell-flat'],
+  ['cable fly',                'cable-fly'],
+  ['low-to-high',              'cable-fly'],
+  ['low to high',              'cable-fly'],
+  ['chest fly',                'cable-fly'],
+  ['pec deck fly',             'pec-deck'],
+  ['pec deck',                 'pec-deck'],
+  ['machine chest press',      'press-machine-chest'],
+  ['chest press',              'press-machine-chest'],
+  // ── Back ──
+  ['pull-up',                  'pullup'],
+  ['pull up',                  'pullup'],
+  ['pullup',                   'pullup'],
+  ['chin-up',                  'pullup'],
+  ['chin up',                  'pullup'],
+  ['single-arm lat',           'pulldown-single-arm'],
+  ['single arm lat',           'pulldown-single-arm'],
+  ['one-arm lat',              'pulldown-single-arm'],
+  ['hammer strength pulldown', 'pulldown-hammer'],
+  ['hammer pulldown',          'pulldown-hammer'],
+  ['machine low row',          'pulldown-hammer'],
+  ['lat pulldown',             'lat-pulldown'],
+  ['pulldown',                 'lat-pulldown'],
+  ['straight-arm',             'pullover-cable'],
+  ['straight arm cable',       'pullover-cable'],
+  ['pullover',                 'pullover-cable'],
+  ['chest-supported',          'row-tbar'],
+  ['chest supported',          'row-tbar'],
+  ['t-bar row',                'row-tbar'],
+  ['t bar row',                'row-tbar'],
+  ['meadows row',              'row-meadows'],
+  ['single-arm row',           'row-db-single-arm'],
+  ['single arm row',           'row-db-single-arm'],
+  ['one-arm db row',           'row-db-single-arm'],
+  ['dumbbell row',             'row-db-single-arm'],
+  ['seated cable row',         'row-cable-seated'],
+  ['cable row',                'row-cable-seated'],
+  ['seated row',               'row-cable-seated'],
+  ['bent-over row',            'row-barbell-bent'],
+  ['bent over row',            'row-barbell-bent'],
+  ['barbell row',              'row-barbell-bent'],
+  ['plate-loaded row',         'row-machine'],
+  ['machine row',              'row-machine'],
+  ['face pull',                'face-pull'],
+  // ── Shoulders ──
+  ['overhead press',           'ohp-barbell'],
+  ['ohp',                      'ohp-barbell'],
+  ['military press',           'ohp-barbell'],
+  ['machine shoulder',         'press-machine-shoulder'],
+  ['seated dumbbell press',    'press-db-seated'],
+  ['seated db press',          'press-db-seated'],
+  ['shoulder press',           'press-db-seated'],
+  ['db shoulder',              'press-db-seated'],
+  ['machine lateral',          'lateral-raise-machine'],
+  ['cable lateral',            'lateral-raise-cable'],
+  ['prone incline lateral',    'lateral-raise-prone'],
+  ['prone lateral',            'lateral-raise-prone'],
+  ['lateral raise',            'lateral-raise-db'],
+  ['side raise',               'lateral-raise-db'],
+  ['lu raise',                 'raise-lu'],
+  ['reverse pec deck',         'rear-delt-fly'],
+  ['rear delt',                'rear-delt-fly'],
+  // ── Biceps ──
+  ['incline dumbbell curl',    'curl-db-incline'],
+  ['incline db curl',          'curl-db-incline'],
+  ['incline curl',             'curl-db-incline'],
+  ['preacher curl',            'curl-preacher'],
+  ['preacher',                 'curl-preacher'],
+  ['bayesian',                 'curl-cable-bayesian'],
+  ['cable hammer curl',        'curl-hammer-cable'],
+  ['hammer curl',              'curl-hammer-db'],
+  ['barbell curl',             'curl-barbell'],
+  ['ez-bar curl',              'curl-barbell'],
+  ['ez bar curl',              'curl-barbell'],
+  // ── Triceps ──
+  ['rope pushdown',            'pushdown-cable-rope'],
+  ['tricep pushdown',          'pushdown-cable-rope'],
+  ['cable pushdown',           'pushdown-cable-rope'],
+  ['pushdown',                 'pushdown-cable-rope'],
+  ['overhead tricep',          'extension-overhead-cable'],
+  ['overhead extension',       'extension-overhead-cable'],
+  ['tricep extension',         'extension-overhead-cable'],
+  ['skullcrusher',             'skullcrusher'],
+  ['skull crusher',            'skullcrusher'],
+  ['jm press',                 'press-jm'],
+  ['machine tricep dip',       'dip-machine'],
+  ['machine dip',              'dip-machine'],
+  ['assisted dip',             'dip-machine'],
+  ['dip',                      'dip'],
+  // ── Quads ──
+  ['front squat',              'squat-front'],
+  ['back squat',               'squat-barbell-back'],
+  ['barbell squat',            'squat-barbell-back'],
+  ['spanish squat',            'squat-spanish'],
+  ['heel-elevated goblet',     'squat-goblet'],
+  ['heel elevated goblet',     'squat-goblet'],
+  ['goblet squat',             'squat-goblet'],
+  ['goblet',                   'squat-goblet'],
+  ['hack squat',               'hack-squat'],
+  ['leg press',                'leg-press'],
+  ['leg extension',            'leg-extension'],
+  ['squat',                    'squat-barbell-back'],
+  // ── Hamstrings/glutes ──
+  ['single-leg rdl',           'rdl-single-leg'],
+  ['single leg rdl',           'rdl-single-leg'],
+  ['b-stance rdl',             'rdl-single-leg'],
+  ['romanian deadlift',        'rdl-barbell'],
+  ['rdl',                      'rdl-barbell'],
+  ['seated leg curl',          'leg-curl-seated'],
+  ['lying leg curl',           'leg-curl-lying'],
+  ['leg curl',                 'leg-curl-seated'],
+  ['hip thrust',               'hip-thrust-barbell'],
+  ['back extension',           'back-extension-45'],
+  ['hyperextension',           'back-extension-45'],
+  ['hip abduction',            'hip-abduction'],
+  ['sumo deadlift',            'deadlift-sumo'],
+  ['deadlift',                 'deadlift-conventional'],
+  ['step-up',                  'step-up-db'],
+  ['step up',                  'step-up-db'],
+  ['reverse lunge',            'lunge-reverse'],
+  ['lunge',                    'lunge-db'],
+  ['calf raise',               'calf-raise'],
+  ['calf',                     'calf-raise'],
+  // ── Core ──
+  ['side plank',               'plank-side'],
+  ['plank',                    'plank'],
+  ['cable crunch',             'cable-crunch'],
+  ['hanging leg raise',        'hanging-leg-raise'],
+  ['hanging knee raise',       'hanging-leg-raise'],
+  ['ab wheel',                 'ab-wheel'],
+  ['ab rollout',               'ab-wheel'],
+  ['dead bug',                 'dead-bug'],
+  ['deadbug',                  'dead-bug'],
+  // ── Cardio ──
+  ['treadmill',                'treadmill'],
+  ['stairmaster',              'stairmaster'],
+  ['stair climber',            'stairmaster'],
+  ['stair',                    'stairmaster'],
+  ['rower',                    'rower-machine'],
+  ['rowing machine',           'rower-machine'],
+  ['row machine',              'rower-machine'],
+  ['elliptical',               'elliptical'],
+  ['bike',                     'bike-upright'],
+  ['cycling',                  'bike-upright'],
+];
+
+// Emoji fallback map (original behavior) — used when no slug is available.
 const EX_ICONS={
   // compounds
   'squat':'🏋️','deadlift':'🏋️','bench':'💪','row':'🔄','press':'💪','pull':'🔄',
@@ -3719,9 +3899,34 @@ const EX_ICONS={
   'treadmill':'🏃','stair':'🪜','bike':'🚴','row machine':'🚣','elliptical':'🏃',
   'walk':'🚶',
 };
-function getExIcon(name){
-  const n=name.toLowerCase();
-  for(const[k,v]of Object.entries(EX_ICONS)){if(n.includes(k))return v;}
+
+// Look up a slug for a given exercise name. Returns a string slug if there's
+// a match AND the PNG exists in AVAILABLE_SLUGS; otherwise null.
+function getExIconSlug(name){
+  if(!name) return null;
+  const n = String(name).toLowerCase();
+  for(const [kw, slug] of EX_SLUG_MAP){
+    if(n.includes(kw) && AVAILABLE_SLUGS.has(slug)) return slug;
+  }
+  return null;
+}
+
+// Main icon getter used by all render sites. Returns an HTML string.
+// If an explicit slug is passed (e.g. from AI response `iconSlug`), it's used directly
+// when available. Otherwise falls through to keyword → slug match, then emoji.
+function getExIcon(name, explicitSlug){
+  // 1. Explicit slug from AI response
+  if(explicitSlug && AVAILABLE_SLUGS.has(explicitSlug)){
+    return `<img class="wo-ex-img" src="icons/${explicitSlug}.png" alt="" loading="lazy">`;
+  }
+  // 2. Keyword match → slug
+  const slug = getExIconSlug(name);
+  if(slug){
+    return `<img class="wo-ex-img" src="icons/${slug}.png" alt="" loading="lazy">`;
+  }
+  // 3. Emoji fallback
+  const n = String(name||'').toLowerCase();
+  for(const [k, v] of Object.entries(EX_ICONS)){if(n.includes(k)) return v;}
   return '💪';
 }
 
@@ -4046,10 +4251,21 @@ Rules:
 - cue: MUST be a specific MMC cue — what muscle to feel, where to initiate, a visualization. Never generic
 - suggestedWeight: fill in if PB exists for that exercise (suggest same or slight increase), else null
 - Cardio: fasted morning = prefer steady state (incline walk, moderate bike). Only recommend HIIT if recovery > 80
+- iconSlug: pick ONE slug from the list below that best matches the exercise. If no slug fits, omit the field entirely (do NOT invent new slugs).
+  Chest: bench-barbell-flat, bench-barbell-incline, bench-db-flat, bench-db-incline, bench-smith-incline, press-smith-flat, cable-fly, pec-deck, press-machine-chest
+  Back: pullup, lat-pulldown, pulldown-single-arm, pulldown-hammer, row-cable-seated, row-tbar, row-db-single-arm, row-barbell-bent, row-machine, row-meadows, pullover-cable, face-pull
+  Shoulders: ohp-barbell, press-db-seated, press-machine-shoulder, lateral-raise-db, lateral-raise-cable, lateral-raise-machine, lateral-raise-prone, rear-delt-fly, raise-lu
+  Biceps: curl-db-incline, curl-barbell, curl-preacher, curl-cable-bayesian, curl-hammer-db, curl-hammer-cable
+  Triceps: pushdown-cable-rope, extension-overhead-cable, skullcrusher, dip, dip-machine, press-jm
+  Quads: squat-barbell-back, squat-front, squat-goblet, squat-spanish, leg-press, hack-squat, leg-extension
+  Hams/Glutes: rdl-barbell, rdl-single-leg, leg-curl-seated, leg-curl-lying, hip-thrust-barbell, back-extension-45, hip-abduction
+  Full-body: deadlift-conventional, deadlift-sumo, lunge-db, lunge-reverse, step-up-db, calf-raise
+  Core: plank, plank-side, cable-crunch, hanging-leg-raise, ab-wheel, dead-bug
+  Cardio: treadmill, stairmaster, bike-upright, rower-machine, elliptical
 - Return ONLY valid JSON, no markdown, no explanation.
 
 JSON format:
-{"splitName":"Push — Chest & Shoulders","muscleGroups":["Chest","Shoulders","Triceps"],"coachNote":"2-line rationale referencing recovery data and how it shaped today's plan","exercises":[{"name":"Incline Dumbbell Press","icon":"💪","cue":"specific MMC cue","intensityTechnique":"straight sets","sets":4,"reps":"6-8","rest":120,"lastWeight":null,"suggestedWeight":null,"alternatives":["alt1","alt2"]}],"cardio":{"machine":"Treadmill","icon":"🏃","duration":15,"speed":6.5,"incline":8,"unit":"km/h","rationale":"one line"}}`;
+{"splitName":"Push — Chest & Shoulders","muscleGroups":["Chest","Shoulders","Triceps"],"coachNote":"2-line rationale referencing recovery data and how it shaped today's plan","exercises":[{"name":"Incline Dumbbell Press","iconSlug":"bench-db-incline","cue":"specific MMC cue","intensityTechnique":"straight sets","sets":4,"reps":"6-8","rest":120,"lastWeight":null,"suggestedWeight":null,"alternatives":["alt1","alt2"]}],"cardio":{"machine":"Treadmill","iconSlug":"treadmill","duration":15,"speed":6.5,"incline":8,"unit":"km/h","rationale":"one line"}}`;
 
   const prompt=`═══ TODAY'S CONTEXT ═══
 - WHOOP Recovery: ${rec}%
@@ -4110,7 +4326,7 @@ function renderWorkoutPreview(){
   if(exEl){
     exEl.innerHTML=(_woPlan.exercises||[]).map((ex,i)=>`
       <div class="wo-ex-preview">
-        <div class="wo-ex-icon">${ex.icon||getExIcon(ex.name)}</div>
+        <div class="wo-ex-icon">${getExIcon(ex.name, ex.iconSlug) || ex.icon || '💪'}</div>
         <div class="wo-ex-info">
           <div class="wo-ex-name"><a href="https://www.youtube.com/results?search_query=${encodeURIComponent(ex.name+' proper form')}" target="_blank" rel="noopener" class="wo-ex-link" onclick="event.stopPropagation()">${ex.name}</a></div>
           <div class="wo-ex-meta">${ex.sets} sets · ${ex.reps} reps · ${ex.rest}s rest</div>
@@ -4123,7 +4339,7 @@ function renderWorkoutPreview(){
   if(cardioEl&&_woPlan.cardio){
     const c=_woPlan.cardio;
     cardioEl.innerHTML=`<div class="wo-cardio-preview">
-      <div class="wo-cardio-icon">${c.icon||'🏃'}</div>
+      <div class="wo-cardio-icon">${getExIcon(c.machine, c.iconSlug) || c.icon || '🏃'}</div>
       <div class="wo-cardio-info">
         <div class="wo-cardio-title">${c.machine} · ${c.duration} min</div>
         <div class="wo-cardio-meta">${c.speed} ${c.unit} · ${c.incline}% incline</div>
@@ -4258,7 +4474,7 @@ function renderExerciseCard(ex,ei){
 
   return `<div class="wo-ex-card ${ex.collapsed?'collapsed':''}" id="wo-ex-${ei}">
     <div class="wo-ex-card-hdr" onclick="toggleExCollapse(${ei})">
-      <div class="wo-ex-card-icon">${ex.icon||getExIcon(ex.name)}</div>
+      <div class="wo-ex-card-icon">${getExIcon(ex.name, ex.iconSlug) || ex.icon || '💪'}</div>
       <div class="wo-ex-card-title">
         <div class="wo-ex-card-name"><a href="https://www.youtube.com/results?search_query=${encodeURIComponent(exName+' proper form')}" target="_blank" rel="noopener" class="wo-ex-link" onclick="event.stopPropagation()">${exName}</a>${savedNote ? '<span class="wo-note-indicator">📝</span>' : ''}</div>
         <div class="wo-ex-card-meta">${ex.sets.length} sets · ${ex.reps||ex.sets[0]?.reps||'—'} reps · ${ex.rest}s rest</div>
@@ -4291,7 +4507,7 @@ function renderCardioSection(){
   const c=_woSession.cardio;
   el.innerHTML=`<div class="wo-cardio-card ${c.done?'done':''}">
     <div class="wo-cardio-hdr">
-      <div class="wo-cardio-icon-big">${c.icon||'🏃'}</div>
+      <div class="wo-cardio-icon-big">${getExIcon(c.machine, c.iconSlug) || c.icon || '🏃'}</div>
       <div>
         <div class="wo-cardio-card-title">Cardio Finisher</div>
         <div class="wo-cardio-card-sub">${c.machine}</div>
@@ -4557,6 +4773,7 @@ function addSuggestedExercise(index) {
   const newExercise = {
     name: s.name,
     icon: getExIcon(s.name),
+    iconSlug: getExIconSlug(s.name),
     sets: Array.from({ length: s.sets }, () => ({ weight: '', reps: '', rpe: '', done: false })),
     reps: s.reps,
     rest: s.rest || 60,
@@ -4683,6 +4900,7 @@ function swapExercise(ei,newName){
 
   ex.swappedTo = newName;
   ex.icon = getExIcon(newName);
+  ex.iconSlug = getExIconSlug(newName);
   ex.cue = getExerciseCue(newName);
   woSave(WO_KEY, _woSession);
   renderExercises();
@@ -5181,7 +5399,7 @@ function renderHistoryDetail(session){
     const bestSet=doneSets.reduce((b,s)=>epley(parseFloat(s.weight),parseInt(s.reps))>epley(parseFloat(b.weight||0),parseInt(b.reps||1))?s:b,doneSets[0]);
     return `<div class="wo-det-ex" onclick="renderExerciseProgression('${name.replace(/'/g,"\\'")}')">
       <div class="wo-det-ex-top">
-        <div class="wo-det-ex-name">${ex.icon||getExIcon(name)} ${name}</div>
+        <div class="wo-det-ex-name">${getExIcon(name, ex.iconSlug) || ex.icon || '💪'} ${name}</div>
         <div class="wo-det-ex-arrow">›</div>
       </div>
       <div class="wo-det-sets">
