@@ -3739,20 +3739,10 @@ body.v11 .hdr-v11-inner {
        t=0 (top of page) → full logo visible, container is wide
        t=1 (scrolled)    → compact rB. visible, container is narrow
 
-     Motion design: instead of a straight crossfade, both logos are
-     positioned so the B's left stem sits at the same on-screen X
-     throughout the transition. The B acts as an anchor: "BORN." dissolves
-     off to the right, while the compact "r" slides in from the right and
-     scales up to meet the B. The shared anchor makes the transition read
-     as a single transformation rather than two separate images swapping.
-
-     Anchor math (see app.js for derivation):
-       full wordmark    529×186 → aspect 2.844, B-stem at ~40% from left
-       compact rB.      242×216 → aspect 1.120, B-stem at ~45% from left
-     Anchor is placed at 45% of container width so the compact naturally
-     aligns at t=1.
-
-     --logo-h is updated by JS on scroll: 64px at top, shrinks to 32px. */
+     Motion design: both logos are positioned so the B's left stem sits at
+     the same on-screen X throughout the transition. The B acts as an
+     anchor: "BORN." dissolves off to the right, while the compact "r"
+     slides in from the right and scales up to meet the B. */
   position: relative;
   display: inline-block;
   line-height: 0;
@@ -3764,7 +3754,6 @@ body.v11 .hdr-v11-inner {
     + var(--logo-h) * 1.120 * var(--hdr-progress, 0)
   );
   transition: width .05s linear;
-  /* Let the compact rB. scale smoothly as it enters. */
   overflow: visible;
 }
 .rb-logo-img {
@@ -3780,10 +3769,6 @@ body.v11 .hdr-v11-inner {
   transition: height .05s linear, opacity .05s linear,
               left .05s linear, transform .05s linear;
 }
-/* Full reBORN. — visible at top, fades + drifts left as we scroll.
-   Opacity ramps out over p ∈ [0, 0.6] so it's mostly gone by the time the
-   compact starts fading in at 0.4, avoiding a double-r overlap near the
-   anchor. Position formula: left = h * (0.1422 - 0.7758*p).  */
 .rb-logo-full {
   left: calc(
     var(--logo-h) * 0.1422
@@ -3795,10 +3780,6 @@ body.v11 .hdr-v11-inner {
     1
   );
 }
-/* Compact rB. — slides in from the right and scales up as scroll progresses.
-   Opacity ramps in over p ∈ [0.4, 1.0]. Position formula:
-   left = h * 0.7758 * (1 - p). At p=1 it lands at left:0 (container has
-   shrunk to compact's width). Small scale from 0.88 → 1 reinforces arrival. */
 .rb-logo-rb {
   left: calc(
     var(--logo-h) * 0.7758 * (1 - var(--hdr-progress, 0))
@@ -4457,219 +4438,6 @@ body.v11 #pg-today .lantern-pill-v11 .lnt-rituals { display: none; }
 .mrow-f .mrow-bar-fill { background: rgba(255,255,255,0.4); }
 
 .mrow-cell.over .mrow-bar-fill { background: var(--v11-accent); }
-
-/* ═══════════════════════════════════════════════════════════
-   PIN PROGRESS — orb and macros transform in place as they
-   approach the header. Driven by two variables on #pg-today:
-
-     --orb-progress     0 → 1   (orb shrinks/slides toward pin line)
-     --macros-progress  0 → 1   (macro row does the same, later)
-     --orb-hold         0px → (scrollTop - anchor)
-                        counter-translate that keeps the orb visually
-                        fixed at the pin line once compact
-     --macros-hold      same for the macro row
-     --orb-exit-opacity 1 → 0   (driven by macros progress — as the
-                                 macros come in, the orb fades out)
-
-   The real elements morph (ring shrinks, particle canvas fades,
-   "N left" slides inline, lantern collapses, etc.) — no duplicate
-   compact DOM nodes. Values in the orb and macros stay live because
-   we're animating the same elements that app.js already updates.
-
-   Data attributes set by updatePinProgress():
-     [data-orb-pinned]       orb fully compact, macros haven't started
-     [data-macros-pinned]    macros fully compact (takes pin slot)
-═══════════════════════════════════════════════════════════ */
-
-body.v11 #pg-today {
-  --orb-progress: 0;
-  --macros-progress: 0;
-  --orb-hold: 0px;
-  --macros-hold: 0px;
-  --orb-exit-opacity: 1;
-}
-
-/* ─── Orb morph ───────────────────────────────────────────────
-   At p=0 the orb cluster is its full ~300px self. At p=1 it's a
-   compact horizontal strip (ring + "N left" inline) pinned at the
-   top. The cluster counter-translates by --orb-hold to stay glued
-   to the pin line once compact, and fades via --orb-exit-opacity
-   as macros take over.
-
-   The cluster wraps the ring-wrap + .hero-v11-rem + lantern. The
-   macro row is a sibling of the cluster (not inside it), so the
-   cluster's transform doesn't drag the macros along. */
-body.v11 #pg-today .hero-orb-cluster {
-  position: relative;
-  transform: translateY(calc(-1 * var(--orb-hold)));
-  opacity: var(--orb-exit-opacity);
-  will-change: transform, opacity;
-  z-index: calc(10 + var(--orb-progress) * 30);
-  /* Collapse internal padding so the cluster shrinks in flow, letting
-     the macro row slide up under it as it compacts. */
-  padding-bottom: calc(var(--orb-progress) * -12px);
-}
-body.v11 #pg-today[data-orb-pinned] .hero-orb-cluster {
-  z-index: 40;
-}
-/* Pinned backdrop on the cluster itself. */
-body.v11 #pg-today[data-orb-pinned] .hero-orb-cluster::before {
-  content: '';
-  position: absolute;
-  inset: 0 -20px auto -20px; /* extend to edges past parent's 20px padding */
-  height: 48px;
-  background: rgba(10, 18, 32, 0.72);
-  -webkit-backdrop-filter: saturate(140%) blur(14px);
-  backdrop-filter: saturate(140%) blur(14px);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04);
-  pointer-events: none;
-  z-index: -1;
-  opacity: var(--orb-exit-opacity);
-}
-
-/* Ring wrapper — scales from full size (300px) down to 36px compact.
-   At p=0: natural margin:0 auto centers it. At p=1: translated to the
-   left edge of the cluster (inside the cluster's own padding).
-
-   Translation math at p=1:
-     parent inner width ≈ 100vw - 40px (hero-v11 has 20px side padding)
-     ring-wrap width at p=1 = 36px
-     leftover = (100vw - 40px) - 36px = 100vw - 76px
-     auto-margin would be leftover/2 = 50vw - 38px on each side
-     to move from centered to left-aligned we translate by -(50vw - 38px)
-
-   We interpolate that offset by p so the ring slides smoothly from
-   centered (p=0) to left-aligned (p=1). */
-body.v11 #pg-today .hero-v11-ring-wrap {
-  max-width: calc(300px - 264px * var(--orb-progress));
-  transform: translateX(calc(var(--orb-progress) * (38px - 50vw)));
-  transform-origin: top left;
-  transition: none;
-  z-index: 2;
-}
-/* At p=1 the glow ::before around the ring would also shrink; hide it
-   since it's irrelevant at tiny size. */
-body.v11 #pg-today .hero-v11-ring-wrap::before {
-  opacity: calc(1 - var(--orb-progress) * 1.5);
-}
-
-/* Center text (big "0 KCAL TODAY") inside the ring — fades out fast
-   since it can't fit in a 36px ring anyway. */
-body.v11 #pg-today .hero-v11-center {
-  opacity: clamp(0, calc(1 - var(--orb-progress) * 2), 1);
-}
-/* Particle canvas — fades with opacity; keep it running (the rAF loop
-   is hard to pause cleanly from CSS) but it's invisible. */
-body.v11 #pg-today .hero-v11-canvas {
-  opacity: calc(1 - var(--orb-progress) * 1.6);
-}
-
-/* "N left" — at p=0 sits below the ring in normal flow. At p=1 sits
-   inline to the right of the compact ring. We keep it in flow but
-   collapse its flow height as progress grows, and use transform to
-   slide its visual position up-and-right into the compact slot.
-   The translate + max-height pair mean it stays roughly where its
-   flow slot was at p<0.5 (so no jump), then smoothly relocates to
-   beside the compact ring as p → 1. */
-body.v11 #pg-today .hero-v11-rem {
-  position: relative;
-  transform:
-    translateY(calc(var(--orb-progress) * -140px))
-    translateX(calc(var(--orb-progress) * 50px));
-  transition: none;
-  z-index: 3;
-  font-size: calc(12px - var(--orb-progress) * 2px);
-  /* Flow height collapses so macros (below) slide up into the space. */
-  max-height: calc(30px - var(--orb-progress) * 30px);
-  margin: calc(12px - var(--orb-progress) * 12px) 0 calc(4px - var(--orb-progress) * 4px);
-  overflow: visible; /* allow translated content to show outside its collapsing box */
-}
-body.v11 #pg-today .hero-v11-rem .hv-rem-num {
-  font-size: calc(18px - var(--orb-progress) * 2px);
-}
-
-/* Lantern pill — collapses and fades as orb compacts; reclaims its
-   vertical space via margin squeeze. */
-body.v11 #pg-today .lantern-pill-v11.lnt-section {
-  opacity: clamp(0, calc(1 - var(--orb-progress) * 1.8), 1);
-  transform: scale(calc(1 - var(--orb-progress) * 0.3));
-  max-height: calc(60px - var(--orb-progress) * 60px);
-  overflow: hidden;
-  margin-top: calc(10px - var(--orb-progress) * 10px);
-  margin-bottom: calc(4px - var(--orb-progress) * 4px);
-  padding-top: calc(5px - var(--orb-progress) * 5px);
-  padding-bottom: calc(5px - var(--orb-progress) * 5px);
-  transition: none;
-}
-
-/* ─── Macros morph ───────────────────────────────────────────────
-   Same pattern as the orb but applied to .macro-row-v11 and its
-   cells. At p=0 macros are the full 4-line layout (label/value/
-   target/bar). At p=1 they're a single-line [P 123g] [C 45g] [F 12g]
-   strip pinned right below the header. */
-body.v11 #pg-today .macro-row-v11 {
-  transform: translateY(calc(-1 * var(--macros-hold)));
-  will-change: transform;
-  z-index: calc(5 + var(--macros-progress) * 40);
-  position: relative;
-  /* Collapse the row's height as each cell's height shrinks. */
-  padding-top: calc(14px - var(--macros-progress) * 10px);
-  padding-bottom: calc(8px - var(--macros-progress) * 8px);
-}
-body.v11 #pg-today[data-macros-pinned] .macro-row-v11 {
-  z-index: 45;
-}
-/* Pinned backdrop behind macros once compact. */
-body.v11 #pg-today[data-macros-pinned] .macro-row-v11::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: rgba(10, 18, 32, 0.72);
-  -webkit-backdrop-filter: saturate(140%) blur(14px);
-  backdrop-filter: saturate(140%) blur(14px);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04);
-  pointer-events: none;
-  z-index: -1;
-}
-
-/* Macro cells morph from stacked 4-line layout to inline [P 123g]
-   by interpolating flex-basis on the label. At p=0 label has
-   flex-basis: 100% which forces the value to the next row (acts
-   like the original block layout). At p=1 label has flex-basis: 0
-   so it sits inline with the value. The target and bar below are
-   collapsed out via max-height/opacity regardless. */
-body.v11 #pg-today .mrow-cell {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  column-gap: calc(var(--macros-progress) * 4px);
-  transition: none;
-}
-body.v11 #pg-today .mrow-lbl {
-  /* At p=0: own row (flex-basis 100%). At p=1: inline (flex-basis 0). */
-  flex-basis: calc(100% - var(--macros-progress) * 100%);
-  font-size: calc(7px + var(--macros-progress) * 4px);
-  letter-spacing: calc(0.22em - var(--macros-progress) * 0.12em);
-  color: rgba(255,255,255, calc(0.22 + var(--macros-progress) * 0.35));
-  margin-bottom: calc(4px - var(--macros-progress) * 4px);
-}
-body.v11 #pg-today .mrow-val {
-  font-size: calc(22px - var(--macros-progress) * 4px);
-}
-body.v11 #pg-today .mrow-target {
-  flex-basis: 100%;
-  opacity: calc(1 - var(--macros-progress) * 1.8);
-  max-height: calc(20px - var(--macros-progress) * 20px);
-  margin-top: calc(2px - var(--macros-progress) * 2px);
-  overflow: hidden;
-}
-body.v11 #pg-today .mrow-bar {
-  flex-basis: 100%;
-  opacity: calc(1 - var(--macros-progress) * 2);
-  max-height: calc(3px - var(--macros-progress) * 3px);
-  margin-top: calc(6px - var(--macros-progress) * 6px);
-  overflow: hidden;
-}
 
 /* ═══════════════════════════════════════════════════════════
    BELOW-FOLD SECTIONS

@@ -84,12 +84,7 @@
 
   <!-- ═══ HERO v11 rev2: canvas particle orb + gradient ring ═══ -->
   <section class="hero-v11">
-    <!-- Orb cluster: ring + "N left" + lantern. This whole cluster pins as
-         a unit when scrolled (see .hero-orb-cluster in style.css). The
-         macro row below is its own pinning unit and is NOT inside this
-         wrapper. -->
-    <div class="hero-orb-cluster">
-      <div class="hero-v11-ring-wrap" onclick="openMacroBreakdown('calories')">
+    <div class="hero-v11-ring-wrap" onclick="openMacroBreakdown('calories')">
       <svg class="hero-v11-ring" viewBox="0 0 260 260" aria-hidden="true">
         <defs>
           <linearGradient id="v11-arc-grad" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -137,7 +132,6 @@
     <section id="lantern-home" class="lnt-section lantern-pill-v11" onclick="openLanternModal()">
       <!-- populated by patched renderLantern() in app.js -->
     </section>
-    </div> <!-- /.hero-orb-cluster -->
 
     <!-- MACRO STAT ROW -->
     <div class="macro-row-v11">
@@ -1316,104 +1310,6 @@
     }
   }
 
-  // ═══ Pin-progress: orb and macros transform in place as they scroll ═══
-  //
-  // The hero orb and macro row each go through a three-stage lifecycle:
-  //
-  //   stage 0 (free):       progress = 0, element in normal flow, full size
-  //   stage 1 (transform):  0 < progress < 1, element interpolates toward
-  //                         its compact pinned form (scale, opacity, layout
-  //                         collapse, counter-translate upward to stay
-  //                         anchored in screen as user scrolls)
-  //   stage 2 (pinned):     progress = 1, element fully compact AND
-  //                         counter-translated by (scrollTop - anchorScroll)
-  //                         so it stays visually glued to the pin line
-  //
-  // When macros enter stage 1, the orb is told to start "exiting" — it
-  // stops counter-translating and fades out, so it scrolls up and away
-  // naturally while macros take the pin slot.
-  //
-  // Progress is computed from scrollTop + recorded layout offsets, NOT
-  // from getBoundingClientRect(), to avoid feedback loops with applied
-  // transforms.
-  var PIN_LINE = 94;           // px, bottom edge of fixed header (matches .hdr-v11.hdr-scrolled)
-  var ORB_RANGE = 180;         // px of scroll over which the orb transforms
-  var MACROS_RANGE = 140;      // px of scroll over which the macro row transforms
-  var MACROS_GAP = 60;         // px between orb fully-pinned and macros starting to transform
-
-  // Cached layout offsets, measured once and refreshed on resize.
-  var _orbAnchorScroll = null;
-  var _macrosAnchorScroll = null;
-  var _orbHeight = 0;
-
-  function measurePinAnchors() {
-    var ring = document.querySelector('#pg-today .hero-v11-ring-wrap');
-    var macs = document.querySelector('#pg-today .macro-row-v11');
-    var page = document.getElementById('pg-today');
-    if (!ring || !macs || !page) return;
-    // offsetTop climbs the offsetParent chain; for fixed-height flow
-    // elements inside #pg-today this gives a stable scroll-space y.
-    function offsetTopIn(el, root) {
-      var y = 0, n = el;
-      while (n && n !== root) { y += n.offsetTop; n = n.offsetParent; }
-      return y;
-    }
-    var ringTop = offsetTopIn(ring, page);
-    var macsTop = offsetTopIn(macs, page);
-    _orbAnchorScroll = ringTop - PIN_LINE;
-    _macrosAnchorScroll = macsTop - PIN_LINE;
-    _orbHeight = ring.offsetHeight;
-  }
-
-  function updatePinProgress(scrollTop) {
-    var pg = document.getElementById('pg-today');
-    if (!pg) return;
-    if (_orbAnchorScroll === null) measurePinAnchors();
-    if (_orbAnchorScroll === null) return; // DOM not ready yet
-    // Orb progress: 0 → 1 as scrollTop goes from (anchor - RANGE) → anchor.
-    var orbP = (scrollTop - (_orbAnchorScroll - ORB_RANGE)) / ORB_RANGE;
-    orbP = Math.max(0, Math.min(1, orbP));
-    // Macros progress: 0 → 1 as scrollTop goes from
-    //   (macrosAnchor - RANGE) → macrosAnchor, but delayed by MACROS_GAP
-    // so there's breathing room after the orb fully pins.
-    var macsStart = _macrosAnchorScroll - MACROS_RANGE + MACROS_GAP;
-    var macsP = (scrollTop - macsStart) / MACROS_RANGE;
-    macsP = Math.max(0, Math.min(1, macsP));
-    // Orb counter-translate: keeps the orb visually glued to PIN_LINE
-    // once fully compact, by translating against the scroll.
-    // Active only while orb is fully pinned AND macros haven't started
-    // to appear yet — once macs progress > 0, orb stops holding and
-    // scrolls away.
-    var orbHold = 0;
-    if (orbP >= 1 && macsP <= 0) {
-      orbHold = scrollTop - _orbAnchorScroll;
-    } else if (orbP >= 1 && macsP > 0) {
-      // Orb exits: hold decays from its pinned value down to 0 as macsP
-      // goes 0 → 1. This makes the orb scroll away *with* the macros
-      // entering, not jump.
-      var holdAtPin = scrollTop - _orbAnchorScroll;
-      orbHold = holdAtPin * (1 - macsP);
-    }
-    // Orb exit opacity: 1 → 0 as macsP: 0 → 0.6
-    var orbExitOpacity = 1 - Math.min(1, macsP / 0.6);
-    // Macros counter-translate: once macsP = 1, stick to pin line.
-    var macsHold = 0;
-    if (macsP >= 1) {
-      macsHold = scrollTop - _macrosAnchorScroll;
-    }
-    pg.style.setProperty('--orb-progress', orbP.toFixed(4));
-    pg.style.setProperty('--macros-progress', macsP.toFixed(4));
-    pg.style.setProperty('--orb-hold', orbHold.toFixed(1) + 'px');
-    pg.style.setProperty('--orb-exit-opacity', orbExitOpacity.toFixed(3));
-    pg.style.setProperty('--macros-hold', macsHold.toFixed(1) + 'px');
-    // Toggle an attribute when each element is in its pinned state, so
-    // CSS can apply "pinned" styling (e.g. raise z-index, add backdrop).
-    if (orbP >= 1 && macsP < 1) pg.setAttribute('data-orb-pinned', '');
-    else pg.removeAttribute('data-orb-pinned');
-    if (macsP >= 1) pg.setAttribute('data-macros-pinned', '');
-    else pg.removeAttribute('data-macros-pinned');
-  }
-
   function attachScrollShrink() {
     var page = document.getElementById('pg-today');
     if (!page) return;
@@ -1426,19 +1322,12 @@
         // either .page or window/body is the actual scrolling element.
         var st = Math.max(page.scrollTop || 0, window.pageYOffset || 0, document.documentElement.scrollTop || 0);
         updateLogoForScroll(st);
-        updatePinProgress(st);
         ticking = false;
       });
     }
     page.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('scroll', onScroll, { passive: true });
-    // Re-measure anchors on resize / orientation change — layout shifts
-    // can change the orb's and macros' offsetTop.
-    function remeasure() { _orbAnchorScroll = null; _macrosAnchorScroll = null; onScroll(); }
-    window.addEventListener('resize', remeasure, { passive: true });
-    window.addEventListener('orientationchange', remeasure, { passive: true });
-    // init — slight delay to let any late layout settle
-    setTimeout(remeasure, 80);
+    // init
     onScroll();
   }
 
