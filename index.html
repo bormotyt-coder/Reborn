@@ -31,6 +31,7 @@
         <img src="reborn-logo.png" alt="reBORN" class="rb-logo-img" />
       </div>
       <button class="streak-pill-v11" onclick="openStreakModal()" aria-label="Streak">
+        <span class="sp-fire" aria-hidden="true">🔥</span>
         <span class="sp-num" id="smc-num">0</span>
         <span class="sp-sep">DAY STREAK</span>
         <span class="sp-divider">|</span>
@@ -1262,6 +1263,7 @@
     var hdr = document.querySelector('#pg-today .hdr-v11');
     var wm  = document.querySelector('#pg-today .rb-wordmark');
     var img = document.querySelector('#pg-today .rb-logo-img');
+    var pill = document.querySelector('#pg-today .streak-pill-v11');
     var pg  = document.getElementById('pg-today');
     if (!hdr || !wm || !pg) return;
     var t = Math.min(1, Math.max(0, scrollTop / SHRINK_RANGE));
@@ -1269,6 +1271,9 @@
     var hStr = h.toFixed(1) + 'px';
     wm.style.setProperty('--logo-h', hStr);
     if (img) img.style.height = hStr;  // belt-and-braces direct set
+    // Drive the streak pill's expand→compact transition off the same t
+    // (0 = full "DAY STREAK | best N" pill, 1 = compact "🔥 N" pill).
+    if (pill) pill.style.setProperty('--streak-progress', t.toFixed(3));
     if (scrollTop > SCROLLED_THRESHOLD) {
       hdr.classList.add('hdr-scrolled');
       pg.classList.add('hdr-is-scrolled');

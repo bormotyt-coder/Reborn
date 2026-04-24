@@ -3767,21 +3767,61 @@ body.v11 .hdr-v11-inner {
   line-height: 0;
 }
 
+/* ─── Streak pill ──────────────────────────────────────────────
+   Drives a smooth expand → compact transition via --streak-progress
+   (0 = full "N DAY STREAK | best N" pill, 1 = compact "🔥 N" pill),
+   set by the same scroll handler that shrinks the logo. The pill's
+   width, padding, and the visibility of each inner element all
+   interpolate off that single variable, so the pill stays in perfect
+   sync with the logo as the user scrolls — and remains that way
+   whether they're mid-scroll or resting at any point in between.
+─────────────────────────────────────────────────────────────── */
 .streak-pill-v11 {
+  --streak-progress: 0;
+  /* Expanded width matches the logo at its 64px height (~240px).
+     Compact width is narrower than the shrunk logo (~120px). */
+  --streak-w-max: 240px;
+  --streak-w-min: 78px;
+  --streak-pad-x-max: 14px;
+  --streak-pad-x-min: 10px;
+
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
-  padding: 6px 14px;
+  /* Interpolate width + padding between expanded and compact via calc() */
+  width: calc(var(--streak-w-max) - (var(--streak-w-max) - var(--streak-w-min)) * var(--streak-progress));
+  padding: 6px calc(var(--streak-pad-x-max) - (var(--streak-pad-x-max) - var(--streak-pad-x-min)) * var(--streak-progress));
   background: var(--v11-accent-soft);
   border: 1px solid rgba(255,45,0,0.40);
   border-radius: 99px;
   cursor: pointer;
   font-family: var(--v11-font-body);
-  transition: transform .15s ease;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
+  overflow: hidden;
+  white-space: nowrap;
+  /* Smooth any direct style changes (e.g. active press), width/padding
+     are driven by the scroll handler so they don't need a transition. */
+  transition: transform .15s ease, background .25s ease, border-color .25s ease;
 }
 .streak-pill-v11:active { transform: scale(0.97); }
+
+/* Fire emoji — hidden when expanded, fades in as pill compacts */
+.streak-pill-v11 .sp-fire {
+  font-size: 13px;
+  line-height: 1;
+  /* Collapse horizontally when expanded, expand when compact */
+  max-width: calc(18px * var(--streak-progress));
+  margin-right: calc(-8px * (1 - var(--streak-progress))); /* kill gap when hidden */
+  opacity: var(--streak-progress);
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  filter: drop-shadow(0 0 4px rgba(255,45,0,0.35));
+}
+
 .streak-pill-v11 .sp-num {
   font-family: var(--v11-font-display);
   font-weight: 800;
@@ -3789,7 +3829,23 @@ body.v11 .hdr-v11-inner {
   color: var(--v11-accent);
   letter-spacing: -0.02em;
   line-height: 1;
+  flex: 0 0 auto;
 }
+
+/* Elements that disappear when compact: "DAY STREAK", "|", "best N".
+   Each collapses its own horizontal space + fades out as progress → 1.
+   The negative margin-left cancels the flex `gap` on its LEFT side once
+   the element has fully collapsed, so the pill packs tight around the
+   remaining "🔥 N" content with no leftover dead space. */
+.streak-pill-v11 .sp-sep,
+.streak-pill-v11 .sp-divider,
+.streak-pill-v11 .sp-best {
+  opacity: calc(1 - var(--streak-progress));
+  max-width: calc((1 - var(--streak-progress)) * 200px);
+  overflow: hidden;
+  margin-left: calc(-8px * var(--streak-progress));
+}
+
 .streak-pill-v11 .sp-sep {
   font-weight: 600;
   font-size: 9px;
@@ -3801,7 +3857,6 @@ body.v11 .hdr-v11-inner {
 .streak-pill-v11 .sp-divider {
   color: rgba(255,255,255,0.14);
   font-weight: 300;
-  margin: 0 1px;
   font-size: 14px;
   line-height: 1;
 }
