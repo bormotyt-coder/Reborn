@@ -1480,7 +1480,7 @@ input:focus, textarea:focus, select:focus { border-color: var(--page-accent); ba
   backdrop-filter: blur(10px);
 }
 .wo-ex-card.collapsed .wo-ex-card-body { display: none; }
-.wo-ex-card-hdr { display: flex; align-items: center; gap: 11px; padding: 15px 17px; cursor: pointer; }
+.wo-ex-card-hdr { display: flex; align-items: center; gap: 14px; padding: 14px 16px; cursor: pointer; }
 .wo-ex-card-icon { font-size: 22px; flex-shrink: 0; }
 .wo-ex-card-title { flex: 1; min-width: 0; }
 .wo-ex-card-name { font-family: var(--font); font-size: 15px; font-weight: 600; color: var(--text); }
@@ -1493,25 +1493,45 @@ input:focus, textarea:focus, select:focus { border-color: var(--page-accent); ba
 }
 .wo-ex-card-body { padding: 0 16px 14px; }
 
-.wo-sets-header { display: flex; gap: 8px; padding: 4px 0 6px; font-family: var(--font); font-size: 9px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.10em; }
-.wo-set-row { display: flex; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--hair); }
+/* Sets table — grid-based so header labels align exactly over their columns.
+   Column tracks: set# | ghost(last) | weight input | × | reps input | 1RM | done btn
+   Keep these in sync between .wo-sets-header and .wo-set-row. */
+.wo-sets-header,
+.wo-set-row {
+  display: grid;
+  grid-template-columns: 24px 1fr 64px 12px 64px 40px 32px;
+  gap: 8px;
+  align-items: center;
+}
+.wo-sets-header {
+  padding: 4px 0 6px;
+  font-family: var(--font); font-size: 9px; font-weight: 600;
+  color: var(--text-3); text-transform: uppercase; letter-spacing: 0.10em;
+}
+.wo-sets-header > span { text-align: center; }
+.wo-sets-header > span:nth-child(1) { text-align: center; }      /* Set */
+.wo-sets-header > span:nth-child(2) { text-align: left; padding-left: 2px; } /* Last */
+.wo-sets-header > span:nth-child(6) { text-align: right; }       /* 1RM */
+.wo-set-row { padding: 6px 0; border-bottom: 1px solid var(--hair); }
 .wo-set-row.done { opacity: 0.5; }
-.wo-set-num { font-family: var(--font-display); font-size: 14px; font-weight: 500; color: var(--text-3); width: 24px; text-align: center; flex-shrink: 0; }
+.wo-set-num { font-family: var(--font-display); font-size: 14px; font-weight: 500; color: var(--text-3); text-align: center; }
 .wo-set-inp {
-  width: 64px; text-align: center;
+  width: 100%; text-align: center;
   font-family: var(--font-display); font-size: 16px; font-weight: 500;
   padding: 8px 4px; border-radius: 10px;
   background: var(--surface-2); border: 1px solid var(--hair); color: var(--text);
   letter-spacing: -0.3px;
+  box-sizing: border-box;
 }
-.wo-set-x { font-family: var(--font); font-size: 12px; color: var(--text-3); }
-.wo-set-1rm { font-family: var(--font); font-size: 10px; color: var(--text-3); min-width: 40px; text-align: right; }
+.wo-set-x { font-family: var(--font); font-size: 12px; color: var(--text-3); text-align: center; }
+.wo-set-1rm { font-family: var(--font); font-size: 10px; color: var(--text-3); text-align: right; }
 .wo-set-done-btn {
   width: 32px; height: 32px; border-radius: 50%;
   border: 1.5px solid var(--hair-2); background: var(--surface);
   display: flex; align-items: center; justify-content: center;
-  font-size: 14px; cursor: pointer; flex-shrink: 0; color: var(--text-3);
+  font-size: 14px; cursor: pointer; color: var(--text-3);
   transition: all .2s var(--ease-calm);
+  padding: 0;
 }
 .wo-set-done-btn.done { background: var(--ok); border-color: var(--ok); color: #0A1220; }
 .wo-add-set-btn {
@@ -1557,12 +1577,12 @@ input:focus, textarea:focus, select:focus { border-color: var(--page-accent); ba
    size per context. Keep containers flex-aligned so the slot width adjusts
    cleanly whether the child is an <img> or an emoji. */
 .wo-ex-img { display: block; object-fit: contain; flex-shrink: 0; }
-.wo-ex-icon .wo-ex-img      { width: 34px; height: 34px; }   /* plan preview slot */
-.wo-ex-card-icon .wo-ex-img { width: 40px; height: 40px; }   /* active workout card */
-.wo-suggest-card-icon .wo-ex-img { width: 36px; height: 36px; } /* AI-suggested card */
-.wo-cardio-icon .wo-ex-img      { width: 30px; height: 30px; } /* cardio preview */
-.wo-cardio-icon-big .wo-ex-img  { width: 40px; height: 40px; } /* cardio active card */
-.wo-det-ex-name .wo-ex-img  { width: 22px; height: 22px; vertical-align: middle; margin-right: 4px; display: inline-block; } /* history list — inline with text */
+.wo-ex-icon .wo-ex-img      { width: 44px; height: 44px; }   /* plan preview slot */
+.wo-ex-card-icon .wo-ex-img { width: 64px; height: 64px; }   /* active workout card — hero size */
+.wo-suggest-card-icon .wo-ex-img { width: 48px; height: 48px; } /* AI-suggested card */
+.wo-cardio-icon .wo-ex-img      { width: 40px; height: 40px; } /* cardio preview */
+.wo-cardio-icon-big .wo-ex-img  { width: 56px; height: 56px; } /* cardio active card */
+.wo-det-ex-name .wo-ex-img  { width: 24px; height: 24px; vertical-align: middle; margin-right: 6px; display: inline-block; } /* history list — inline with text */
 
 /* When the icon slot holds a PNG, drop the emoji font-size so container height
    collapses to the image height (no stray line-box height pushing layout). */
@@ -1832,7 +1852,7 @@ input:focus, textarea:focus, select:focus { border-color: var(--page-accent); ba
 .wo-suggest-error button { background: var(--bad); border: none; padding: 8px 18px; border-radius: 8px; font-family: var(--font); font-size: 12px; font-weight: 500; color: #fff; cursor: pointer; margin-top: 10px; }
 
 /* Ghost sets & trends */
-.wo-set-ghost { font-family: var(--font); font-size: 10px; color: var(--text-3); min-width: 48px; text-align: center; opacity: 0.75; display: flex; align-items: center; gap: 2px; justify-content: center; }
+.wo-set-ghost { font-family: var(--font); font-size: 10px; color: var(--text-3); text-align: left; padding-left: 2px; opacity: 0.75; display: flex; align-items: center; gap: 2px; justify-content: flex-start; overflow: hidden; white-space: nowrap; }
 .wo-trend-up { color: var(--ok); font-weight: 600; font-size: 11px; }
 .wo-trend-down { color: var(--bad); font-weight: 600; font-size: 11px; }
 .wo-trend-same { color: var(--text-3); font-weight: 500; font-size: 10px; }
