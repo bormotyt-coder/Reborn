@@ -49,10 +49,44 @@
           </button>
         </div>
       </div>
+      <!-- Compact macro strip — swapped in for the logo+pills when the macro
+           row has scrolled off-screen. Visibility driven by
+           #pg-today[data-macros-pinned]. Values mirrored from .macro-row-v11
+           by updatePinnedBars() in the scroll handler. -->
+      <div class="hdr-v11-macros" aria-hidden="true">
+        <div class="hmac-cell hmac-p">
+          <span class="hmac-lbl">P</span>
+          <span class="hmac-val"><span id="hmac-p-v">0</span><span class="hmac-unit">g</span></span>
+        </div>
+        <div class="hmac-cell hmac-c">
+          <span class="hmac-lbl">C</span>
+          <span class="hmac-val"><span id="hmac-c-v">0</span><span class="hmac-unit">g</span></span>
+        </div>
+        <div class="hmac-cell hmac-f">
+          <span class="hmac-lbl">F</span>
+          <span class="hmac-val"><span id="hmac-f-v">0</span><span class="hmac-unit">g</span></span>
+        </div>
+      </div>
       <!-- hidden compat: preserves element referenced elsewhere -->
       <span id="hdr-date" style="display:none"></span>
     </div>
   </header>
+
+  <!-- Pinned mini-orb bar — appears below the fixed header once the hero
+       orb has scrolled off, disappears again once the macro row has
+       scrolled off (at which point the macro strip inside the header takes
+       over). Visibility driven by #pg-today[data-orb-pinned]. -->
+  <div class="orb-pin-bar" id="orb-pin-bar" aria-hidden="true" onclick="(function(){var p=document.getElementById('pg-today');if(p)p.scrollTop=0;})()">
+    <svg class="opb-ring" viewBox="0 0 40 40" aria-hidden="true">
+      <circle cx="20" cy="20" r="16" fill="none" stroke="rgba(255,255,255,0.10)" stroke-width="3"/>
+      <circle id="opb-ring-arc" cx="20" cy="20" r="16" fill="none"
+              stroke="var(--v11-accent)" stroke-width="3" stroke-linecap="round"
+              stroke-dasharray="100.53" stroke-dashoffset="100.53"
+              transform="rotate(-90 20 20)"/>
+    </svg>
+    <span class="opb-rem" id="opb-rem">—</span>
+    <span class="opb-unit">left</span>
+  </div>
 
   <!-- DAY SCRUBBER -->
   <div class="day-cal-strip" id="day-cal-strip"></div>
@@ -133,6 +167,11 @@
       <!-- populated by patched renderLantern() in app.js -->
     </section>
 
+    <!-- Sentinel: when this crosses under the fixed header, the orb has
+         scrolled off → pin the mini-orb bar. IntersectionObserver in the
+         scroll handler toggles #pg-today[data-orb-pinned]. -->
+    <div class="orb-pin-sentinel" aria-hidden="true"></div>
+
     <!-- MACRO STAT ROW -->
     <div class="macro-row-v11">
       <div class="mrow-cell mrow-p" onclick="openMacroBreakdown('protein')">
@@ -154,6 +193,11 @@
         <div class="mrow-bar"><div class="mrow-bar-fill" id="rf-bar" style="width:0%"></div></div>
       </div>
     </div>
+
+    <!-- Sentinel: when this crosses under the fixed header, the macro row
+         has scrolled off → unpin the mini-orb and swap header content for
+         the compact macro strip. Toggles #pg-today[data-macros-pinned]. -->
+    <div class="macros-pin-sentinel" aria-hidden="true"></div>
 
   </section>
 
@@ -1310,6 +1354,75 @@
     }
   }
 
+  // ═══ Pinned-strip progression: orb → macros ═══
+  //
+  // Two sentinels placed in the hero section (one after the lantern,
+  // before the macro row; one after the macro row) act as scroll
+  // triggers. As each crosses under the fixed header's bottom edge,
+  // we flip a data-attribute on #pg-today that drives the CSS for
+  // that phase. Values shown in the pinned strips are mirrored live
+  // from their source elements (#cal-rem, #rp-v-big, etc.) — no need
+  // to patch app.js's render functions.
+  //
+  // Phase 0: neither pinned   → normal page
+  // Phase 1: orb pinned       → mini-orb bar below header
+  // Phase 2: macros pinned    → macros replace header content, mini-orb hides
+  function updatePinnedBars() {
+    var pg = document.getElementById('pg-today');
+    var hdr = document.querySelector('#pg-today .hdr-v11');
+    var orbSent = document.querySelector('#pg-today .orb-pin-sentinel');
+    var macSent = document.querySelector('#pg-today .macros-pin-sentinel');
+    if (!pg || !hdr) return;
+    // Anchor line = bottom of the fixed header (+ a tiny buffer).
+    var anchorY = hdr.getBoundingClientRect().bottom + 4;
+    var orbTop = orbSent ? orbSent.getBoundingClientRect().top : Infinity;
+    var macTop = macSent ? macSent.getBoundingClientRect().top : Infinity;
+    var orbPinned = orbTop <= anchorY;
+    var macsPinned = macTop <= anchorY;
+    // macsPinned implies orbPinned has already triggered, but the orb
+    // bar is *hidden* during phase 2 — see CSS.
+    if (orbPinned) pg.setAttribute('data-orb-pinned', 'true');
+    else pg.removeAttribute('data-orb-pinned');
+    if (macsPinned) pg.setAttribute('data-macros-pinned', 'true');
+    else pg.removeAttribute('data-macros-pinned');
+    // Mirror live values into the pinned strips. Cheap string reads;
+    // runs at most once per animation frame.
+    if (orbPinned && !macsPinned) {
+      var remSrc = document.getElementById('cal-rem');
+      var remDst = document.getElementById('opb-rem');
+      if (remSrc && remDst) {
+        // #cal-rem's textContent is "123 left" or "45 over" — we have
+        // a static "left" label, so strip the suffix if present.
+        var txt = (remSrc.textContent || '').trim();
+        var m = txt.match(/^(-?\d[\d,]*)\s*(left|over)?/i);
+        remDst.textContent = m ? m[1] : txt;
+        // Flip label between "left" and "over" to match source state.
+        var unit = document.querySelector('#orb-pin-bar .opb-unit');
+        if (unit) unit.textContent = (m && m[2]) ? m[2].toLowerCase() : 'left';
+      }
+      // Drive the mini ring arc from the same fraction as the big ring.
+      // #cal-bar has style.width = pct% already set by renderCal().
+      var arc = document.getElementById('opb-ring-arc');
+      var bar = document.getElementById('cal-bar');
+      if (arc && bar) {
+        var pctStr = (bar.style.width || '0%').replace('%', '');
+        var pct = Math.max(0, Math.min(1, parseFloat(pctStr) / 100)) || 0;
+        var CIRC = 100.53; // 2π × r(16)
+        arc.setAttribute('stroke-dashoffset', (CIRC * (1 - pct)).toFixed(2));
+      }
+    }
+    if (macsPinned) {
+      var mirror = function(srcId, dstId) {
+        var s = document.getElementById(srcId);
+        var d = document.getElementById(dstId);
+        if (s && d) d.textContent = (s.textContent || '0').trim();
+      };
+      mirror('rp-v-big', 'hmac-p-v');
+      mirror('rc-v-big', 'hmac-c-v');
+      mirror('rf-v-big', 'hmac-f-v');
+    }
+  }
+
   function attachScrollShrink() {
     var page = document.getElementById('pg-today');
     if (!page) return;
@@ -1322,6 +1435,7 @@
         // either .page or window/body is the actual scrolling element.
         var st = Math.max(page.scrollTop || 0, window.pageYOffset || 0, document.documentElement.scrollTop || 0);
         updateLogoForScroll(st);
+        updatePinnedBars();
         ticking = false;
       });
     }
