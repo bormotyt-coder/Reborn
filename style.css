@@ -4459,148 +4459,216 @@ body.v11 #pg-today .lantern-pill-v11 .lnt-rituals { display: none; }
 .mrow-cell.over .mrow-bar-fill { background: var(--v11-accent); }
 
 /* ═══════════════════════════════════════════════════════════
-   PINNED STRIPS — orb-pin-bar and hdr-v11-macros
-   ─────────────────────────────────────────────────────────────
-   Two-phase pinning scheme on the Home page:
+   PIN PROGRESS — orb and macros transform in place as they
+   approach the header. Driven by two variables on #pg-today:
 
-     Phase 0 — nothing pinned (default).
-     Phase 1 — #pg-today[data-orb-pinned]: mini-orb strip fades in
-               below the fixed header showing [tiny ring] N left.
-               Page content pushes down by ORB_BAR_H to make room.
-     Phase 2 — #pg-today[data-macros-pinned]: the mini-orb hides,
-               the header's logo+pills hide, and the compact macro
-               strip (P/C/F) fades in *inside* the header.
+     --orb-progress     0 → 1   (orb shrinks/slides toward pin line)
+     --macros-progress  0 → 1   (macro row does the same, later)
+     --orb-hold         0px → (scrollTop - anchor)
+                        counter-translate that keeps the orb visually
+                        fixed at the pin line once compact
+     --macros-hold      same for the macro row
+     --orb-exit-opacity 1 → 0   (driven by macros progress — as the
+                                 macros come in, the orb fades out)
 
-   Both strips live in the DOM at all times; visibility is pure
-   CSS driven by data-attributes set by updatePinnedBars() in
-   index.html's scroll handler. Values are mirrored from the
-   existing #cal-rem / #rp-v-big / #rc-v-big / #rf-v-big nodes on
-   every scroll tick — no changes to app.js render paths.
+   The real elements morph (ring shrinks, particle canvas fades,
+   "N left" slides inline, lantern collapses, etc.) — no duplicate
+   compact DOM nodes. Values in the orb and macros stay live because
+   we're animating the same elements that app.js already updates.
+
+   Data attributes set by updatePinProgress():
+     [data-orb-pinned]       orb fully compact, macros haven't started
+     [data-macros-pinned]    macros fully compact (takes pin slot)
 ═══════════════════════════════════════════════════════════ */
 
-/* Phase-1 strip: sits directly below the fixed header. Scoped to
-   #pg-today so it doesn't leak into other pages. */
-body.v11 .orb-pin-bar {
-  position: fixed;
-  top: 94px; /* matches .hdr-v11.hdr-scrolled height */
-  left: 0;
-  right: 0;
-  z-index: 49; /* header is 50 */
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  height: 44px;
-  padding: 0 16px;
+body.v11 #pg-today {
+  --orb-progress: 0;
+  --macros-progress: 0;
+  --orb-hold: 0px;
+  --macros-hold: 0px;
+  --orb-exit-opacity: 1;
+}
+
+/* ─── Orb morph ───────────────────────────────────────────────
+   At p=0 the orb cluster is its full ~300px self. At p=1 it's a
+   compact horizontal strip (ring + "N left" inline) pinned at the
+   top. The cluster counter-translates by --orb-hold to stay glued
+   to the pin line once compact, and fades via --orb-exit-opacity
+   as macros take over.
+
+   The cluster wraps the ring-wrap + .hero-v11-rem + lantern. The
+   macro row is a sibling of the cluster (not inside it), so the
+   cluster's transform doesn't drag the macros along. */
+body.v11 #pg-today .hero-orb-cluster {
+  position: relative;
+  transform: translateY(calc(-1 * var(--orb-hold)));
+  opacity: var(--orb-exit-opacity);
+  will-change: transform, opacity;
+  z-index: calc(10 + var(--orb-progress) * 30);
+  /* Collapse internal padding so the cluster shrinks in flow, letting
+     the macro row slide up under it as it compacts. */
+  padding-bottom: calc(var(--orb-progress) * -12px);
+}
+body.v11 #pg-today[data-orb-pinned] .hero-orb-cluster {
+  z-index: 40;
+}
+/* Pinned backdrop on the cluster itself. */
+body.v11 #pg-today[data-orb-pinned] .hero-orb-cluster::before {
+  content: '';
+  position: absolute;
+  inset: 0 -20px auto -20px; /* extend to edges past parent's 20px padding */
+  height: 48px;
   background: rgba(10, 18, 32, 0.72);
   -webkit-backdrop-filter: saturate(140%) blur(14px);
   backdrop-filter: saturate(140%) blur(14px);
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04);
-  opacity: 0;
   pointer-events: none;
-  transform: translateY(-6px);
-  transition: opacity .18s ease, transform .18s ease;
-  cursor: pointer;
-  user-select: none;
-}
-/* Only shows on the Home page, only in phase 1 (orb pinned but not yet macros). */
-body.v11 #pg-today.active[data-orb-pinned]:not([data-macros-pinned]) #orb-pin-bar {
-  opacity: 1;
-  pointer-events: auto;
-  transform: translateY(0);
-}
-/* The bar is actually a sibling of #pg-today's header, inside #pg-today.
-   Hide it on any non-Home page by default (it's scoped via its position
-   inside #pg-today already, but belt-and-braces). */
-body.v11 #pg-today:not(.active) .orb-pin-bar { display: none; }
-/* Mini ring (40px), mirrors the big ring's progress via stroke-dashoffset
-   set in JS. Circumference for r=16 is 2π×16 ≈ 100.53. */
-.opb-ring {
-  width: 28px;
-  height: 28px;
-  flex-shrink: 0;
-  filter: drop-shadow(0 0 3px var(--v11-accent-glow, rgba(255, 45, 0, 0.35)));
-}
-#opb-ring-arc {
-  transition: stroke-dashoffset .4s cubic-bezier(.34, 1.56, .64, 1);
-}
-.opb-rem {
-  font-family: var(--v11-font-display);
-  font-weight: 800;
-  font-size: 17px;
-  letter-spacing: -0.01em;
-  color: #fff;
-  line-height: 1;
-}
-.opb-unit {
-  font-family: var(--v11-font-body);
-  font-size: 13px;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.55);
-  text-transform: lowercase;
-  letter-spacing: 0.02em;
-}
-/* Push page content further down during phase 1 to make room for the
-   44px pinned strip. Uses the existing --hdr-pad-top ladder. */
-body.v11 #pg-today.active.hdr-is-scrolled[data-orb-pinned]:not([data-macros-pinned]) {
-  --hdr-pad-top: calc(94px + 44px);
+  z-index: -1;
+  opacity: var(--orb-exit-opacity);
 }
 
-/* Phase-2 content: compact P/C/F strip that lives inside .hdr-v11-inner
-   and swaps in for the logo+pills when [data-macros-pinned] is set. */
-.hdr-v11-macros {
-  display: none;
-  align-items: center;
-  justify-content: space-around;
-  gap: 14px;
-  width: 100%;
-  padding: 4px 4px;
-}
-.hmac-cell {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 6px;
-  font-family: var(--v11-font-body);
-  line-height: 1;
-}
-.hmac-lbl {
-  font-family: var(--v11-font-display);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  color: rgba(255, 255, 255, 0.55);
-}
-.hmac-val {
-  font-family: var(--v11-font-display);
-  font-size: 18px;
-  font-weight: 800;
-  letter-spacing: -0.01em;
-  color: #fff;
-}
-.hmac-unit {
-  font-size: 11px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.45);
-  margin-left: 1px;
-}
-/* Macro-color coding mirrors .mrow-p / .mrow-c / .mrow-f. */
-.hmac-p .hmac-val { color: var(--v11-accent); }
-.hmac-c .hmac-val { color: #fff; }
-.hmac-f .hmac-val { color: rgba(255, 255, 255, 0.55); }
+/* Ring wrapper — scales from full size (300px) down to 36px compact.
+   At p=0: natural margin:0 auto centers it. At p=1: translated to the
+   left edge of the cluster (inside the cluster's own padding).
 
-/* Swap: once macros are pinned, hide the logo+pills and show the
-   compact macro strip inside the header. The header remains the only
-   fixed bar on screen. */
-body.v11 #pg-today.active[data-macros-pinned] .rb-wordmark,
-body.v11 #pg-today.active[data-macros-pinned] .hdr-v11-pills {
-  display: none;
+   Translation math at p=1:
+     parent inner width ≈ 100vw - 40px (hero-v11 has 20px side padding)
+     ring-wrap width at p=1 = 36px
+     leftover = (100vw - 40px) - 36px = 100vw - 76px
+     auto-margin would be leftover/2 = 50vw - 38px on each side
+     to move from centered to left-aligned we translate by -(50vw - 38px)
+
+   We interpolate that offset by p so the ring slides smoothly from
+   centered (p=0) to left-aligned (p=1). */
+body.v11 #pg-today .hero-v11-ring-wrap {
+  max-width: calc(300px - 264px * var(--orb-progress));
+  transform: translateX(calc(var(--orb-progress) * (38px - 50vw)));
+  transform-origin: top left;
+  transition: none;
+  z-index: 2;
 }
-body.v11 #pg-today.active[data-macros-pinned] .hdr-v11-macros {
+/* At p=1 the glow ::before around the ring would also shrink; hide it
+   since it's irrelevant at tiny size. */
+body.v11 #pg-today .hero-v11-ring-wrap::before {
+  opacity: calc(1 - var(--orb-progress) * 1.5);
+}
+
+/* Center text (big "0 KCAL TODAY") inside the ring — fades out fast
+   since it can't fit in a 36px ring anyway. */
+body.v11 #pg-today .hero-v11-center {
+  opacity: clamp(0, calc(1 - var(--orb-progress) * 2), 1);
+}
+/* Particle canvas — fades with opacity; keep it running (the rAF loop
+   is hard to pause cleanly from CSS) but it's invisible. */
+body.v11 #pg-today .hero-v11-canvas {
+  opacity: calc(1 - var(--orb-progress) * 1.6);
+}
+
+/* "N left" — at p=0 sits below the ring in normal flow. At p=1 sits
+   inline to the right of the compact ring. We keep it in flow but
+   collapse its flow height as progress grows, and use transform to
+   slide its visual position up-and-right into the compact slot.
+   The translate + max-height pair mean it stays roughly where its
+   flow slot was at p<0.5 (so no jump), then smoothly relocates to
+   beside the compact ring as p → 1. */
+body.v11 #pg-today .hero-v11-rem {
+  position: relative;
+  transform:
+    translateY(calc(var(--orb-progress) * -140px))
+    translateX(calc(var(--orb-progress) * 50px));
+  transition: none;
+  z-index: 3;
+  font-size: calc(12px - var(--orb-progress) * 2px);
+  /* Flow height collapses so macros (below) slide up into the space. */
+  max-height: calc(30px - var(--orb-progress) * 30px);
+  margin: calc(12px - var(--orb-progress) * 12px) 0 calc(4px - var(--orb-progress) * 4px);
+  overflow: visible; /* allow translated content to show outside its collapsing box */
+}
+body.v11 #pg-today .hero-v11-rem .hv-rem-num {
+  font-size: calc(18px - var(--orb-progress) * 2px);
+}
+
+/* Lantern pill — collapses and fades as orb compacts; reclaims its
+   vertical space via margin squeeze. */
+body.v11 #pg-today .lantern-pill-v11.lnt-section {
+  opacity: clamp(0, calc(1 - var(--orb-progress) * 1.8), 1);
+  transform: scale(calc(1 - var(--orb-progress) * 0.3));
+  max-height: calc(60px - var(--orb-progress) * 60px);
+  overflow: hidden;
+  margin-top: calc(10px - var(--orb-progress) * 10px);
+  margin-bottom: calc(4px - var(--orb-progress) * 4px);
+  padding-top: calc(5px - var(--orb-progress) * 5px);
+  padding-bottom: calc(5px - var(--orb-progress) * 5px);
+  transition: none;
+}
+
+/* ─── Macros morph ───────────────────────────────────────────────
+   Same pattern as the orb but applied to .macro-row-v11 and its
+   cells. At p=0 macros are the full 4-line layout (label/value/
+   target/bar). At p=1 they're a single-line [P 123g] [C 45g] [F 12g]
+   strip pinned right below the header. */
+body.v11 #pg-today .macro-row-v11 {
+  transform: translateY(calc(-1 * var(--macros-hold)));
+  will-change: transform;
+  z-index: calc(5 + var(--macros-progress) * 40);
+  position: relative;
+  /* Collapse the row's height as each cell's height shrinks. */
+  padding-top: calc(14px - var(--macros-progress) * 10px);
+  padding-bottom: calc(8px - var(--macros-progress) * 8px);
+}
+body.v11 #pg-today[data-macros-pinned] .macro-row-v11 {
+  z-index: 45;
+}
+/* Pinned backdrop behind macros once compact. */
+body.v11 #pg-today[data-macros-pinned] .macro-row-v11::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 18, 32, 0.72);
+  -webkit-backdrop-filter: saturate(140%) blur(14px);
+  backdrop-filter: saturate(140%) blur(14px);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04);
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* Macro cells morph from stacked 4-line layout to inline [P 123g]
+   by interpolating flex-basis on the label. At p=0 label has
+   flex-basis: 100% which forces the value to the next row (acts
+   like the original block layout). At p=1 label has flex-basis: 0
+   so it sits inline with the value. The target and bar below are
+   collapsed out via max-height/opacity regardless. */
+body.v11 #pg-today .mrow-cell {
   display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: calc(var(--macros-progress) * 4px);
+  transition: none;
 }
-/* Make sure the header stays at its compact height during phase 2. */
-body.v11 #pg-today.active[data-macros-pinned] {
-  --hdr-pad-top: 94px;
+body.v11 #pg-today .mrow-lbl {
+  /* At p=0: own row (flex-basis 100%). At p=1: inline (flex-basis 0). */
+  flex-basis: calc(100% - var(--macros-progress) * 100%);
+  font-size: calc(7px + var(--macros-progress) * 4px);
+  letter-spacing: calc(0.22em - var(--macros-progress) * 0.12em);
+  color: rgba(255,255,255, calc(0.22 + var(--macros-progress) * 0.35));
+  margin-bottom: calc(4px - var(--macros-progress) * 4px);
+}
+body.v11 #pg-today .mrow-val {
+  font-size: calc(22px - var(--macros-progress) * 4px);
+}
+body.v11 #pg-today .mrow-target {
+  flex-basis: 100%;
+  opacity: calc(1 - var(--macros-progress) * 1.8);
+  max-height: calc(20px - var(--macros-progress) * 20px);
+  margin-top: calc(2px - var(--macros-progress) * 2px);
+  overflow: hidden;
+}
+body.v11 #pg-today .mrow-bar {
+  flex-basis: 100%;
+  opacity: calc(1 - var(--macros-progress) * 2);
+  max-height: calc(3px - var(--macros-progress) * 3px);
+  margin-top: calc(6px - var(--macros-progress) * 6px);
+  overflow: hidden;
 }
 
 /* ═══════════════════════════════════════════════════════════

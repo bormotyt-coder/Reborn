@@ -49,44 +49,10 @@
           </button>
         </div>
       </div>
-      <!-- Compact macro strip — swapped in for the logo+pills when the macro
-           row has scrolled off-screen. Visibility driven by
-           #pg-today[data-macros-pinned]. Values mirrored from .macro-row-v11
-           by updatePinnedBars() in the scroll handler. -->
-      <div class="hdr-v11-macros" aria-hidden="true">
-        <div class="hmac-cell hmac-p">
-          <span class="hmac-lbl">P</span>
-          <span class="hmac-val"><span id="hmac-p-v">0</span><span class="hmac-unit">g</span></span>
-        </div>
-        <div class="hmac-cell hmac-c">
-          <span class="hmac-lbl">C</span>
-          <span class="hmac-val"><span id="hmac-c-v">0</span><span class="hmac-unit">g</span></span>
-        </div>
-        <div class="hmac-cell hmac-f">
-          <span class="hmac-lbl">F</span>
-          <span class="hmac-val"><span id="hmac-f-v">0</span><span class="hmac-unit">g</span></span>
-        </div>
-      </div>
       <!-- hidden compat: preserves element referenced elsewhere -->
       <span id="hdr-date" style="display:none"></span>
     </div>
   </header>
-
-  <!-- Pinned mini-orb bar — appears below the fixed header once the hero
-       orb has scrolled off, disappears again once the macro row has
-       scrolled off (at which point the macro strip inside the header takes
-       over). Visibility driven by #pg-today[data-orb-pinned]. -->
-  <div class="orb-pin-bar" id="orb-pin-bar" aria-hidden="true" onclick="(function(){var p=document.getElementById('pg-today');if(p)p.scrollTop=0;})()">
-    <svg class="opb-ring" viewBox="0 0 40 40" aria-hidden="true">
-      <circle cx="20" cy="20" r="16" fill="none" stroke="rgba(255,255,255,0.10)" stroke-width="3"/>
-      <circle id="opb-ring-arc" cx="20" cy="20" r="16" fill="none"
-              stroke="var(--v11-accent)" stroke-width="3" stroke-linecap="round"
-              stroke-dasharray="100.53" stroke-dashoffset="100.53"
-              transform="rotate(-90 20 20)"/>
-    </svg>
-    <span class="opb-rem" id="opb-rem">—</span>
-    <span class="opb-unit">left</span>
-  </div>
 
   <!-- DAY SCRUBBER -->
   <div class="day-cal-strip" id="day-cal-strip"></div>
@@ -118,7 +84,12 @@
 
   <!-- ═══ HERO v11 rev2: canvas particle orb + gradient ring ═══ -->
   <section class="hero-v11">
-    <div class="hero-v11-ring-wrap" onclick="openMacroBreakdown('calories')">
+    <!-- Orb cluster: ring + "N left" + lantern. This whole cluster pins as
+         a unit when scrolled (see .hero-orb-cluster in style.css). The
+         macro row below is its own pinning unit and is NOT inside this
+         wrapper. -->
+    <div class="hero-orb-cluster">
+      <div class="hero-v11-ring-wrap" onclick="openMacroBreakdown('calories')">
       <svg class="hero-v11-ring" viewBox="0 0 260 260" aria-hidden="true">
         <defs>
           <linearGradient id="v11-arc-grad" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -166,11 +137,7 @@
     <section id="lantern-home" class="lnt-section lantern-pill-v11" onclick="openLanternModal()">
       <!-- populated by patched renderLantern() in app.js -->
     </section>
-
-    <!-- Sentinel: when this crosses under the fixed header, the orb has
-         scrolled off → pin the mini-orb bar. IntersectionObserver in the
-         scroll handler toggles #pg-today[data-orb-pinned]. -->
-    <div class="orb-pin-sentinel" aria-hidden="true"></div>
+    </div> <!-- /.hero-orb-cluster -->
 
     <!-- MACRO STAT ROW -->
     <div class="macro-row-v11">
@@ -193,11 +160,6 @@
         <div class="mrow-bar"><div class="mrow-bar-fill" id="rf-bar" style="width:0%"></div></div>
       </div>
     </div>
-
-    <!-- Sentinel: when this crosses under the fixed header, the macro row
-         has scrolled off → unpin the mini-orb and swap header content for
-         the compact macro strip. Toggles #pg-today[data-macros-pinned]. -->
-    <div class="macros-pin-sentinel" aria-hidden="true"></div>
 
   </section>
 
@@ -1354,73 +1316,102 @@
     }
   }
 
-  // ═══ Pinned-strip progression: orb → macros ═══
+  // ═══ Pin-progress: orb and macros transform in place as they scroll ═══
   //
-  // Two sentinels placed in the hero section (one after the lantern,
-  // before the macro row; one after the macro row) act as scroll
-  // triggers. As each crosses under the fixed header's bottom edge,
-  // we flip a data-attribute on #pg-today that drives the CSS for
-  // that phase. Values shown in the pinned strips are mirrored live
-  // from their source elements (#cal-rem, #rp-v-big, etc.) — no need
-  // to patch app.js's render functions.
+  // The hero orb and macro row each go through a three-stage lifecycle:
   //
-  // Phase 0: neither pinned   → normal page
-  // Phase 1: orb pinned       → mini-orb bar below header
-  // Phase 2: macros pinned    → macros replace header content, mini-orb hides
-  function updatePinnedBars() {
+  //   stage 0 (free):       progress = 0, element in normal flow, full size
+  //   stage 1 (transform):  0 < progress < 1, element interpolates toward
+  //                         its compact pinned form (scale, opacity, layout
+  //                         collapse, counter-translate upward to stay
+  //                         anchored in screen as user scrolls)
+  //   stage 2 (pinned):     progress = 1, element fully compact AND
+  //                         counter-translated by (scrollTop - anchorScroll)
+  //                         so it stays visually glued to the pin line
+  //
+  // When macros enter stage 1, the orb is told to start "exiting" — it
+  // stops counter-translating and fades out, so it scrolls up and away
+  // naturally while macros take the pin slot.
+  //
+  // Progress is computed from scrollTop + recorded layout offsets, NOT
+  // from getBoundingClientRect(), to avoid feedback loops with applied
+  // transforms.
+  var PIN_LINE = 94;           // px, bottom edge of fixed header (matches .hdr-v11.hdr-scrolled)
+  var ORB_RANGE = 180;         // px of scroll over which the orb transforms
+  var MACROS_RANGE = 140;      // px of scroll over which the macro row transforms
+  var MACROS_GAP = 60;         // px between orb fully-pinned and macros starting to transform
+
+  // Cached layout offsets, measured once and refreshed on resize.
+  var _orbAnchorScroll = null;
+  var _macrosAnchorScroll = null;
+  var _orbHeight = 0;
+
+  function measurePinAnchors() {
+    var ring = document.querySelector('#pg-today .hero-v11-ring-wrap');
+    var macs = document.querySelector('#pg-today .macro-row-v11');
+    var page = document.getElementById('pg-today');
+    if (!ring || !macs || !page) return;
+    // offsetTop climbs the offsetParent chain; for fixed-height flow
+    // elements inside #pg-today this gives a stable scroll-space y.
+    function offsetTopIn(el, root) {
+      var y = 0, n = el;
+      while (n && n !== root) { y += n.offsetTop; n = n.offsetParent; }
+      return y;
+    }
+    var ringTop = offsetTopIn(ring, page);
+    var macsTop = offsetTopIn(macs, page);
+    _orbAnchorScroll = ringTop - PIN_LINE;
+    _macrosAnchorScroll = macsTop - PIN_LINE;
+    _orbHeight = ring.offsetHeight;
+  }
+
+  function updatePinProgress(scrollTop) {
     var pg = document.getElementById('pg-today');
-    var hdr = document.querySelector('#pg-today .hdr-v11');
-    var orbSent = document.querySelector('#pg-today .orb-pin-sentinel');
-    var macSent = document.querySelector('#pg-today .macros-pin-sentinel');
-    if (!pg || !hdr) return;
-    // Anchor line = bottom of the fixed header (+ a tiny buffer).
-    var anchorY = hdr.getBoundingClientRect().bottom + 4;
-    var orbTop = orbSent ? orbSent.getBoundingClientRect().top : Infinity;
-    var macTop = macSent ? macSent.getBoundingClientRect().top : Infinity;
-    var orbPinned = orbTop <= anchorY;
-    var macsPinned = macTop <= anchorY;
-    // macsPinned implies orbPinned has already triggered, but the orb
-    // bar is *hidden* during phase 2 — see CSS.
-    if (orbPinned) pg.setAttribute('data-orb-pinned', 'true');
+    if (!pg) return;
+    if (_orbAnchorScroll === null) measurePinAnchors();
+    if (_orbAnchorScroll === null) return; // DOM not ready yet
+    // Orb progress: 0 → 1 as scrollTop goes from (anchor - RANGE) → anchor.
+    var orbP = (scrollTop - (_orbAnchorScroll - ORB_RANGE)) / ORB_RANGE;
+    orbP = Math.max(0, Math.min(1, orbP));
+    // Macros progress: 0 → 1 as scrollTop goes from
+    //   (macrosAnchor - RANGE) → macrosAnchor, but delayed by MACROS_GAP
+    // so there's breathing room after the orb fully pins.
+    var macsStart = _macrosAnchorScroll - MACROS_RANGE + MACROS_GAP;
+    var macsP = (scrollTop - macsStart) / MACROS_RANGE;
+    macsP = Math.max(0, Math.min(1, macsP));
+    // Orb counter-translate: keeps the orb visually glued to PIN_LINE
+    // once fully compact, by translating against the scroll.
+    // Active only while orb is fully pinned AND macros haven't started
+    // to appear yet — once macs progress > 0, orb stops holding and
+    // scrolls away.
+    var orbHold = 0;
+    if (orbP >= 1 && macsP <= 0) {
+      orbHold = scrollTop - _orbAnchorScroll;
+    } else if (orbP >= 1 && macsP > 0) {
+      // Orb exits: hold decays from its pinned value down to 0 as macsP
+      // goes 0 → 1. This makes the orb scroll away *with* the macros
+      // entering, not jump.
+      var holdAtPin = scrollTop - _orbAnchorScroll;
+      orbHold = holdAtPin * (1 - macsP);
+    }
+    // Orb exit opacity: 1 → 0 as macsP: 0 → 0.6
+    var orbExitOpacity = 1 - Math.min(1, macsP / 0.6);
+    // Macros counter-translate: once macsP = 1, stick to pin line.
+    var macsHold = 0;
+    if (macsP >= 1) {
+      macsHold = scrollTop - _macrosAnchorScroll;
+    }
+    pg.style.setProperty('--orb-progress', orbP.toFixed(4));
+    pg.style.setProperty('--macros-progress', macsP.toFixed(4));
+    pg.style.setProperty('--orb-hold', orbHold.toFixed(1) + 'px');
+    pg.style.setProperty('--orb-exit-opacity', orbExitOpacity.toFixed(3));
+    pg.style.setProperty('--macros-hold', macsHold.toFixed(1) + 'px');
+    // Toggle an attribute when each element is in its pinned state, so
+    // CSS can apply "pinned" styling (e.g. raise z-index, add backdrop).
+    if (orbP >= 1 && macsP < 1) pg.setAttribute('data-orb-pinned', '');
     else pg.removeAttribute('data-orb-pinned');
-    if (macsPinned) pg.setAttribute('data-macros-pinned', 'true');
+    if (macsP >= 1) pg.setAttribute('data-macros-pinned', '');
     else pg.removeAttribute('data-macros-pinned');
-    // Mirror live values into the pinned strips. Cheap string reads;
-    // runs at most once per animation frame.
-    if (orbPinned && !macsPinned) {
-      var remSrc = document.getElementById('cal-rem');
-      var remDst = document.getElementById('opb-rem');
-      if (remSrc && remDst) {
-        // #cal-rem's textContent is "123 left" or "45 over" — we have
-        // a static "left" label, so strip the suffix if present.
-        var txt = (remSrc.textContent || '').trim();
-        var m = txt.match(/^(-?\d[\d,]*)\s*(left|over)?/i);
-        remDst.textContent = m ? m[1] : txt;
-        // Flip label between "left" and "over" to match source state.
-        var unit = document.querySelector('#orb-pin-bar .opb-unit');
-        if (unit) unit.textContent = (m && m[2]) ? m[2].toLowerCase() : 'left';
-      }
-      // Drive the mini ring arc from the same fraction as the big ring.
-      // #cal-bar has style.width = pct% already set by renderCal().
-      var arc = document.getElementById('opb-ring-arc');
-      var bar = document.getElementById('cal-bar');
-      if (arc && bar) {
-        var pctStr = (bar.style.width || '0%').replace('%', '');
-        var pct = Math.max(0, Math.min(1, parseFloat(pctStr) / 100)) || 0;
-        var CIRC = 100.53; // 2π × r(16)
-        arc.setAttribute('stroke-dashoffset', (CIRC * (1 - pct)).toFixed(2));
-      }
-    }
-    if (macsPinned) {
-      var mirror = function(srcId, dstId) {
-        var s = document.getElementById(srcId);
-        var d = document.getElementById(dstId);
-        if (s && d) d.textContent = (s.textContent || '0').trim();
-      };
-      mirror('rp-v-big', 'hmac-p-v');
-      mirror('rc-v-big', 'hmac-c-v');
-      mirror('rf-v-big', 'hmac-f-v');
-    }
   }
 
   function attachScrollShrink() {
@@ -1435,13 +1426,19 @@
         // either .page or window/body is the actual scrolling element.
         var st = Math.max(page.scrollTop || 0, window.pageYOffset || 0, document.documentElement.scrollTop || 0);
         updateLogoForScroll(st);
-        updatePinnedBars();
+        updatePinProgress(st);
         ticking = false;
       });
     }
     page.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('scroll', onScroll, { passive: true });
-    // init
+    // Re-measure anchors on resize / orientation change — layout shifts
+    // can change the orb's and macros' offsetTop.
+    function remeasure() { _orbAnchorScroll = null; _macrosAnchorScroll = null; onScroll(); }
+    window.addEventListener('resize', remeasure, { passive: true });
+    window.addEventListener('orientationchange', remeasure, { passive: true });
+    // init — slight delay to let any late layout settle
+    setTimeout(remeasure, 80);
     onScroll();
   }
 
