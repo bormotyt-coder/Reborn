@@ -28,7 +28,8 @@
   <header class="hdr hdr-v11">
     <div class="hdr-v11-inner">
       <div class="rb-wordmark" aria-label="reBORN">
-        <img src="reborn-logo.png" alt="reBORN" class="rb-logo-img" />
+        <img src="reborn-logo-full.png" alt="reBORN" class="rb-logo-img rb-logo-full" />
+        <img src="reborn-logo-rb.png" alt="" aria-hidden="true" class="rb-logo-img rb-logo-rb" />
       </div>
       <div class="hdr-v11-pills">
         <button class="streak-pill-v11" onclick="openStreakModal()" aria-label="Streak">
@@ -1285,7 +1286,7 @@
   function updateLogoForScroll(scrollTop) {
     var hdr = document.querySelector('#pg-today .hdr-v11');
     var wm  = document.querySelector('#pg-today .rb-wordmark');
-    var img = document.querySelector('#pg-today .rb-logo-img');
+    var imgs = document.querySelectorAll('#pg-today .rb-logo-img');
     var inner = document.querySelector('#pg-today .hdr-v11-inner');
     var pg  = document.getElementById('pg-today');
     if (!hdr || !wm || !pg) return;
@@ -1293,10 +1294,12 @@
     var h = LOGO_MAX - (LOGO_MAX - LOGO_MIN) * t;
     var hStr = h.toFixed(1) + 'px';
     wm.style.setProperty('--logo-h', hStr);
-    if (img) img.style.height = hStr;  // belt-and-braces direct set
+    // belt-and-braces: also set height directly on both logo imgs (full + rB)
+    for (var i = 0; i < imgs.length; i++) imgs[i].style.height = hStr;
     // Drive both pills (streak + day) off one inherited variable on the
     // shared parent. 0 = fully expanded (full labels visible), 1 = fully
     // compact (streak → "🔥 N", day → just [‹][›] arrows).
+    // Also drives the logo crossfade (full reBORN → rB.) via CSS.
     if (inner) inner.style.setProperty('--hdr-progress', t.toFixed(3));
     if (scrollTop > SCROLLED_THRESHOLD) {
       hdr.classList.add('hdr-scrolled');

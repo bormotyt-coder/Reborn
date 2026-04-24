@@ -3733,22 +3733,45 @@ body.v11 .hdr-v11-inner {
 }
 
 .rb-wordmark {
-  display: inline-flex;
-  align-items: center;
-  line-height: 1;
+  /* Container holds two stacked logos (full reBORN and compact rB.) that
+     crossfade based on --hdr-progress inherited from .hdr-v11-inner.
+       t=0 (top of page)   → full logo visible, container is wide
+       t=1 (scrolled)      → compact rB. visible, container is narrow
+     --logo-h is updated by JS on scroll: 64px at top, shrinks to 32px. */
+  position: relative;
+  display: inline-block;
+  line-height: 0;
   user-select: none;
-  gap: 0;
-  /* --logo-h is updated by JS on scroll: 64px at top, shrinks to 32px */
   --logo-h: 64px;
+  /* Aspect ratios baked in from source PNGs:
+       full wordmark  529×186  → 2.844
+       compact rB.    242×216  → 1.120 */
+  height: var(--logo-h);
+  width: calc(
+    var(--logo-h) * 2.844 * (1 - var(--hdr-progress, 0))
+    + var(--logo-h) * 1.120 * var(--hdr-progress, 0)
+  );
+  transition: width .05s linear;
 }
 .rb-logo-img {
-  height: var(--logo-h);
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
   width: auto;
   display: block;
   -webkit-user-drag: none;
   user-select: none;
   pointer-events: none;
-  transition: height .05s linear;
+  transition: height .05s linear, opacity .05s linear;
+}
+/* Full reBORN — visible at top, fades out on scroll. */
+.rb-logo-full {
+  opacity: calc(1 - var(--hdr-progress, 0));
+}
+/* Compact rB. — invisible at top, fades in on scroll. */
+.rb-logo-rb {
+  opacity: var(--hdr-progress, 0);
 }
 .rb-wm-re {
   font-family: var(--v11-font-logo-re);
