@@ -4459,6 +4459,151 @@ body.v11 #pg-today .lantern-pill-v11 .lnt-rituals { display: none; }
 .mrow-cell.over .mrow-bar-fill { background: var(--v11-accent); }
 
 /* ═══════════════════════════════════════════════════════════
+   PINNED STRIPS — orb-pin-bar and hdr-v11-macros
+   ─────────────────────────────────────────────────────────────
+   Two-phase pinning scheme on the Home page:
+
+     Phase 0 — nothing pinned (default).
+     Phase 1 — #pg-today[data-orb-pinned]: mini-orb strip fades in
+               below the fixed header showing [tiny ring] N left.
+               Page content pushes down by ORB_BAR_H to make room.
+     Phase 2 — #pg-today[data-macros-pinned]: the mini-orb hides,
+               the header's logo+pills hide, and the compact macro
+               strip (P/C/F) fades in *inside* the header.
+
+   Both strips live in the DOM at all times; visibility is pure
+   CSS driven by data-attributes set by updatePinnedBars() in
+   index.html's scroll handler. Values are mirrored from the
+   existing #cal-rem / #rp-v-big / #rc-v-big / #rf-v-big nodes on
+   every scroll tick — no changes to app.js render paths.
+═══════════════════════════════════════════════════════════ */
+
+/* Phase-1 strip: sits directly below the fixed header. Scoped to
+   #pg-today so it doesn't leak into other pages. */
+body.v11 .orb-pin-bar {
+  position: fixed;
+  top: 94px; /* matches .hdr-v11.hdr-scrolled height */
+  left: 0;
+  right: 0;
+  z-index: 49; /* header is 50 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 44px;
+  padding: 0 16px;
+  background: rgba(10, 18, 32, 0.72);
+  -webkit-backdrop-filter: saturate(140%) blur(14px);
+  backdrop-filter: saturate(140%) blur(14px);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-6px);
+  transition: opacity .18s ease, transform .18s ease;
+  cursor: pointer;
+  user-select: none;
+}
+/* Only shows on the Home page, only in phase 1 (orb pinned but not yet macros). */
+body.v11 #pg-today.active[data-orb-pinned]:not([data-macros-pinned]) #orb-pin-bar {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+/* The bar is actually a sibling of #pg-today's header, inside #pg-today.
+   Hide it on any non-Home page by default (it's scoped via its position
+   inside #pg-today already, but belt-and-braces). */
+body.v11 #pg-today:not(.active) .orb-pin-bar { display: none; }
+/* Mini ring (40px), mirrors the big ring's progress via stroke-dashoffset
+   set in JS. Circumference for r=16 is 2π×16 ≈ 100.53. */
+.opb-ring {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  filter: drop-shadow(0 0 3px var(--v11-accent-glow, rgba(255, 45, 0, 0.35)));
+}
+#opb-ring-arc {
+  transition: stroke-dashoffset .4s cubic-bezier(.34, 1.56, .64, 1);
+}
+.opb-rem {
+  font-family: var(--v11-font-display);
+  font-weight: 800;
+  font-size: 17px;
+  letter-spacing: -0.01em;
+  color: #fff;
+  line-height: 1;
+}
+.opb-unit {
+  font-family: var(--v11-font-body);
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.55);
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
+}
+/* Push page content further down during phase 1 to make room for the
+   44px pinned strip. Uses the existing --hdr-pad-top ladder. */
+body.v11 #pg-today.active.hdr-is-scrolled[data-orb-pinned]:not([data-macros-pinned]) {
+  --hdr-pad-top: calc(94px + 44px);
+}
+
+/* Phase-2 content: compact P/C/F strip that lives inside .hdr-v11-inner
+   and swaps in for the logo+pills when [data-macros-pinned] is set. */
+.hdr-v11-macros {
+  display: none;
+  align-items: center;
+  justify-content: space-around;
+  gap: 14px;
+  width: 100%;
+  padding: 4px 4px;
+}
+.hmac-cell {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  font-family: var(--v11-font-body);
+  line-height: 1;
+}
+.hmac-lbl {
+  font-family: var(--v11-font-display);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.55);
+}
+.hmac-val {
+  font-family: var(--v11-font-display);
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: #fff;
+}
+.hmac-unit {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.45);
+  margin-left: 1px;
+}
+/* Macro-color coding mirrors .mrow-p / .mrow-c / .mrow-f. */
+.hmac-p .hmac-val { color: var(--v11-accent); }
+.hmac-c .hmac-val { color: #fff; }
+.hmac-f .hmac-val { color: rgba(255, 255, 255, 0.55); }
+
+/* Swap: once macros are pinned, hide the logo+pills and show the
+   compact macro strip inside the header. The header remains the only
+   fixed bar on screen. */
+body.v11 #pg-today.active[data-macros-pinned] .rb-wordmark,
+body.v11 #pg-today.active[data-macros-pinned] .hdr-v11-pills {
+  display: none;
+}
+body.v11 #pg-today.active[data-macros-pinned] .hdr-v11-macros {
+  display: flex;
+}
+/* Make sure the header stays at its compact height during phase 2. */
+body.v11 #pg-today.active[data-macros-pinned] {
+  --hdr-pad-top: 94px;
+}
+
+/* ═══════════════════════════════════════════════════════════
    BELOW-FOLD SECTIONS
 ═══════════════════════════════════════════════════════════ */
 body.v11 #pg-today .home-section,
