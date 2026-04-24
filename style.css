@@ -3733,45 +3733,84 @@ body.v11 .hdr-v11-inner {
 }
 
 .rb-wordmark {
-  /* Container holds two stacked logos (full reBORN and compact rB.) that
-     crossfade based on --hdr-progress inherited from .hdr-v11-inner.
-       t=0 (top of page)   → full logo visible, container is wide
-       t=1 (scrolled)      → compact rB. visible, container is narrow
+  /* Container holds two stacked logos (full reBORN. and compact rB.) that
+     morph between states based on --hdr-progress inherited from
+     .hdr-v11-inner.
+       t=0 (top of page) → full logo visible, container is wide
+       t=1 (scrolled)    → compact rB. visible, container is narrow
+
+     Motion design: instead of a straight crossfade, both logos are
+     positioned so the B's left stem sits at the same on-screen X
+     throughout the transition. The B acts as an anchor: "BORN." dissolves
+     off to the right, while the compact "r" slides in from the right and
+     scales up to meet the B. The shared anchor makes the transition read
+     as a single transformation rather than two separate images swapping.
+
+     Anchor math (see app.js for derivation):
+       full wordmark    529×186 → aspect 2.844, B-stem at ~40% from left
+       compact rB.      242×216 → aspect 1.120, B-stem at ~45% from left
+     Anchor is placed at 45% of container width so the compact naturally
+     aligns at t=1.
+
      --logo-h is updated by JS on scroll: 64px at top, shrinks to 32px. */
   position: relative;
   display: inline-block;
   line-height: 0;
   user-select: none;
   --logo-h: 64px;
-  /* Aspect ratios baked in from source PNGs:
-       full wordmark  529×186  → 2.844
-       compact rB.    242×216  → 1.120 */
   height: var(--logo-h);
   width: calc(
     var(--logo-h) * 2.844 * (1 - var(--hdr-progress, 0))
     + var(--logo-h) * 1.120 * var(--hdr-progress, 0)
   );
   transition: width .05s linear;
+  /* Let the compact rB. scale smoothly as it enters. */
+  overflow: visible;
 }
 .rb-logo-img {
   position: absolute;
   top: 0;
-  left: 0;
   height: 100%;
   width: auto;
   display: block;
   -webkit-user-drag: none;
   user-select: none;
   pointer-events: none;
-  transition: height .05s linear, opacity .05s linear;
+  transform-origin: left center;
+  transition: height .05s linear, opacity .05s linear,
+              left .05s linear, transform .05s linear;
 }
-/* Full reBORN — visible at top, fades out on scroll. */
+/* Full reBORN. — visible at top, fades + drifts left as we scroll.
+   Opacity ramps out over p ∈ [0, 0.6] so it's mostly gone by the time the
+   compact starts fading in at 0.4, avoiding a double-r overlap near the
+   anchor. Position formula: left = h * (0.1422 - 0.7758*p).  */
 .rb-logo-full {
-  opacity: calc(1 - var(--hdr-progress, 0));
+  left: calc(
+    var(--logo-h) * 0.1422
+    - var(--logo-h) * 0.7758 * var(--hdr-progress, 0)
+  );
+  opacity: clamp(
+    0,
+    calc(1 - var(--hdr-progress, 0) / 0.6),
+    1
+  );
 }
-/* Compact rB. — invisible at top, fades in on scroll. */
+/* Compact rB. — slides in from the right and scales up as scroll progresses.
+   Opacity ramps in over p ∈ [0.4, 1.0]. Position formula:
+   left = h * 0.7758 * (1 - p). At p=1 it lands at left:0 (container has
+   shrunk to compact's width). Small scale from 0.88 → 1 reinforces arrival. */
 .rb-logo-rb {
-  opacity: var(--hdr-progress, 0);
+  left: calc(
+    var(--logo-h) * 0.7758 * (1 - var(--hdr-progress, 0))
+  );
+  opacity: clamp(
+    0,
+    calc((var(--hdr-progress, 0) - 0.4) / 0.6),
+    1
+  );
+  transform: scale(
+    calc(0.88 + 0.12 * var(--hdr-progress, 0))
+  );
 }
 .rb-wm-re {
   font-family: var(--v11-font-logo-re);
