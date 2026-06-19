@@ -1175,7 +1175,7 @@ async function aiLookupQA(){
   const loadingEl = gv('qa-loading');
   loadingEl.classList.add('show');
   try{
-    const data=await callAI({model:'claude-sonnet-4-20250514',max_tokens:300,
+    const data=await callAI({model:'claude-sonnet-4-6',max_tokens:300,
       system:'Return ONLY valid JSON, no markdown: {"emoji":"single emoji","calories":number,"protein":number,"carbs":number,"fat":number}',
       messages:[{role:'user',content:`Nutrition facts for: ${name}. Use official label if branded.`}]});
     const raw = aiText(data);
@@ -1390,7 +1390,7 @@ After this meal, remaining for the day: ${remaining.cal} kcal, ${remaining.p}g P
 
 Give a 2-3 sentence honest assessment: how well this meal fits his cut goals, what it does well or poorly, and one actionable tip. Be direct, no fluff.`;
   try{
-    const data=await callAI({model:'claude-sonnet-4-20250514',max_tokens:200,
+    const data=await callAI({model:'claude-sonnet-4-6',max_tokens:200,
       messages:[{role:'user',content:prompt}]});
     const text=aiText(data).trim();
     gv('mdd-analysis-loading').style.display='none';
@@ -1487,7 +1487,7 @@ async function analyzeMeal(){
   content.push({type:'text',text:prompt});
   
   try{
-    const data=await callAI({model:'claude-sonnet-4-20250514',max_tokens:1500,
+    const data=await callAI({model:'claude-sonnet-4-6',max_tokens:1500,
         system:`Precise nutrition expert. Identify each ingredient separately.
 Return ONLY valid JSON, no markdown:
 {"confidence":"high"|"medium"|"low","confidence_tip":"one sentence or empty","ingredients":[{"name":"name","emoji":"emoji","portion":"e.g. 80g","calories":number,"protein":number,"carbs":number,"fat":number,"fibre":number,"sugar":number,"sodium":number}]}
@@ -1730,7 +1730,7 @@ async function aiLookupIngredient(){
   const loadingEl = gv('ing-lookup-loading');
   loadingEl.classList.add('show');
   try{
-    const data=await callAI({model:'claude-sonnet-4-20250514',max_tokens:300,
+    const data=await callAI({model:'claude-sonnet-4-6',max_tokens:300,
       system:'Return ONLY valid JSON, no markdown: {"emoji":"emoji","portion":"portion description","calories":number,"protein":number,"carbs":number,"fat":number}',
       messages:[{role:'user',content:`Nutrition facts for: ${name}`}]});
     const raw = aiText(data);
@@ -1916,7 +1916,7 @@ Give me a direct daily debrief:
 Direct. No fluff. Reference the rolling context if there are patterns worth calling out.`;
 
   try{
-    const data=await callAI({model:'claude-sonnet-4-20250514',max_tokens:900,
+    const data=await callAI({model:'claude-sonnet-4-6',max_tokens:900,
       system:'You are a direct, no-nonsense performance and nutrition coach for Borna. Honest, specific, actionable. No filler. When you spot multi-day patterns (e.g. 3rd day under on protein), call them out explicitly.',
       messages:[{role:'user',content:prompt}]});
     const text=aiText(data).trim();
@@ -1935,7 +1935,7 @@ Direct. No fluff. Reference the rolling context if there are patterns worth call
 
 async function generateCoachSuggestions(debriefText){
   try{
-    const data=await callAI({model:'claude-sonnet-4-20250514',max_tokens:120,
+    const data=await callAI({model:'claude-sonnet-4-6',max_tokens:120,
       system:'You are a nutrition and performance coach.',
       messages:[{role:'user',content:`Based on this daily debrief, write 3 short questions that the athlete would ask their coach — things like "how can I fix my protein intake?", "what should I eat tonight?", "is my deficit too aggressive?". First-person from the athlete's perspective. Return ONLY 3 lines, one question per line, no numbering, under 10 words each.\n\n${debriefText}`}]});
     const chips=aiText(data).trim().split('\n').map(s=>s.trim()).filter(Boolean).slice(0,3);
@@ -1978,7 +1978,7 @@ async function sendChatMessage(){
   chatHistory.push({role:'user',content:msg});
 
   try{
-    const data=await callAI({model:'claude-sonnet-4-20250514',max_tokens:600,
+    const data=await callAI({model:'claude-sonnet-4-6',max_tokens:600,
       system:`You are a direct, no-nonsense performance and nutrition coach for Borna. You have full context of his day. Be specific, honest, and actionable. Keep replies concise.\n\n${getDayContext()}`,
       messages:chatHistory});
     const reply=aiText(data).trim();
@@ -2747,7 +2747,7 @@ async function snapAndReadBarcode(){
   const b64=canvas.toDataURL('image/jpeg',0.92).split(',')[1];
 
   try{
-    const data=await callAI({model:'claude-sonnet-4-20250514',max_tokens:100,
+    const data=await callAI({model:'claude-sonnet-4-6',max_tokens:100,
       system:'You are a barcode reader. Look at the image and find the barcode number (EAN-13, EAN-8, UPC-A etc). Return ONLY the digits, nothing else. If you cannot find a barcode, return the word NONE.',
       messages:[{role:'user',content:[
         {type:'image',source:{type:'base64',media_type:'image/jpeg',data:b64}},
@@ -2864,7 +2864,7 @@ async function identifyProductFromImage(b64){
   if(descEl)descEl.value='Identifying product from packaging…';
   try{
     const data=await callAI({
-      model:'claude-sonnet-4-20250514',
+      model:'claude-sonnet-4-6',
       max_tokens:80,
       messages:[{role:'user',content:[
         {type:'image',source:{type:'base64',media_type:'image/jpeg',data:b64}},
@@ -2983,7 +2983,7 @@ async function runImpactScan(){
   content.push({type:'text',text:prompt});
 
   try{
-    const data=await callAI({model:'claude-sonnet-4-20250514',max_tokens:400,
+    const data=await callAI({model:'claude-sonnet-4-6',max_tokens:400,
       system:'Nutrition expert. Return ONLY valid JSON, no markdown: {"name":"food name","emoji":"single emoji","calories":number,"protein":number,"carbs":number,"fat":number,"verdict":"one punchy sentence about whether this fits remaining targets"}',
       messages:[{role:'user',content}]});
     const raw=aiText(data);
@@ -3321,7 +3321,7 @@ Remaining targets: ${remCal} kcal, ${remP}g protein, ${remC}g carbs, ${remF}g fa
 Time of day: ${new Date().getHours()}:00. Goal: fat loss cut phase.`;
 
   try{
-    const data=await callAI({model:'claude-sonnet-4-20250514',max_tokens:600,
+    const data=await callAI({model:'claude-sonnet-4-6',max_tokens:600,
       system:'Return ONLY valid JSON, no markdown: {"suggestions":[{"name":"food name","emoji":"emoji","reason":"one line why this fits","calories":number,"protein":number,"carbs":number,"fat":number}]} — 3 suggestions, practical foods available in Dubai, prioritize whatever macro is most behind.',
       messages:[{role:'user',content:ctx}]});
     const raw=aiText(data).replace(/```json|```/g,'').trim();
@@ -4466,7 +4466,7 @@ ${pbSummary||'No PBs yet — first session'}
 Generate a workout split for today. Return ONLY valid JSON.`;
 
   try{
-    const data=await callAI({model:'claude-sonnet-4-20250514',max_tokens:2000,system:woSystem,messages:[{role:'user',content:prompt}]});
+    const data=await callAI({model:'claude-sonnet-4-6',max_tokens:2000,system:woSystem,messages:[{role:'user',content:prompt}]});
     const rawText=aiText(data);
     if(!rawText)throw new Error('Empty response from API');
     
@@ -4902,7 +4902,7 @@ Requirements:
 
   try {
     const data = await callAI({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-6',
       max_tokens: 500,
       messages: [{ role: 'user', content: prompt }]
     });
@@ -5718,7 +5718,7 @@ async function generateWeeklySummary(weekK){
 
   try{
     const data=await callAI({
-      model:'claude-sonnet-4-20250514',
+      model:'claude-sonnet-4-6',
       max_tokens:120,
       system:"You are a concise performance coach. Analyse this week's data and give 2-3 bullet observations about patterns — e.g. consistently under on protein, stronger workout days after better sleep, calories spiking on weekends. Be specific, use the actual numbers, max 60 words total.",
       messages:[{role:'user',content:userMsg}]
@@ -5919,7 +5919,7 @@ async function loadFastingRecommendation(forceRefresh=false){
   const ctx=`${getDayContext()}\n${getFastContext()}\nFasting preference: ${fastProtocol}\nAvg recent fast: ${avgDur}h over ${recentFasts.length} fasts\n${_buildCoachContext().workoutCtx}`;
   try{
     const data=await callAI({
-      model:'claude-sonnet-4-20250514',max_tokens:450,
+      model:'claude-sonnet-4-6',max_tokens:450,
       system:'You are a concise intermittent fasting and nutrition coach for Borna (26M, 89.1kg, 25.1% BF, goal 20.1% BF by Apr 27 2026). Give specific, actionable fasting advice. Be brief and direct. No markdown headers, just 3-4 short paragraphs.',
       messages:[{role:'user',content:`Based on my data, recommend:\n1. Best fasting protocol (16:8, 18:6, or 20:4) for my fat loss goal and why\n2. Optimal eating window start/end times\n3. Which days this week to fast considering my workout schedule\n4. One key tip for right now\n\n${ctx}`}]
     });
