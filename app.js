@@ -454,7 +454,7 @@ const SNAP_CFG=[
 
 const todayKey=()=>new Date().toISOString().slice(0,10);
 const load=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}};
-const save=(k,v)=>localStorage.setItem(k,JSON.stringify(v));
+const save=(k,v)=>{localStorage.setItem(k,JSON.stringify(v));if(typeof cloudPush==='function')cloudPush(k,v);};
 const gv=id=>document.getElementById(id);
 
 const DEFAULT_QA=[
@@ -972,7 +972,7 @@ function _waveCommitCups(newCups, persist){
   // Called during drag (persist=false) and on release (persist=true).
   cups = newCups;
   if (persist){
-    localStorage.setItem(`${KEY}_cups_${todayKey()}`, String(cups));
+    localStorage.setItem(`${KEY}_cups_${todayKey()}`, String(cups));if(typeof cloudPush==='function')cloudPush(`${KEY}_cups_${todayKey()}`,cups);
   }
   // Update compact readouts in the section header
   const a = gv('water-cups'); if (a) a.textContent = _waveFormatCups(cups);
@@ -1145,7 +1145,7 @@ function resetWater(){
   _waveState.animTarget = 0;
   _waveState.animStart = performance.now();
   cups = 0;
-  localStorage.setItem(`${KEY}_cups_${todayKey()}`, '0');
+  localStorage.setItem(`${KEY}_cups_${todayKey()}`, '0');if(typeof cloudPush==='function')cloudPush(`${KEY}_cups_${todayKey()}`,0);
   _waveCommitCups(0, false);
 }
 
@@ -3694,7 +3694,7 @@ let _woHistExName= null;           // selected exercise for progression
 
 // ── Utilities ──
 function woLoad(key,def){try{const v=localStorage.getItem(key);return v?JSON.parse(v):def;}catch{return def;}}
-function woSave(key,val){localStorage.setItem(key,JSON.stringify(val));}
+function woSave(key,val){localStorage.setItem(key,JSON.stringify(val));if(typeof cloudPush==='function')cloudPush(key,val);}
 function woHistory(){return woLoad(WO_HIST_KEY,[]);}
 function woPBs(){return woLoad(WO_PBS_KEY,{});}
 function woNotes(){return woLoad(WO_NOTES_KEY,{});}

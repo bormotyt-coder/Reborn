@@ -15,6 +15,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@600;700&family=Outfit:wght@300;400;500;600;700;800;900&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body class="v11">
 <div id="app">
@@ -48,6 +49,17 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
           </button>
         </div>
+      </div>
+      <!-- Cloud sync button -->
+      <div class="cloud-hdr-wrap">
+        <button id="cloud-signin-btn" class="cloud-btn" onclick="openCloudModal()" aria-label="Sign in to sync">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
+          Sync
+        </button>
+        <button id="cloud-badge" class="cloud-btn cloud-btn--active" onclick="openCloudModal()" aria-label="Cloud account" style="display:none">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
+          <span></span>
+        </button>
       </div>
       <!-- hidden compat: preserves element referenced elsewhere -->
       <span id="hdr-date" style="display:none"></span>
@@ -1099,8 +1111,46 @@
   </div>
 </div>
 
+<!-- ═══ CLOUD AUTH MODALS ═══════════════════════════════════ -->
+
+<!-- Sign-in / sign-up modal -->
+<div class="overlay" id="cloud-modal" onclick="closeCloudModal()">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="m-handle"></div>
+    <div class="m-title" id="cloud-modal-title">Sign in</div>
+    <div class="m-sub">Your workouts, meals and progress sync across all your devices.</div>
+    <div class="cloud-form-group">
+      <label>Email</label>
+      <input type="email" id="cloud-email" placeholder="you@example.com" autocomplete="email" onkeydown="if(event.key==='Enter')document.getElementById('cloud-password').focus()">
+    </div>
+    <div class="cloud-form-group">
+      <label>Password</label>
+      <input type="password" id="cloud-password" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')_submitAuth()">
+    </div>
+    <div id="cloud-auth-err"></div>
+    <button class="btn-primary" id="cloud-auth-submit" onclick="_submitAuth()">Sign In</button>
+    <div id="cloud-auth-toggle">No account? <button onclick="_setAuthMode('up')">Create one</button></div>
+  </div>
+</div>
+
+<!-- Signed-in account sheet -->
+<div class="overlay" id="cloud-account-sheet" onclick="closeCloudModal()">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="m-handle"></div>
+    <div class="m-title">Account</div>
+    <div class="cloud-acct-row">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent-lake)"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
+      <span id="cloud-acct-email" style="color:var(--text-2);font-size:14px"></span>
+    </div>
+    <div class="cloud-acct-note">Data syncs automatically every time you log a meal, finish a set, or update anything in the app.</div>
+    <button class="btn-primary btn-danger" onclick="cloudSignOut();closeCloudModal()">Sign Out</button>
+    <button class="cloud-cancel-btn" onclick="closeCloudModal()">Close</button>
+  </div>
+</div>
+
 <script src="data.js"></script>
 <script src="app.js"></script>
+<script src="cloud.js"></script>
 <script>
 // ═══ v11 HOME GLUE — bridges new Home layout to existing app.js ═══
 (function() {
@@ -1341,5 +1391,81 @@
   }
 })();
 </script>
+
+<style>
+/* ── Cloud sync button in header ─────────────────────────── */
+.cloud-hdr-wrap { display:flex; align-items:center; }
+.cloud-btn {
+  display:flex; align-items:center; gap:5px;
+  background:var(--surface-2); border:1px solid var(--hair-2);
+  border-radius:20px; padding:5px 11px;
+  font-family:var(--font); font-size:11px; font-weight:600;
+  color:var(--text-3); cursor:pointer; letter-spacing:.04em;
+  text-transform:uppercase; white-space:nowrap;
+}
+.cloud-btn--active {
+  color:var(--accent-lake);
+  background:rgba(127,176,212,0.08);
+  border-color:rgba(127,176,212,0.22);
+}
+
+/* ── Auth form ───────────────────────────────────────────── */
+.cloud-form-group { margin-bottom:14px; }
+.cloud-form-group label {
+  display:block; font-size:10px; font-weight:700;
+  color:var(--text-3); margin-bottom:7px;
+  text-transform:uppercase; letter-spacing:.08em;
+}
+.cloud-form-group input {
+  width:100%; background:var(--surface-2);
+  border:1px solid var(--hair-2); border-radius:12px;
+  padding:13px 14px; font-family:var(--font); font-size:15px;
+  color:var(--text); box-sizing:border-box;
+}
+.cloud-form-group input:focus { outline:none; border-color:var(--accent-lake); }
+#cloud-auth-err {
+  font-size:13px; color:var(--bad);
+  min-height:20px; margin:6px 0 10px;
+}
+#cloud-auth-toggle {
+  text-align:center; font-size:13px;
+  color:var(--text-3); margin-top:14px;
+}
+#cloud-auth-toggle button {
+  background:none; border:none; color:var(--accent-lake);
+  font-family:var(--font); font-size:13px; cursor:pointer; padding:0;
+}
+
+/* ── Account sheet ───────────────────────────────────────── */
+.cloud-acct-row {
+  display:flex; align-items:center; gap:10px;
+  background:var(--surface-2); border:1px solid var(--hair-2);
+  border-radius:12px; padding:14px; margin-bottom:12px;
+}
+.cloud-acct-note {
+  font-size:13px; color:var(--text-3); line-height:1.5;
+  margin-bottom:20px;
+}
+.btn-danger { background:rgba(232,138,130,0.12)!important; color:var(--bad)!important; border:1px solid rgba(232,138,130,0.22)!important; }
+.cloud-cancel-btn {
+  width:100%; background:none; border:none;
+  color:var(--text-3); font-family:var(--font);
+  font-size:14px; cursor:pointer; margin-top:10px;
+  padding:8px;
+}
+
+/* ── Toast ───────────────────────────────────────────────── */
+#cloud-toast {
+  position:fixed; bottom:80px; left:50%;
+  transform:translateX(-50%) translateY(12px);
+  background:var(--bg-3); border:1px solid var(--hair-2);
+  border-radius:20px; padding:9px 18px;
+  font-size:13px; color:var(--text-2);
+  z-index:10000; opacity:0;
+  transition:opacity .25s, transform .25s;
+  pointer-events:none; white-space:nowrap;
+}
+#cloud-toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+</style>
 </body>
 </html>
