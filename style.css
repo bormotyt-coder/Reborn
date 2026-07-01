@@ -1622,6 +1622,30 @@ input:focus, textarea:focus, select:focus { border-color: var(--page-accent); ba
 .wo-last-meta { font-family: var(--font); font-size: 11px; color: var(--text-3); margin-top: 3px; }
 .wo-last-muscles { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
 
+/* Split picker */
+.wo-split-picker-card {
+  margin: 12px 16px;
+  background: var(--surface); border: 1px solid var(--hair);
+  border-radius: var(--r-lg); padding: 14px 16px;
+  box-shadow: var(--sh-sm);
+  backdrop-filter: blur(10px);
+}
+.wo-split-picker-label { display: flex; align-items: center; gap: 8px; font-family: var(--font); font-size: 10px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 10px; }
+.wo-split-override { text-transform: none; letter-spacing: 0; font-size: 9px; font-weight: 700; color: var(--amber, #f97316); background: rgba(249,115,22,0.12); padding: 2px 7px; border-radius: 999px; }
+.wo-split-chips { display: flex; flex-wrap: wrap; gap: 7px; }
+.wo-split-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 13px; border-radius: 999px;
+  font-family: var(--font); font-size: 12px; font-weight: 600;
+  background: var(--surface-2); color: var(--text-2);
+  border: 1px solid var(--hair); cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.wo-split-chip:hover { border-color: var(--text-3); }
+.wo-split-chip.sel { background: var(--accent, var(--blue2, #4f8cff)); color: #fff; border-color: transparent; }
+.wo-split-next { font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.75; background: rgba(255,255,255,0.18); padding: 1px 5px; border-radius: 999px; }
+.wo-split-chip:not(.sel) .wo-split-next { background: var(--surface); color: var(--text-3); }
+
 /* Workout modals */
 .wo-summary-modal, .wo-strain-modal {
   position: fixed; inset: 0;

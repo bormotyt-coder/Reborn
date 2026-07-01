@@ -3691,6 +3691,7 @@ let _woHistMode  = false;          // viewing history?
 let _woHistPage  = 'list';         // 'list' | 'detail' | 'exercise'
 let _woHistDetail= null;           // selected session for detail view
 let _woHistExName= null;           // selected exercise for progression
+let _woSplitOverride = null;       // one-shot manual split override (else auto rotation)
 
 // ── Utilities ──
 function woLoad(key,def){try{const v=localStorage.getItem(key);return v?JSON.parse(v):def;}catch{return def;}}
@@ -4317,6 +4318,7 @@ function renderWorkoutPage(){
     localStorage.removeItem(WO_KEY);
     if(typeof cloudDelete==='function')cloudDelete(WO_KEY);
   }
+  renderSplitPicker();
   renderLastSession();
 }
 
@@ -4369,6 +4371,29 @@ function updateReadiness(){
   }
 }
 
+// ── Split picker: shows the auto-rotation next-up split and lets the user
+// override it for the next generation (one-shot). ──
+function renderSplitPicker(){
+  const el=gv('wo-split-picker');if(!el)return;
+  const autoSplit=getNextSplit();
+  const selected=_woSplitOverride||autoSplit;
+  const chips=WO_SPLIT_CYCLE.map(name=>{
+    const isSel=name===selected;
+    const isAuto=name===autoSplit;
+    return `<button class="wo-split-chip${isSel?' sel':''}" onclick="pickSplit('${name.replace(/'/g,"\\'")}')">${name}${isAuto?' <span class="wo-split-next">next</span>':''}</button>`;
+  }).join('');
+  el.innerHTML=`<div class="wo-split-picker-card">
+    <div class="wo-split-picker-label">Today's Split ${_woSplitOverride?'<span class="wo-split-override">override</span>':''}</div>
+    <div class="wo-split-chips">${chips}</div>
+  </div>`;
+}
+
+// Set a manual override (or clear it back to auto when tapping the auto split).
+function pickSplit(name){
+  _woSplitOverride = (name===getNextSplit()) ? null : name;
+  renderSplitPicker();
+}
+
 function renderLastSession(){
   const el=gv('wo-last-session');if(!el)return;
   const hist=getRecentSessions(1);
@@ -4404,7 +4429,7 @@ async function generateWorkout(){
   const rec=_woRecovery||'unknown';
   const sleepSnap=whoopSnaps[0]||{};
   const recentSessions=getRecentSessions(7);
-  const todaySplit=getNextSplit();
+  const todaySplit=_woSplitOverride||getNextSplit();
   const todayMuscles=WO_SPLIT_MUSCLES[todaySplit];
   const pbs=woPBs();
   const daysAgo=getDaysSinceMuscle();
@@ -4543,7 +4568,11 @@ Generate a workout split for today. Return ONLY valid JSON.`;
 
     // Auto-append a core exercise if none present
     _woPlan = appendCoreExercise(_woPlan);
-    
+
+    // Override was a one-shot; clear it so the next auto rotation resumes.
+    _woSplitOverride = null;
+    renderSplitPicker();
+
     renderWorkoutPreview();
   }catch(e){
     console.error('[reBorn] Workout gen error:', e);
