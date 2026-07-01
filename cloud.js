@@ -34,17 +34,51 @@ function _shouldSync(key) {
   return _SYNC_EXACT.has(key) || _SYNC_PREFIX.some(p => key.startsWith(p));
 }
 
+// ── Local write-version tracking ──────────────────────────────
+// Every local write to a synced key is stamped with the moment it happened.
+// cloudPull uses these stamps to avoid clobbering data that is newer locally
+// than what's in the cloud ("cloud wins" was overwriting fresh local writes —
+// e.g. a workout you just finished — with a stale server copy on reload).
+const _TS_KEY = `${KEY}_cloud_ts`;
+function _loadTs() { try { return JSON.parse(localStorage.getItem(_TS_KEY)) || {}; } catch { return {}; } }
+function _saveTs(map) { try { localStorage.setItem(_TS_KEY, JSON.stringify(map)); } catch {} }
+function _stampLocal(key, iso) {
+  const m = _loadTs(); m[key] = iso; _saveTs(m);
+}
+function _localTs(key) { return _loadTs()[key] || null; }
+
 // ── Push one key to Supabase (fire-and-forget) ────────────────
 async function cloudPush(key, value) {
-  if (!_cloudUser || !_shouldSync(key)) return;
+  if (!_shouldSync(key)) return;
+  // Stamp the local write time even when signed out, so a later sign-in pull
+  // doesn't overwrite offline edits that are newer than the server copy.
+  const iso = new Date().toISOString();
+  _stampLocal(key, iso);
+  if (!_cloudUser) return;
   try {
     const { error } = await _sb.from('user_data').upsert(
-      { user_id: _cloudUser.id, key, value: JSON.stringify(value), updated_at: new Date().toISOString() },
+      { user_id: _cloudUser.id, key, value: JSON.stringify(value), updated_at: iso },
       { onConflict: 'user_id,key' }
     );
     if (error) throw error;
   } catch (e) {
     console.warn('[reBorn Cloud] push failed:', key, e.message);
+  }
+}
+
+// ── Delete one key from Supabase (propagate local removals) ────
+// localStorage.removeItem() alone left finished sessions alive in the cloud,
+// so the next cloudPull resurrected them (an ended workout reappeared as
+// still in-progress). Removing the cloud row too keeps deletions sticky.
+async function cloudDelete(key) {
+  const m = _loadTs(); delete m[key]; _saveTs(m);
+  if (!_cloudUser || !_shouldSync(key)) return;
+  try {
+    const { error } = await _sb.from('user_data').delete()
+      .eq('user_id', _cloudUser.id).eq('key', key);
+    if (error) throw error;
+  } catch (e) {
+    console.warn('[reBorn Cloud] delete failed:', key, e.message);
   }
 }
 
@@ -79,14 +113,23 @@ async function cloudPull() {
   try {
     const { data, error } = await _sb
       .from('user_data')
-      .select('key, value')
+      .select('key, value, updated_at')
       .eq('user_id', _cloudUser.id);
     if (error) throw error;
     if (data && data.length > 0) {
-      data.forEach(({ key, value }) => localStorage.setItem(key, value));
+      let applied = 0;
+      data.forEach(({ key, value, updated_at }) => {
+        // Skip rows that are older than an unsynced local write — otherwise a
+        // stale server copy overwrites data you just changed on this device.
+        const localIso = _localTs(key);
+        if (localIso && updated_at && localIso > updated_at) return;
+        localStorage.setItem(key, value);
+        if (updated_at) _stampLocal(key, updated_at);
+        applied++;
+      });
       _cloudReloadState();
       renderAll();
-      console.log(`[reBorn Cloud] pulled ${data.length} keys`);
+      console.log(`[reBorn Cloud] pulled ${data.length} keys, applied ${applied}`);
     }
   } catch (e) {
     console.warn('[reBorn Cloud] pull failed:', e.message);

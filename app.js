@@ -4265,10 +4265,16 @@ function renderWorkoutPage(){
   updateReadiness();
   // Restore active session if app was closed mid-workout
   const saved=woLoad(WO_KEY,null);
-  if(saved&&saved.inProgress){
+  // Safety net: if this "active" session was already completed (its id is in
+  // history), it's a stale copy — discard it instead of reopening it.
+  const alreadyDone=saved&&woHistory().some(s=>s.id===saved.id);
+  if(saved&&saved.inProgress&&!alreadyDone){
     _woSession=saved;
     _woPlan=saved.plan;
     showActiveWorkout();
+  }else if(alreadyDone){
+    localStorage.removeItem(WO_KEY);
+    if(typeof cloudDelete==='function')cloudDelete(WO_KEY);
   }
   renderLastSession();
 }
@@ -4442,14 +4448,17 @@ Rules:
   Cardio: treadmill, stairmaster, bike-upright, rower-machine, elliptical
 - Return ONLY valid JSON, no markdown, no explanation.
 
-JSON format:
-{"splitName":"Push — Chest & Shoulders","muscleGroups":["Chest","Shoulders","Triceps"],"coachNote":"2-line rationale referencing recovery data and how it shaped today's plan","exercises":[{"name":"Incline Dumbbell Press","iconSlug":"bench-db-incline","cue":"specific MMC cue","intensityTechnique":"straight sets","sets":4,"reps":"6-8","rest":120,"lastWeight":null,"suggestedWeight":null,"alternatives":["alt1","alt2"]}],"cardio":{"machine":"Treadmill","iconSlug":"treadmill","duration":15,"speed":6.5,"incline":8,"unit":"km/h","rationale":"one line"}}`;
+JSON format (this is a FORMAT example only — do NOT copy its split/exercises; choose today's split from the recent-training context):
+{"splitName":"<split for today>","muscleGroups":["<muscle>","<muscle>"],"coachNote":"2-line rationale referencing recovery data and how it shaped today's plan","exercises":[{"name":"<exercise>","iconSlug":"bench-db-incline","cue":"specific MMC cue","intensityTechnique":"straight sets","sets":4,"reps":"6-8","rest":120,"lastWeight":null,"suggestedWeight":null,"alternatives":["alt1","alt2"]}],"cardio":{"machine":"Treadmill","iconSlug":"treadmill","duration":15,"speed":6.5,"incline":8,"unit":"km/h","rationale":"one line"}}`;
 
   const prompt=`═══ TODAY'S CONTEXT ═══
 - WHOOP Recovery: ${rec}%
 - Sleep: ${sleepSnap.sleep!=null?(()=>{const hh=Math.floor(sleepSnap.sleep),mm=Math.round((sleepSnap.sleep-hh)*60);return hh+'h'+(mm>0?' '+mm+'m':'');})():'unknown'}
 - HRV: ${sleepSnap.hrv||'unknown'}
 - Yesterday's nutrition: ${Math.round(yest.p||0)}g protein, ${Math.round(yest.cal||0)} kcal, ${Math.round(yest.c||0)}g carbs
+
+MOST RECENT SESSION: ${recentSessions[0]?`${recentSessions[0].splitName} — ${(recentSessions[0].muscleGroups||[]).join(', ')||'?'}`:'None yet'}
+→ Today MUST target a DIFFERENT split focus. If the last session was Push (chest/shoulders/triceps), today is Pull (back/biceps) or Legs — do NOT program chest again. Rotate the split; never hand back the same day the user just completed.
 
 RECENT TRAINING (last 7 sessions):
 ${histSummary||'No recent sessions logged'}
@@ -5387,7 +5396,11 @@ function saveStrainAndFinish() {
   const hist = woHistory();
   hist.push(session);
   woSave(WO_HIST_KEY, hist);
+  // Clear the active session locally AND in the cloud. Without the cloud
+  // delete, the finished session survived on the server and cloudPull restored
+  // it on the next load — the ended workout came back as still in-progress.
   localStorage.removeItem(WO_KEY);
+  if (typeof cloudDelete === 'function') cloudDelete(WO_KEY);
 
   // Remove strain modal
   const strainModal = gv('wo-strain-modal');
