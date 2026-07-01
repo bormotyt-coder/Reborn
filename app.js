@@ -3691,6 +3691,7 @@ let _woHistMode  = false;          // viewing history?
 let _woHistPage  = 'list';         // 'list' | 'detail' | 'exercise'
 let _woHistDetail= null;           // selected session for detail view
 let _woHistExName= null;           // selected exercise for progression
+let _woSplitOverride = null;       // one-shot manual split override (else auto rotation)
 
 // ── Utilities ──
 function woLoad(key,def){try{const v=localStorage.getItem(key);return v?JSON.parse(v):def;}catch{return def;}}
@@ -4196,6 +4197,47 @@ function getExercisesRepeatedOnSimilarDays(sessionCount = 3) {
   return Array.from(names);
 }
 
+// ── Fixed split rotation ──
+// The sequence is hardcoded; the AI only fills in the exercises for whichever
+// split comes next. Rotation advances off the most recently COMPLETED session.
+const WO_SPLIT_CYCLE = ['Push', 'Pull', 'Arms & Shoulders', 'Legs'];
+const WO_SPLIT_MUSCLES = {
+  'Push':             ['Chest', 'Shoulders', 'Triceps'],
+  'Pull':             ['Back', 'Biceps', 'Rear Delts'],
+  'Arms & Shoulders': ['Shoulders', 'Biceps', 'Triceps'],
+  'Legs':             ['Quads', 'Hamstrings', 'Glutes', 'Calves'],
+};
+
+// Map a completed session onto one of the four cycle categories.
+// Prefers the explicit splitCategory saved on newer sessions; otherwise infers
+// from muscle groups / split name so legacy history still advances correctly.
+function classifySplit(session) {
+  if (!session) return null;
+  if (session.splitCategory && WO_SPLIT_CYCLE.includes(session.splitCategory)) return session.splitCategory;
+  const m = (session.muscleGroups || []).map(x => String(x).toLowerCase());
+  const has = k => m.some(x => x.includes(k));
+  if (has('quad') || has('hamstring') || has('glute') || has('calf') || has('calv') || has('leg')) return 'Legs';
+  if (has('chest')) return 'Push';
+  if (has('back') || has('lat')) return 'Pull';
+  if (has('shoulder') || has('bicep') || has('tricep') || has('delt') || has('arm')) return 'Arms & Shoulders';
+  const n = (session.splitName || '').toLowerCase();
+  if (n.includes('push')) return 'Push';
+  if (n.includes('pull')) return 'Pull';
+  if (n.includes('leg')) return 'Legs';
+  if (n.includes('arm') || n.includes('shoulder')) return 'Arms & Shoulders';
+  return null;
+}
+
+// The split to program today = the one after the last completed session's split.
+function getNextSplit() {
+  const hist = woHistory();
+  const last = hist.length ? hist[hist.length - 1] : null;
+  const lastCat = classifySplit(last);
+  if (!lastCat) return WO_SPLIT_CYCLE[0]; // no usable history → start at Push
+  const idx = WO_SPLIT_CYCLE.indexOf(lastCat);
+  return WO_SPLIT_CYCLE[(idx + 1) % WO_SPLIT_CYCLE.length];
+}
+
 // ── Ghost Sets: Get last performed sets for an exercise ──
 function getExerciseGhostSets(exerciseName) {
   const hist = woHistory();
@@ -4265,11 +4307,18 @@ function renderWorkoutPage(){
   updateReadiness();
   // Restore active session if app was closed mid-workout
   const saved=woLoad(WO_KEY,null);
-  if(saved&&saved.inProgress){
+  // Safety net: if this "active" session was already completed (its id is in
+  // history), it's a stale copy — discard it instead of reopening it.
+  const alreadyDone=saved&&woHistory().some(s=>s.id===saved.id);
+  if(saved&&saved.inProgress&&!alreadyDone){
     _woSession=saved;
     _woPlan=saved.plan;
     showActiveWorkout();
+  }else if(alreadyDone){
+    localStorage.removeItem(WO_KEY);
+    if(typeof cloudDelete==='function')cloudDelete(WO_KEY);
   }
+  renderSplitPicker();
   renderLastSession();
 }
 
@@ -4322,6 +4371,29 @@ function updateReadiness(){
   }
 }
 
+// ── Split picker: shows the auto-rotation next-up split and lets the user
+// override it for the next generation (one-shot). ──
+function renderSplitPicker(){
+  const el=gv('wo-split-picker');if(!el)return;
+  const autoSplit=getNextSplit();
+  const selected=_woSplitOverride||autoSplit;
+  const chips=WO_SPLIT_CYCLE.map(name=>{
+    const isSel=name===selected;
+    const isAuto=name===autoSplit;
+    return `<button class="wo-split-chip${isSel?' sel':''}" onclick="pickSplit('${name.replace(/'/g,"\\'")}')">${name}${isAuto?' <span class="wo-split-next">next</span>':''}</button>`;
+  }).join('');
+  el.innerHTML=`<div class="wo-split-picker-card">
+    <div class="wo-split-picker-label">Today's Split ${_woSplitOverride?'<span class="wo-split-override">override</span>':''}</div>
+    <div class="wo-split-chips">${chips}</div>
+  </div>`;
+}
+
+// Set a manual override (or clear it back to auto when tapping the auto split).
+function pickSplit(name){
+  _woSplitOverride = (name===getNextSplit()) ? null : name;
+  renderSplitPicker();
+}
+
 function renderLastSession(){
   const el=gv('wo-last-session');if(!el)return;
   const hist=getRecentSessions(1);
@@ -4357,6 +4429,8 @@ async function generateWorkout(){
   const rec=_woRecovery||'unknown';
   const sleepSnap=whoopSnaps[0]||{};
   const recentSessions=getRecentSessions(7);
+  const todaySplit=_woSplitOverride||getNextSplit();
+  const todayMuscles=WO_SPLIT_MUSCLES[todaySplit];
   const pbs=woPBs();
   const daysAgo=getDaysSinceMuscle();
   const recentExercises = getRecentExercises(240); // 10 days
@@ -4442,14 +4516,24 @@ Rules:
   Cardio: treadmill, stairmaster, bike-upright, rower-machine, elliptical
 - Return ONLY valid JSON, no markdown, no explanation.
 
-JSON format:
-{"splitName":"Push — Chest & Shoulders","muscleGroups":["Chest","Shoulders","Triceps"],"coachNote":"2-line rationale referencing recovery data and how it shaped today's plan","exercises":[{"name":"Incline Dumbbell Press","iconSlug":"bench-db-incline","cue":"specific MMC cue","intensityTechnique":"straight sets","sets":4,"reps":"6-8","rest":120,"lastWeight":null,"suggestedWeight":null,"alternatives":["alt1","alt2"]}],"cardio":{"machine":"Treadmill","iconSlug":"treadmill","duration":15,"speed":6.5,"incline":8,"unit":"km/h","rationale":"one line"}}`;
+JSON format (this is a FORMAT example only — do NOT copy its split/exercises; choose today's split from the recent-training context):
+{"splitName":"<split for today>","muscleGroups":["<muscle>","<muscle>"],"coachNote":"2-line rationale referencing recovery data and how it shaped today's plan","exercises":[{"name":"<exercise>","iconSlug":"bench-db-incline","cue":"specific MMC cue","intensityTechnique":"straight sets","sets":4,"reps":"6-8","rest":120,"lastWeight":null,"suggestedWeight":null,"alternatives":["alt1","alt2"]}],"cardio":{"machine":"Treadmill","iconSlug":"treadmill","duration":15,"speed":6.5,"incline":8,"unit":"km/h","rationale":"one line"}}`;
 
   const prompt=`═══ TODAY'S CONTEXT ═══
 - WHOOP Recovery: ${rec}%
 - Sleep: ${sleepSnap.sleep!=null?(()=>{const hh=Math.floor(sleepSnap.sleep),mm=Math.round((sleepSnap.sleep-hh)*60);return hh+'h'+(mm>0?' '+mm+'m':'');})():'unknown'}
 - HRV: ${sleepSnap.hrv||'unknown'}
 - Yesterday's nutrition: ${Math.round(yest.p||0)}g protein, ${Math.round(yest.cal||0)} kcal, ${Math.round(yest.c||0)}g carbs
+
+MOST RECENT SESSION: ${recentSessions[0]?`${recentSessions[0].splitName} — ${(recentSessions[0].muscleGroups||[]).join(', ')||'?'}`:'None yet'}
+
+═══ TODAY'S SPLIT IS FIXED (NON-NEGOTIABLE) ═══
+The split rotation is hardcoded: Push → Pull → Arms & Shoulders → Legs → (repeat).
+TODAY = ${todaySplit}. Target ONLY these muscle groups: ${todayMuscles.join(', ')}.
+- "muscleGroups" in your JSON MUST be exactly: ${JSON.stringify(todayMuscles)}
+- "splitName" MUST reflect the ${todaySplit} day (e.g. "${todaySplit} — ...").
+- Every exercise MUST train one of those muscle groups. Do NOT program any other split. Do NOT substitute a different day.
+Your ONLY job is choosing the best exercises for a ${todaySplit} day given recovery, PBs, and variance.
 
 RECENT TRAINING (last 7 sessions):
 ${histSummary||'No recent sessions logged'}
@@ -4475,10 +4559,20 @@ Generate a workout split for today. Return ONLY valid JSON.`;
     if(!_woPlan || !_woPlan.exercises){
       throw new Error('Could not parse workout plan');
     }
-    
+
+    // Pin the rotation category so the next session advances deterministically,
+    // regardless of how the AI phrased splitName/muscleGroups.
+    _woPlan.splitCategory = todaySplit;
+    if(!_woPlan.splitName) _woPlan.splitName = todaySplit;
+    if(!Array.isArray(_woPlan.muscleGroups) || !_woPlan.muscleGroups.length) _woPlan.muscleGroups = todayMuscles.slice();
+
     // Auto-append a core exercise if none present
     _woPlan = appendCoreExercise(_woPlan);
-    
+
+    // Override was a one-shot; clear it so the next auto rotation resumes.
+    _woSplitOverride = null;
+    renderSplitPicker();
+
     renderWorkoutPreview();
   }catch(e){
     console.error('[reBorn] Workout gen error:', e);
@@ -4537,6 +4631,7 @@ function startWorkout(){
     date: new Date().toISOString(),
     plan: _woPlan,
     splitName: _woPlan.splitName,
+    splitCategory: _woPlan.splitCategory||null,
     muscleGroups: _woPlan.muscleGroups||[],
     inProgress: true,
     startTime: Date.now(),
@@ -5387,7 +5482,11 @@ function saveStrainAndFinish() {
   const hist = woHistory();
   hist.push(session);
   woSave(WO_HIST_KEY, hist);
+  // Clear the active session locally AND in the cloud. Without the cloud
+  // delete, the finished session survived on the server and cloudPull restored
+  // it on the next load — the ended workout came back as still in-progress.
   localStorage.removeItem(WO_KEY);
+  if (typeof cloudDelete === 'function') cloudDelete(WO_KEY);
 
   // Remove strain modal
   const strainModal = gv('wo-strain-modal');
