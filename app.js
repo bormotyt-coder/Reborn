@@ -4196,6 +4196,47 @@ function getExercisesRepeatedOnSimilarDays(sessionCount = 3) {
   return Array.from(names);
 }
 
+// ── Fixed split rotation ──
+// The sequence is hardcoded; the AI only fills in the exercises for whichever
+// split comes next. Rotation advances off the most recently COMPLETED session.
+const WO_SPLIT_CYCLE = ['Push', 'Pull', 'Arms & Shoulders', 'Legs'];
+const WO_SPLIT_MUSCLES = {
+  'Push':             ['Chest', 'Shoulders', 'Triceps'],
+  'Pull':             ['Back', 'Biceps', 'Rear Delts'],
+  'Arms & Shoulders': ['Shoulders', 'Biceps', 'Triceps'],
+  'Legs':             ['Quads', 'Hamstrings', 'Glutes', 'Calves'],
+};
+
+// Map a completed session onto one of the four cycle categories.
+// Prefers the explicit splitCategory saved on newer sessions; otherwise infers
+// from muscle groups / split name so legacy history still advances correctly.
+function classifySplit(session) {
+  if (!session) return null;
+  if (session.splitCategory && WO_SPLIT_CYCLE.includes(session.splitCategory)) return session.splitCategory;
+  const m = (session.muscleGroups || []).map(x => String(x).toLowerCase());
+  const has = k => m.some(x => x.includes(k));
+  if (has('quad') || has('hamstring') || has('glute') || has('calf') || has('calv') || has('leg')) return 'Legs';
+  if (has('chest')) return 'Push';
+  if (has('back') || has('lat')) return 'Pull';
+  if (has('shoulder') || has('bicep') || has('tricep') || has('delt') || has('arm')) return 'Arms & Shoulders';
+  const n = (session.splitName || '').toLowerCase();
+  if (n.includes('push')) return 'Push';
+  if (n.includes('pull')) return 'Pull';
+  if (n.includes('leg')) return 'Legs';
+  if (n.includes('arm') || n.includes('shoulder')) return 'Arms & Shoulders';
+  return null;
+}
+
+// The split to program today = the one after the last completed session's split.
+function getNextSplit() {
+  const hist = woHistory();
+  const last = hist.length ? hist[hist.length - 1] : null;
+  const lastCat = classifySplit(last);
+  if (!lastCat) return WO_SPLIT_CYCLE[0]; // no usable history → start at Push
+  const idx = WO_SPLIT_CYCLE.indexOf(lastCat);
+  return WO_SPLIT_CYCLE[(idx + 1) % WO_SPLIT_CYCLE.length];
+}
+
 // ── Ghost Sets: Get last performed sets for an exercise ──
 function getExerciseGhostSets(exerciseName) {
   const hist = woHistory();
@@ -4363,6 +4404,8 @@ async function generateWorkout(){
   const rec=_woRecovery||'unknown';
   const sleepSnap=whoopSnaps[0]||{};
   const recentSessions=getRecentSessions(7);
+  const todaySplit=getNextSplit();
+  const todayMuscles=WO_SPLIT_MUSCLES[todaySplit];
   const pbs=woPBs();
   const daysAgo=getDaysSinceMuscle();
   const recentExercises = getRecentExercises(240); // 10 days
@@ -4458,7 +4501,14 @@ JSON format (this is a FORMAT example only — do NOT copy its split/exercises; 
 - Yesterday's nutrition: ${Math.round(yest.p||0)}g protein, ${Math.round(yest.cal||0)} kcal, ${Math.round(yest.c||0)}g carbs
 
 MOST RECENT SESSION: ${recentSessions[0]?`${recentSessions[0].splitName} — ${(recentSessions[0].muscleGroups||[]).join(', ')||'?'}`:'None yet'}
-→ Today MUST target a DIFFERENT split focus. If the last session was Push (chest/shoulders/triceps), today is Pull (back/biceps) or Legs — do NOT program chest again. Rotate the split; never hand back the same day the user just completed.
+
+═══ TODAY'S SPLIT IS FIXED (NON-NEGOTIABLE) ═══
+The split rotation is hardcoded: Push → Pull → Arms & Shoulders → Legs → (repeat).
+TODAY = ${todaySplit}. Target ONLY these muscle groups: ${todayMuscles.join(', ')}.
+- "muscleGroups" in your JSON MUST be exactly: ${JSON.stringify(todayMuscles)}
+- "splitName" MUST reflect the ${todaySplit} day (e.g. "${todaySplit} — ...").
+- Every exercise MUST train one of those muscle groups. Do NOT program any other split. Do NOT substitute a different day.
+Your ONLY job is choosing the best exercises for a ${todaySplit} day given recovery, PBs, and variance.
 
 RECENT TRAINING (last 7 sessions):
 ${histSummary||'No recent sessions logged'}
@@ -4484,7 +4534,13 @@ Generate a workout split for today. Return ONLY valid JSON.`;
     if(!_woPlan || !_woPlan.exercises){
       throw new Error('Could not parse workout plan');
     }
-    
+
+    // Pin the rotation category so the next session advances deterministically,
+    // regardless of how the AI phrased splitName/muscleGroups.
+    _woPlan.splitCategory = todaySplit;
+    if(!_woPlan.splitName) _woPlan.splitName = todaySplit;
+    if(!Array.isArray(_woPlan.muscleGroups) || !_woPlan.muscleGroups.length) _woPlan.muscleGroups = todayMuscles.slice();
+
     // Auto-append a core exercise if none present
     _woPlan = appendCoreExercise(_woPlan);
     
@@ -4546,6 +4602,7 @@ function startWorkout(){
     date: new Date().toISOString(),
     plan: _woPlan,
     splitName: _woPlan.splitName,
+    splitCategory: _woPlan.splitCategory||null,
     muscleGroups: _woPlan.muscleGroups||[],
     inProgress: true,
     startTime: Date.now(),
