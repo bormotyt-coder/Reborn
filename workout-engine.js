@@ -42,6 +42,7 @@
     hg: 'Hamstrings', hc: 'Hamstrings',
     gt: 'Glutes', gb: 'Glutes', ga: 'Glutes',
     ca: 'Calves',
+    tr: 'Back',
     cx: 'Core', cf: 'Core', cr: 'Core', cl: 'Core',
   };
   const PAT_LABEL = {
@@ -49,7 +50,7 @@
     vp: 'vertical pull', hr: 'row', po: 'lat isolation',
     rd: 'rear-delt', ohp: 'overhead press', lat: 'lateral raise',
     bl: 'lengthened curl', bs: 'curl', to: 'overhead triceps', tp: 'pushdown', tc: 'triceps press',
-    sq: 'squat', lp: 'leg press', lg: 'single-leg', le: 'quad isolation',
+    tr: 'trap', sq: 'squat', lp: 'leg press', lg: 'single-leg', le: 'quad isolation',
     hg: 'hinge', hc: 'leg curl', gt: 'hip thrust', gb: 'glute hinge', ga: 'abduction', ca: 'calf',
     cx: 'anti-extension', cf: 'flexion', cr: 'anti-rotation', cl: 'lateral core',
   };
@@ -73,6 +74,16 @@
     ['High-to-Low Cable Fly', 'fly', 'i', 'cable', 1, 0, 'Soft elbows, sweep down and across to your hips — squeeze the lower chest fibres together at the bottom.'],
     ['Pec Deck Fly', 'fly', 'i', 'mach', 1, 1, 'Sit tall with your chest proud and lead with your elbows, not your hands — feel the pecs squeeze together at the midline.'],
     ['Svend Press', 'fly', 'i', 'other', 1, 0, 'Squeeze the plates together as hard as you can through the whole rep — that constant tension lights up the inner chest.'],
+    ['Decline Barbell Bench Press', 'pf', 'c', 'bb', 3, 0, 'Set a slight decline and touch the bar to your lower chest — shoulder blades pinned, squeeze the lower pecs to drive it up. The shorter range lets you load it heavy.'],
+    ['Decline Dumbbell Press', 'pf', 'c', 'db', 2, 0, 'Lower the dumbbells beside your lower chest with elbows at about 45° and press up and in — feel the lower pecs shorten at the top.'],
+    ['Dumbbell Floor Press', 'pf', 'c', 'db', 2, 0, 'Lower until your triceps touch the floor, pause for a beat, then press — the dead stop keeps the pecs and triceps honest and the shoulders safe.'],
+    ['Standing Cable Chest Press', 'pf', 'c', 'cable', 1, 0, 'Stagger your stance and press forward and slightly in — the cable never lets up, so squeeze the pecs together at lockout.'],
+    ['Plate-Loaded Chest Press', 'pf', 'c', 'mach', 1, 1, 'Set the handles low enough for a deep pec stretch, then drive through the chest — independent arms let you chase failure safely.'],
+    ['Deficit Push-Up', 'pf', 'c', 'bw', 1, 1, 'Hands on plates or handles so your chest drops below them — control the deep stretch, then push the floor away and squeeze the pecs.', { bw: 1 }],
+    ['Reverse-Grip Bench Press', 'pi', 'c', 'bb', 3, 0, 'Underhand grip with elbows tucked — lower to the lower chest and press up and back, feeling the upper pecs (and biceps) share the load.'],
+    ['Seated Cable Fly', 'fly', 'i', 'cable', 1, 1, 'Chest tall against the pad with soft elbows — take a wide arc until the pecs are stretched, then bring the handles together in front of your sternum.'],
+    ['Incline Dumbbell Fly', 'fly', 'i', 'db', 1, 1, 'Soft elbows and a wide arc — lower until the upper pecs are stretched, then hug the dumbbells up and stop where the tension fades.'],
+    ['Dumbbell Fly', 'fly', 'i', 'db', 1, 1, 'Think of hugging a barrel: open until you feel a deep chest stretch (not a shoulder strain), then squeeze the pecs to sweep the dumbbells together.'],
 
     // ── Back ──
     ['Pull-Up', 'vp', 'c', 'bw', 2, 1, 'Think elbows to back pockets — drive your chest to the bar and feel your lats, not your biceps, doing the pulling.', { bw: 1 }],
@@ -90,12 +101,35 @@
     ['Cable Pullover (Straight-Arm)', 'po', 'i', 'cable', 1, 1, 'Arms nearly straight, sweep the bar to your thighs — feel your lats stretch overhead and squeeze down through the armpits.'],
     ['Dumbbell Pullover', 'po', 'i', 'db', 1, 1, 'Lie across a bench and lower the dumbbell behind your head with soft elbows — feel the lats stretch, then pull it back over your chest.'],
     ['Kneeling Cable Lat Prayer', 'po', 'i', 'cable', 1, 1, 'Hinge forward with straight arms and sweep the rope to your thighs — keep the ribs down and feel the lats, not the triceps.'],
+    ['Underhand Lat Pulldown', 'vp', 'c', 'cable', 1, 1, 'Shoulder-width underhand grip — lean back slightly and pull your elbows down into your hips, feeling the lower lats and biceps squeeze.'],
+    ['Close-Grip V-Bar Pulldown', 'vp', 'c', 'cable', 1, 1, 'Stretch fully overhead, then drive the elbows down and back past your ribs — squeeze the lats like you are pulling them into your back pockets.'],
+    ['Neutral-Grip Pull-Up', 'vp', 'c', 'bw', 2, 1, 'Palms facing each other — pull your elbows to your ribs and your chest up to the handles, feeling the lats work through a full hang.', { bw: 1 }],
+    ['Wide-Grip Pull-Up', 'vp', 'c', 'bw', 2, 1, 'Hands just outside shoulder width — start by pulling the shoulder blades down, then drive the elbows down and in so the lats, not the arms, do the work.', { bw: 1 }],
+    ['Plate-Loaded Pulldown Machine', 'vp', 'c', 'mach', 1, 1, 'Independent arms let each lat work separately — reach long for the stretch and drive both elbows down toward your hips.'],
+    ['Pendlay Row', 'hr', 'c', 'bb', 3, 0, 'The bar starts dead on the floor every rep with a flat back — explode it to your lower chest and feel the lats and upper back fire together.'],
+    ['Underhand Barbell Row', 'hr', 'c', 'bb', 3, 0, 'Underhand grip and a flat back — pull the bar to your belly button and drive the elbows past your torso to hit the lower lats.'],
+    ['Seal Row', 'hr', 'c', 'bb', 2, 1, 'Lie flat on a high bench so momentum is impossible — let the lats stretch at the bottom, then row to your ribs and squeeze the shoulder blades.'],
+    ['Iso-Lateral High Row', 'hr', 'c', 'mach', 1, 1, 'Chest on the pad, reach forward for the lat stretch, then pull each elbow down and back — feel the upper back and lats, not the biceps.'],
+    ['Wide-Grip Seated Cable Row', 'hr', 'c', 'cable', 1, 0, 'Pull the bar to your upper abdomen with the elbows flared — feel the rear delts and mid-traps squeeze your shoulder blades together.'],
+    ['Single-Arm Cable Row', 'hr', 'c', 'cable', 1, 1, 'Rotate slightly as you reach for a deep lat stretch, then drive your elbow to your hip — the cable keeps tension for the whole rep.'],
+    ['Machine Chest-Supported Row', 'hr', 'c', 'mach', 1, 0, 'Pad against your chest so only the back can work — pull your elbows behind you and hold the squeeze for a beat.'],
+    ['Standing T-Bar Row', 'hr', 'c', 'bb', 3, 0, 'Hinge with a flat back and a neutral grip — row the handle to your lower chest and drive the elbows back to thicken the lats and mid-back.'],
+    ['Rack Pull', 'hr', 'c', 'bb', 3, 0, 'Bar at knee height, chest proud and lats tight — drive your hips through and shrug at the top, feeling the upper back and traps lock it out.'],
+    ['Inverted Row', 'hr', 'c', 'bw', 1, 0, 'Body rigid under a bar — pull your chest to it and squeeze the shoulder blades together; walk your feet forward to make it harder.', { bw: 1 }],
+    ['Barbell Shrug', 'tr', 'i', 'bb', 1, 0, 'Straight up and down — no rolling — and hold the top for a second; feel the upper traps squeeze toward your ears.'],
+    ['Dumbbell Shrug', 'tr', 'i', 'db', 1, 0, 'Arms heavy at your sides, shrug straight up and pause — think about touching your shoulders to your ears while keeping your neck long.'],
+    ['Cable Shrug', 'tr', 'i', 'cable', 1, 1, 'Low pulleys keep constant tension — let the traps stretch down, then shrug up and slightly back and squeeze at the top.'],
+    ['Prone Y-Raise', 'tr', 'i', 'db', 1, 1, 'Chest on an incline bench, thumbs up, raise the arms into a Y — feel the lower traps between your shoulder blades pull the arms up.'],
 
     // ── Rear delts ──
     ['Reverse Pec Deck', 'rd', 'i', 'mach', 1, 0, 'Lead with your elbows and think about pushing your hands apart — feel the back of your shoulders, not your traps, doing the work.'],
     ['Face Pull (Rope)', 'rd', 'i', 'cable', 1, 0, 'Pull the rope toward your forehead and rotate your thumbs behind you — rear delts and external rotators should burn.'],
     ['Cable Rear Delt Fly', 'rd', 'i', 'cable', 1, 1, 'Cross the cables and sweep out wide with soft elbows — feel the rear delts stretch across your body, then squeeze.'],
     ['Incline Bench Rear Delt Raise', 'rd', 'i', 'db', 1, 1, 'Chest on the incline bench, pinkies up — raise out to the sides and feel the back of the shoulder, not the upper back.'],
+    ['Seated Dumbbell Rear Delt Raise', 'rd', 'i', 'db', 1, 0, 'Fold forward over your thighs and raise the dumbbells wide with the elbows leading — feel the back of the shoulder, not the traps.'],
+    ['Bent-Over Dumbbell Rear Delt Fly', 'rd', 'i', 'db', 1, 0, 'Hinge to flat with the arms hanging, then sweep the dumbbells out wide — lead with the elbows and pinch the rear delts at the top.'],
+    ['Prone Incline Dumbbell Rear Delt Row', 'rd', 'i', 'db', 1, 1, 'Chest on a 45° bench, row the dumbbells with the elbows flared wide — the rear delts and mid-back do the work.'],
+    ['Band Pull-Apart', 'rd', 'i', 'other', 1, 0, 'Arms straight, pull the band apart to your chest and squeeze the shoulder blades — slow on the return and keep your ribs down.'],
 
     // ── Shoulders ──
     ['Barbell Overhead Press', 'ohp', 'c', 'bb', 3, 0, 'Squeeze your glutes and brace your abs, press straight up and shrug at lockout — front and side delts drive the bar.'],
@@ -108,6 +142,15 @@
     ['Lean-Away Cable Lateral Raise', 'lat', 'i', 'cable', 1, 1, 'Hold the upright and lean away — the longer lever loads the side delt in its most stretched position.'],
     ['Machine Lateral Raise', 'lat', 'i', 'mach', 1, 0, 'Push with your elbows against the pads, shoulders down away from your ears — the side delts do all the lifting.'],
     ['Cable Y-Raise', 'lat', 'i', 'cable', 1, 1, 'Raise your arms into a Y — thumbs up, shoulder blades down — and feel the delts and lower traps working together.'],
+    ['Seated Barbell Overhead Press', 'ohp', 'c', 'bb', 3, 0, 'Back supported and abs braced — press the bar in a straight line overhead and feel the delts drive it to lockout.'],
+    ['Standing Dumbbell Shoulder Press', 'ohp', 'c', 'db', 2, 0, 'Dumbbells at ear height with your ribs down — press up and slightly together, squeezing the delts at lockout.'],
+    ['Single-Arm Dumbbell Shoulder Press', 'ohp', 'c', 'db', 2, 0, 'One arm at a time lets you brace harder — press straight up and feel the delt on that side drive it.'],
+    ['Plate-Loaded Shoulder Press', 'ohp', 'c', 'mach', 1, 0, 'Independent arms on a fixed path — press up and slightly in, stopping just short of lockout so the delts never rest.'],
+    ['Half-Kneeling Landmine Press', 'ohp', 'c', 'other', 2, 0, 'Brace tall on one knee and press the bar up and forward along its arc — feel the front delt and serratus drive it without shoulder pinch.'],
+    ['Seated Dumbbell Lateral Raise', 'lat', 'i', 'db', 1, 0, 'Seated to remove swing — raise your elbows out to the side until the arms are parallel and feel the side delts burn.'],
+    ['Bent-Arm Lateral Raise', 'lat', 'i', 'db', 1, 0, 'Elbows bent about 90° — lead with the elbows to shoulder height; the shorter lever makes the side delts fire harder.'],
+    ['Prone Incline Lateral Raise', 'lat', 'i', 'db', 1, 1, 'Chest on an incline bench, raise the arms out to the side — the delts work at their stretched position with no momentum to cheat with.'],
+    ['Single-Arm Cable Lateral Raise (Behind the Back)', 'lat', 'i', 'cable', 1, 1, 'Start with the cable crossing behind your body for a deep stretch — raise your elbow out and up and feel the side delt from stretch to squeeze.'],
 
     // ── Biceps ──
     ['Incline Dumbbell Curl', 'bl', 'i', 'db', 1, 1, 'Let your arms hang behind your torso for a deep biceps stretch, then curl without swinging and squeeze the peak hard.'],
@@ -121,9 +164,18 @@
     ['Hammer Curl', 'bs', 'i', 'db', 1, 0, 'Neutral grip, curl slightly across the body — feel the brachialis and outer biceps work while the elbows stay still.'],
     ['Cable Hammer Curl (Rope)', 'bs', 'i', 'cable', 1, 0, 'Constant cable tension — keep elbows pinned and pull the rope apart at the top.'],
     ['Cable Curl (Straight Bar)', 'bs', 'i', 'cable', 1, 0, 'Curl up, squeeze for a beat, and lower slowly without ever letting the cable go slack.'],
+    ['Standing Alternating Dumbbell Curl', 'bs', 'i', 'db', 1, 0, 'Turn your palm up as you curl and squeeze the biceps at the top — elbow pinned, lowering slowly so every rep is strict.'],
+    ['Barbell Curl (Straight Bar)', 'bs', 'i', 'bb', 1, 0, 'Elbows pinned just ahead of your ribs — curl without swinging, squeeze for a beat at the top and lower for two seconds.'],
+    ['Cross-Body Hammer Curl', 'bs', 'i', 'db', 1, 0, 'Curl the dumbbell across your chest toward the opposite shoulder — feel the brachialis and outer biceps work.'],
+    ['Zottman Curl', 'bs', 'i', 'db', 1, 0, 'Curl up with palms up, rotate to palms down and lower slowly — the biceps lift it and the forearms control the way down.'],
+    ['Concentration Curl', 'bs', 'i', 'db', 1, 0, 'Elbow braced against your inner thigh — curl and twist your pinky up at the top for a hard peak squeeze.'],
+    ['Reverse Curl (EZ-Bar)', 'bs', 'i', 'bb', 1, 0, 'Overhand grip with the elbows pinned — curl and feel the forearms and brachialis (the muscle that adds arm thickness) work.'],
+    ['Drag Curl', 'bs', 'i', 'bb', 1, 0, 'Drag the bar up your torso with the elbows travelling back — it takes the shoulders out and keeps the biceps loaded.'],
+    ['Double-Biceps Cable Curl', 'bs', 'i', 'cable', 1, 0, 'Arms out to the sides like a double-biceps pose — curl the handles toward your head and squeeze hard at the peak.'],
+    ['Single-Arm Dumbbell Preacher Curl', 'bl', 'i', 'db', 1, 1, 'Upper arm flat on the pad — lower until the biceps are fully stretched, then curl without letting the elbow lift.'],
 
     // ── Triceps ──
-    ['Overhead Cable Triceps Extension', 'to', 'i', 'cable', 1, 1, 'Elbows by your ears, let the rope stretch the long head behind you, then extend fully and squeeze.'],
+    ['Overhead Cable Triceps Extension', 'to', 'i', 'cable', 1, 1, 'Set the pulley LOW (it grows more triceps than a high pulley) — elbows by your ears, let the rope stretch the long head behind you, then extend fully and squeeze.'],
     ['Overhead Dumbbell Triceps Extension', 'to', 'i', 'db', 1, 1, 'Lower the dumbbell deep behind your head until the triceps are stretched, then extend without flaring the elbows.'],
     ['EZ-Bar Skullcrusher', 'to', 'i', 'bb', 1, 1, 'Lower toward your forehead or just behind it for extra stretch — elbows fixed, extend by squeezing the triceps.'],
     ['Dumbbell Skullcrusher', 'to', 'i', 'db', 1, 1, 'Lower the dumbbells beside your head with elbows fixed — feel the long head stretch, then extend and squeeze.'],
@@ -137,6 +189,15 @@
     ['Close-Grip Bench Press', 'tc', 'c', 'bb', 3, 0, 'Hands just inside shoulder width, elbows tucked — press by squeezing the triceps, not by flaring.'],
     ['Tricep Dip (Upright)', 'tc', 'c', 'bw', 2, 1, 'Stay upright with elbows back and in — drive up by locking out the triceps and squeezing at the top.', { bw: 1 }],
     ['Machine Triceps Dip', 'tc', 'c', 'mach', 1, 0, 'Elbows tucked, press down through your triceps and fully lock out — squeeze at the bottom of every rep.'],
+    ['Overhead EZ-Bar Triceps Extension', 'to', 'i', 'bb', 1, 1, 'Elbows pointing up and in — lower the bar behind your head until the long head is stretched, then extend without letting the elbows flare.'],
+    ['Cable Skullcrusher', 'to', 'i', 'cable', 1, 1, 'Lie back with the cable pulling over your head — lower toward your forehead, feel the long-head stretch and extend with the triceps.'],
+    ['Seated Triceps Extension Machine', 'tp', 'i', 'mach', 1, 0, 'Elbows tucked on the pads — extend fully and squeeze the triceps hard at lockout, then control the return.'],
+    ['Reverse-Grip Pushdown', 'tp', 'i', 'cable', 1, 0, 'Underhand grip with the elbows pinned — push down and feel the medial head squeeze as you lock out.'],
+    ['Cable Triceps Kickback', 'tp', 'i', 'cable', 1, 0, 'Hinge forward with the elbow pinned high — extend fully and squeeze; the cable keeps tension where dumbbells fade.'],
+    ['Dumbbell Triceps Kickback', 'tp', 'i', 'db', 1, 0, 'Upper arm parallel to the floor and still — extend and squeeze the triceps at the top without swinging.'],
+    ['Diamond Push-Up', 'tc', 'c', 'bw', 1, 0, 'Hands close under your chest with the elbows tracking back — press up by squeezing the triceps and finish with a full lockout.', { bw: 1 }],
+    ['Smith Close-Grip Bench Press', 'tc', 'c', 'smith', 2, 0, 'Hands just inside shoulder width and elbows tucked — the fixed bar lets you grind the triceps to failure safely.'],
+    ['Bench Dip', 'tc', 'c', 'bw', 1, 0, 'Hips close to the bench and elbows pointing back — lower only as far as your shoulders are comfortable and press up through the triceps.', { bw: 1 }],
 
     // ── Quads ──
     ['Barbell Back Squat', 'sq', 'c', 'bb', 3, 0, 'Push the floor away and drive through your whole foot — feel your quads and glutes power you out of the hole.'],
@@ -152,7 +213,18 @@
     ['Forward-Lean Step-Up', 'lg', 'c', 'db', 2, 0, 'Whole foot on the box and a slight forward lean — drive through the heel and don\'t push off the back leg.'],
     ['Leg Extension', 'le', 'i', 'mach', 1, 1, 'Squeeze your quads at the top for a full second, then lower slowly and feel the stretch at the bottom.'],
     ['Single-Leg Extension', 'le', 'i', 'mach', 1, 1, 'One leg at a time — squeeze the quad at the top for a full second and lower slowly into the stretch.'],
-    ['Sissy Squat (Assisted)', 'le', 'i', 'bw', 1, 1, 'Hold a post for balance, lean back and let the knees travel forward — feel the quads stretch hard, then drive back up.', { bw: 1 }],
+    ['Pendulum Squat', 'sq', 'c', 'mach', 2, 1, 'The arc lets you sink deep with constant quad tension — drive through your whole foot and feel the quads stretch at the bottom.'],
+    ['Belt Squat', 'sq', 'c', 'mach', 1, 1, 'The load hangs from your hips so your spine is free — sit deep with an upright torso and feel only quads and glutes working.'],
+    ['V-Squat Machine', 'sq', 'c', 'mach', 2, 1, 'Back against the pad, feet shoulder-width — lower to a deep knee bend and drive up through the mid-foot, feeling the quads work.'],
+    ['Goblet Squat', 'sq', 'c', 'db', 1, 1, 'Hold the weight at your chest with the elbows inside your knees — sit between your legs and feel the quads drive you up tall.'],
+    ['Narrow-Stance Leg Press', 'lp', 'c', 'mach', 1, 1, 'Feet low and close — lower until the knees are deeply bent and drive through the whole foot, feeling the outer quads.'],
+    ['Single-Leg Leg Press', 'lp', 'c', 'mach', 1, 1, 'One leg at a time to expose imbalances — lower deep under control and drive through the mid-foot without letting the hips rotate.'],
+    ['Deficit Reverse Lunge', 'lg', 'c', 'db', 2, 1, 'Front foot on a small step so the knee travels deeper — feel the front quad and glute stretch, then drive through the front heel.'],
+    ['Curtsy Lunge', 'lg', 'c', 'db', 2, 0, 'Step back and across behind you with the weight on the front heel — the glute and outer quad of the front leg drive you up.'],
+    ['Static Dumbbell Split Squat', 'lg', 'c', 'db', 2, 1, 'Stay in a staggered stance and lower straight down — feel the front quad and glute stretch and fire with no hopping.'],
+    ['Smith Machine Split Squat', 'lg', 'c', 'smith', 2, 1, 'The fixed path takes balance out of it — sink until the front thigh is parallel and drive through the front heel.'],
+    ['Lateral Lunge', 'lg', 'c', 'db', 2, 0, 'Step wide and sit back into one hip — feel the glute and adductor stretch, then drive back to standing through the heel.'],
+    ['Reverse Nordic Curl', 'le', 'i', 'bw', 2, 1, 'Kneel and lean back with a straight line from knee to shoulder — feel the quads stretch hard under your body weight, then pull back up.', { bw: 1 }],
 
     // ── Hamstrings ──
     ['Barbell Romanian Deadlift', 'hg', 'c', 'bb', 2, 1, 'Push your hips back until you feel a deep hamstring stretch, then drive them forward — keep the bar dragging against your thighs.'],
@@ -165,6 +237,15 @@
     ['Lying Leg Curl', 'hc', 'i', 'mach', 1, 0, 'Hips down on the pad, curl toward your glutes — squeeze at the top and lower slowly.'],
     ['Single-Leg Seated Leg Curl', 'hc', 'i', 'mach', 1, 1, 'One leg at a time in the lengthened position — curl by squeezing the hamstring and take three seconds to return.'],
     ['Single-Leg Lying Leg Curl', 'hc', 'i', 'mach', 1, 0, 'Hips glued to the pad, curl one leg toward your glute — squeeze at the top and lower slowly.'],
+    ['Stiff-Leg Deadlift', 'hg', 'c', 'bb', 2, 1, 'Legs nearly straight with the hips back — feel the whole hamstring stretch as the bar slides down your legs, then drive the hips forward.'],
+    ['Good Morning', 'hg', 'c', 'bb', 3, 1, 'Bar on your back with soft knees — hinge until the hamstrings are taut and your back is flat, then squeeze the glutes to stand tall.'],
+    ['B-Stance Romanian Deadlift', 'hg', 'c', 'db', 2, 1, 'Back foot as a kickstand with most weight on the front leg — hinge until the front hamstring is stretched, then squeeze the glute to stand.'],
+    ['Trap Bar Deadlift', 'hg', 'c', 'bb', 3, 0, 'Chest up, push the floor away with an upright torso — drive the hips through and feel the quads, glutes and hamstrings lock it out together.'],
+    ['Nordic Hamstring Curl', 'hc', 'i', 'bw', 2, 1, 'Kneel with your ankles anchored and lower your torso as slowly as you can — resist with the hamstrings, then push off the floor to come back up.', { bw: 1 }],
+    ['Glute-Ham Raise', 'hc', 'i', 'mach', 2, 1, 'Hips locked at the pad, lower with a straight spine until the hamstrings are stretched — curl back up with hamstrings and glutes.', { bw: 1 }],
+    ['Standing Single-Leg Curl', 'hc', 'i', 'mach', 1, 0, 'Hips pressed into the pad, curl the heel to your glute and squeeze — take two seconds to lower.'],
+    ['Slider Leg Curl', 'hc', 'i', 'bw', 1, 0, 'Bridge up, slide your heels out slowly and curl back in — the hamstrings control the stretch and squeeze at the top.', { bw: 1 }],
+    ['Stability Ball Leg Curl', 'hc', 'i', 'bw', 1, 0, 'Hips high in a bridge, roll the ball out and back — keep the hips up so the hamstrings and glutes stay loaded.', { bw: 1 }],
 
     // ── Glutes ──
     ['Barbell Hip Thrust', 'gt', 'c', 'bb', 2, 0, 'Chin tucked, ribs down — drive through your heels and squeeze your glutes hard at the top for a full second.'],
@@ -174,12 +255,23 @@
     ['Cable Pull-Through', 'gb', 'i', 'cable', 1, 1, 'Hinge back until you feel the hamstring stretch, then snap your hips forward and squeeze the glutes.'],
     ['Hip Abduction Machine (Lean Forward)', 'ga', 'i', 'mach', 1, 0, 'Lean forward slightly and push out with the glute — feel the outer glutes burn at the end range.'],
     ['Cable Glute Kickback', 'ga', 'i', 'cable', 1, 0, 'Slight hinge and a soft knee — kick back by squeezing the glute, not by arching the lower back.'],
+    ['Machine Hip Thrust', 'gt', 'c', 'mach', 1, 0, 'Chin tucked and ribs down — drive through the heels and squeeze the glutes at the top for a full second; the machine makes heavy loading simple.'],
+    ['Barbell Glute Bridge', 'gt', 'c', 'bb', 2, 0, 'Shoulders on the floor and knees at 90° — drive the hips up and squeeze the glutes hard at lockout.'],
+    ['Dumbbell Hip Thrust', 'gt', 'c', 'db', 2, 0, 'Upper back on the bench with the dumbbell on your hips — drive up and lock out with a hard glute squeeze.'],
+    ['Reverse Hyperextension', 'gb', 'i', 'mach', 1, 1, 'Hips on the pad, swing the legs up with a glute squeeze — control the stretch down with no lower-back arch.'],
+    ['Kettlebell Swing', 'gb', 'c', 'other', 2, 0, 'Hinge back and snap the hips forward — the glutes and hamstrings drive the bell and the arms just hang on.'],
+    ['Seated Hip Abduction Machine', 'ga', 'i', 'mach', 1, 0, 'Lean forward slightly and push the pads apart with your glutes — feel the outer glutes burn and control the return.'],
+    ['Cable Hip Abduction', 'ga', 'i', 'cable', 1, 0, 'Stand tall and take the leg out to the side with a soft knee — keep your hips square and squeeze the outer glute at the top.'],
 
     // ── Calves ──
     ['Standing Calf Raise', 'ca', 'i', 'mach', 1, 1, 'Full stretch at the bottom with a one-second pause, then rise as high as you can — feel your calves, not your toes.'],
     ['Seated Calf Raise', 'ca', 'i', 'mach', 1, 1, 'Bent knee shifts the load to the soleus — pause at the stretch, rise slowly and squeeze at the top.'],
     ['Smith Machine Calf Raise', 'ca', 'i', 'smith', 1, 1, 'Balls of the feet on a plate — drop the heels for a deep stretch, pause, then press up onto your toes.'],
     ['Single-Leg Dumbbell Calf Raise', 'ca', 'i', 'db', 1, 1, 'Hold a wall for balance — sink into a deep heel stretch and rise straight up, squeezing the calf at the top.', { bw: 1 }],
+    ['Donkey Calf Raise', 'ca', 'i', 'mach', 1, 1, 'Hips hinged forward for a huge calf stretch — pause at the bottom, then rise as high as you can onto your toes.'],
+    ['Leg Press Calf Raise', 'ca', 'i', 'mach', 1, 1, 'Legs straight with the balls of your feet on the platform — sink for a deep stretch, pause, then press up powerfully through the big toe.'],
+    ['Single-Leg Calf Raise (Step)', 'ca', 'i', 'bw', 1, 1, 'Heel off a step — drop for a full stretch, pause, then rise as high as possible and squeeze.', { bw: 1 }],
+    ['Tibialis Raise', 'ca', 'i', 'bw', 1, 0, 'Back against a wall with your heels out — pull your toes toward your shins and squeeze; strong shins protect the knees and ankles.', { bw: 1 }],
 
     // ── Core (prescribed individually) ──
     ['Plank', 'cx', 'i', 'bw', 1, 0, 'Keep a straight line from head to heels — squeeze your glutes and pull your belly button toward your spine.', { core: 1, bw: 1, unit: 'sec', reps: '30-45s', sets: 3, rest: 30 }],
@@ -192,7 +284,49 @@
     ['Cable Crunch', 'cf', 'i', 'cable', 1, 1, 'Curl your spine bringing elbows toward knees — squeeze the abs hard at the bottom and don\'t sit back onto your hips.', { core: 1, reps: '12-15', sets: 3, rest: 45 }],
     ['Pallof Press', 'cr', 'i', 'cable', 1, 0, 'Press straight out and resist the rotation — feel your obliques working to keep you square.', { core: 1, reps: '10 each side', sets: 3, rest: 30 }],
     ['Russian Twist', 'cr', 'i', 'bw', 1, 0, 'Lean back slightly and rotate from the ribcage, not the arms — keep your feet up for extra challenge.', { core: 1, bw: 1, reps: '15 each side', sets: 3, rest: 30 }],
+    ['Reverse Crunch', 'cf', 'i', 'bw', 1, 0, 'Curl your hips off the bench toward your ribs — feel the lower abs lift the pelvis, then lower slowly without swinging.', { core: 1, bw: 1, reps: '12-15', sets: 3, rest: 45 }],
+    ['Vertical Leg Raise (Captain Chair)', 'cf', 'i', 'bw', 1, 0, 'Forearms on the pads with your back flat — curl the pelvis up as the knees come to your chest, feeling the abs and not the hip flexors.', { core: 1, bw: 1, reps: '10-15', sets: 3, rest: 45 }],
+    ['Toes-to-Bar', 'cf', 'i', 'bw', 2, 0, 'Hang tight and curl your pelvis up as the toes drive to the bar — control the descent to keep tension through the abs.', { core: 1, bw: 1, reps: '6-10', sets: 3, rest: 60 }],
+    ['Bicycle Crunch', 'cr', 'i', 'bw', 1, 0, 'Shoulder blades off the floor, slow elbow-to-knee rotations — feel the obliques twist while the abs stay braced.', { core: 1, bw: 1, reps: '15 each side', sets: 3, rest: 30 }],
+    ['Cable Woodchop', 'cr', 'i', 'cable', 1, 0, 'Rotate from the ribcage, not the arms — pull diagonally across your body, pivoting the back foot, and feel the obliques drive it.', { core: 1, reps: '10 each side', sets: 3, rest: 30 }],
+    ['Bird Dog', 'cr', 'i', 'bw', 1, 0, 'Extend the opposite arm and leg while keeping your hips square — pause at the top and keep the spine perfectly still.', { core: 1, bw: 1, reps: '10 each side', sets: 3, rest: 30 }],
+    ['Copenhagen Plank', 'cl', 'i', 'bw', 2, 0, 'Top foot on a bench, body in a straight line — lift the hips and hold; the inner thigh and obliques work hard to keep you up.', { core: 1, bw: 1, unit: 'sec', reps: '15-25s each', sets: 3, rest: 45 }],
+    ['Stability Ball Rollout', 'cx', 'i', 'other', 1, 0, 'Forearms on the ball, roll out only as far as you can keep the ribs down — feel the abs brace against the extension.', { core: 1, bw: 1, reps: '10-12', sets: 3, rest: 45 }],
+    ['L-Sit Hold', 'cf', 'i', 'bw', 2, 0, 'Press down tall through your hands and lift the legs straight out — squeeze the abs and quads for the whole hold.', { core: 1, bw: 1, unit: 'sec', reps: '10-20s', sets: 3, rest: 45 }],
   ];
+
+  // ── Evidence weighting ───────────────────────────────────────────────────
+  // A gentle selection nudge (+6 / -8 on a ~100-point scale), never a hard rule — variety
+  // still dominates. "Backed" = ranks at or near the top in published EMG work, hypertrophy
+  // trials or widely-cited coach tier lists (Nippard / Cavaliere quad, glute, chest, back and
+  // biceps rankings; ACE shoulder EMG; Maeo et al. on lengthened-position triceps/hamstring
+  // training; Escamilla et al. ab EMG; barbell-shrug and prone-Y trap EMG). Most of that
+  // evidence is EMG or opinion rather than long-term growth data, hence the small weight.
+  const BACKED = [
+    // chest
+    'Barbell Bench Press', 'Incline Dumbbell Press', 'Dumbbell Bench Press', 'Machine Chest Press', 'Plate-Loaded Chest Press',
+    'Pec Deck Fly', 'Seated Cable Fly', 'Low-to-High Cable Fly',
+    // back
+    'Pull-Up', 'Chin-Up', 'Wide-Grip Lat Pulldown', 'Chest-Supported T-Bar Row', 'Machine Chest-Supported Row', 'Seated Cable Row',
+    'Barbell Bent-Over Row', 'Single-Arm Dumbbell Row', 'Barbell Shrug', 'Prone Y-Raise',
+    // shoulders
+    'Seated Dumbbell Shoulder Press', 'Dumbbell Lateral Raise', 'Cable Lateral Raise', 'Seated Dumbbell Rear Delt Raise',
+    'Reverse Pec Deck', 'Cable Rear Delt Fly',
+    // arms
+    'Bayesian Cable Curl', 'EZ-Bar Preacher Curl', 'Incline Dumbbell Curl', 'Hammer Curl', 'Standing Alternating Dumbbell Curl',
+    'Overhead Cable Triceps Extension', 'Overhead Dumbbell Triceps Extension', 'EZ-Bar Skullcrusher', 'Rope Pushdown',
+    // legs
+    'Hack Squat Machine', 'Pendulum Squat', 'Barbell Back Squat', 'Smith Machine Squat (Heels Elevated)', 'Leg Extension',
+    'Bulgarian Split Squat', 'Walking Lunge', 'Barbell Romanian Deadlift', 'Seated Leg Curl', 'Nordic Hamstring Curl',
+    'Barbell Hip Thrust', 'Machine Hip Thrust', 'Standing Calf Raise', 'Seated Calf Raise', 'Donkey Calf Raise',
+    // core
+    'Hanging Leg Raise', 'Vertical Leg Raise (Captain Chair)', 'Ab Wheel Rollout', 'Reverse Crunch', 'Cable Crunch',
+  ];
+  // Weak overload potential or consistently ranked in the bottom tiers.
+  const WEAKER = [
+    'Cable Glute Kickback', 'Dumbbell Triceps Kickback', 'Bench Dip', 'Russian Twist', 'Svend Press', 'Inverted Row',
+  ];
+  const BACKED_SET = new Set(BACKED), WEAKER_SET = new Set(WEAKER);
 
   // Anything that can't be coaxed into a rep-range progression (loaded on bodyweight).
   const LIB = RAW.map(r => {
@@ -200,6 +334,7 @@
     const e = {
       name: r[0], pat: r[1], role: r[2], equip: r[3], cost: r[4], len: !!r[5], cue: r[6],
       muscle: PAT_MUSCLE[r[1]], bw: !!o.bw, core: !!o.core, unit: o.unit || 'reps',
+      top: BACKED_SET.has(r[0]), low: WEAKER_SET.has(r[0]),
       reps: o.reps || null, sets: o.sets || null, rest: o.rest || null,
     };
     if (e.reps) { const rg = parseRange(e.reps); e.lo = rg[0]; e.hi = rg[1]; }
@@ -353,10 +488,10 @@
       { id: 'L2', pats: ['hr'], role: 'c', anchor: true, warm: true, p: 2 },
       { id: 'L3', pats: ['hr', 'vp'], role: 'c', diff: true, p: 3 },
       { id: 'L4', pats: ['rd'], role: 'i', p: 4 },
-      { id: 'L5', pats: ['po'], role: 'i', len: true, p: 5 },
+      { id: 'L5', pats: ['po', 'tr'], role: 'i', len: true, p: 5 },
       { id: 'L6', pats: ['bl'], role: 'i', len: true, p: 6 },
       { id: 'L7', pats: ['bs'], role: 'i', p: 7 },
-      { id: 'L8', pats: ['bl', 'bs'], role: 'i', p: 9, bonus: true },
+      { id: 'L8', pats: ['tr', 'bl', 'bs'], role: 'i', p: 9, bonus: true },
     ],
     'Arms & Shoulders': [
       { id: 'A1', pats: ['ohp'], role: 'c', anchor: true, warm: true, p: 1 },
@@ -407,6 +542,7 @@
     const lastBySplit = {};
     const cardioKeys = [];
     const blockStart = n - (n % BLOCK_SESSIONS);
+    let lastSessionDaysAgo = null;
 
     for (let i = n - 1; i >= 0; i--) {
       const s = hist[i];
@@ -414,6 +550,7 @@
       const sessAgo = n - 1 - i;
       const t = Date.parse(s.date);
       const daysAgo = isFinite(t) ? Math.max(0, (now - t) / 864e5) : 999;
+      if (lastSessionDaysAgo === null) lastSessionDaysAgo = daysAgo;
       const cat = classifySplit(s);
       if (cat && !lastBySplit[cat]) lastBySplit[cat] = { s, i, inBlock: i >= blockStart };
       if (cardioKeys.length < 3 && s.cardio && s.cardio.machine) cardioKeys.push(cardioKey(s.cardio));
@@ -440,7 +577,7 @@
         if (e.techs.length < 4 && ex.intensityTechnique && ex.intensityTechnique !== 'straight sets') e.techs.push(ex.intensityTechnique);
       });
     }
-    return { byName: byNm, recent6, lastBySplit, cardioKeys, n, blockStart };
+    return { byName: byNm, recent6, lastBySplit, cardioKeys, n, blockStart, lastSessionDaysAgo };
   }
 
   // ── Progression ──────────────────────────────────────────────────────────
@@ -496,9 +633,11 @@
         if (prevMissed) { w = roundW(W * 0.92); kind = 'reset'; }
         else kind = 'hold';
       }
+      // A layoff means time away from TRAINING, not from this one exercise — with a big
+      // library a lift can sit out for weeks while you train every day without losing strength.
       const away = B.lastDaysAgo != null ? B.lastDaysAgo : L.daysAgo;
       if (away > 21 && kind !== 'shift-up' && kind !== 'shift-down' && w > 0) {
-        w = roundW(w * 0.95); kind = 'return';
+        w = roundW(w * (away > 42 ? 0.9 : 0.95)); kind = 'return';
       }
     }
     const targets = [];
@@ -547,7 +686,7 @@
   function buildExercise(e, slot, ctx) {
     const P = prescribe(e, ctx, slot);
     const info = ctx.idx.byName.get(e.key);
-    const prog = progress(e, info ? info.exps : [], { lo: P.lo, hi: P.hi, sets: P.sets, deload: ctx.block.deload, lastDaysAgo: info ? info.daysAgo : null });
+    const prog = progress(e, info ? info.exps : [], { lo: P.lo, hi: P.hi, sets: P.sets, deload: ctx.block.deload, lastDaysAgo: ctx.idx.lastSessionDaysAgo });
     const first = prog.targets ? prog.targets[0] : null;
     const reps = e.core ? e.reps : (P.lo + '-' + P.hi);
     return {
@@ -575,7 +714,8 @@
     s -= 14 * (ctx.idx.recent6.get(e.key) || 0);
     if (info && info.sessAgo < 2) s -= 26;
     if (slot.len && e.len) s += 12;
-    if (slot.anchor && e.cost >= 2) s += 10;   // anchors should be real, progressable lifts
+    if (slot.anchor && (e.cost >= 2 || e.top)) s += 10;   // anchors should be real, progressable lifts
+    if (e.top) s += 6; else if (e.low) s -= 8;            // gentle evidence nudge (see BACKED / WEAKER)
     if (slot.diff && st.pats.has(e.pat)) s -= 30;
     const eq = st.equip[e.equip] || 0;
     if (eq >= 3) s -= 8; else if (eq === 2) s -= 3;
@@ -887,7 +1027,7 @@
     const idx = buildIndex(o.history || [], o.now || Date.now());
     const info = idx.byName.get(e.key);
     const rg = parseRange(o.reps) || [8, 12];
-    const prog = progress(e, info ? info.exps : [], { lo: rg[0], hi: rg[1], sets: o.sets || 3, deload: false, lastDaysAgo: info ? info.daysAgo : null });
+    const prog = progress(e, info ? info.exps : [], { lo: rg[0], hi: rg[1], sets: o.sets || 3, deload: false, lastDaysAgo: idx.lastSessionDaysAgo });
     return { targets: prog.targets, kind: prog.kind, isNew: prog.kind === 'new', lastText: prog.last ? lastText(e, prog.last) : '' };
   }
 
@@ -940,7 +1080,7 @@
   }
 
   const api = {
-    LIB, SPLIT_CYCLE, SPLIT_MUSCLES, PHASES, TECH_NOTES, PAT_MUSCLE, SLOTS,
+    LIB, SPLIT_CYCLE, SPLIT_MUSCLES, PHASES, TECH_NOTES, PAT_MUSCLE, SLOTS, EVIDENCE: { backed: BACKED, weaker: WEAKER },
     BLOCK_SESSIONS, SESSIONS_PER_WEEK,
     generate, swapOne, exerciseFor, targetsFor, alternativesFor, suggestExtras,
     blockInfo, restoreBlock, tierOf, nextSplit, classifySplit, byName, canon, parseRange, roundW, progress, buildIndex,

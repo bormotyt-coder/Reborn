@@ -71,11 +71,30 @@ test('every exercise has muscle, cue and a unique key', () => {
     assert(!keys.has(e.key), 'duplicate ' + e.name); keys.add(e.key);
   });
 });
-test('every slot has at least 3 candidates (so variety is possible)', () => {
+test('every slot has at least 3 candidates, and most have plenty (so variety is possible)', () => {
+  const sizes = [];
   Object.entries(E.SLOTS).forEach(([split, slots]) => slots.forEach(s => {
     const n = E.LIB.filter(e => s.pats.includes(e.pat) && (!s.role || e.role === s.role) && !e.core).length;
     assert(n >= 3, split + ' ' + s.id + ' only has ' + n);
+    sizes.push(n);
   }));
+  const mean = sizes.reduce((a, b) => a + b, 0) / sizes.length;
+  assert(mean >= 8, 'average slot pool is only ' + mean.toFixed(1));
+});
+test('library covers every muscle group generously (200+ movements)', () => {
+  assert(E.LIB.length >= 200, 'only ' + E.LIB.length);
+  const byMuscle = {};
+  E.LIB.forEach(e => byMuscle[e.muscle] = (byMuscle[e.muscle] || 0) + 1);
+  ['Chest', 'Back', 'Shoulders', 'Rear Delts', 'Biceps', 'Triceps', 'Quads', 'Hamstrings', 'Glutes', 'Calves', 'Core']
+    .forEach(m => assert(byMuscle[m] >= 8, m + ' has only ' + byMuscle[m]));
+});
+test('evidence flags only name real exercises, and no exercise is both backed and weaker', () => {
+  const names = new Set(E.LIB.map(e => e.name));
+  [...E.EVIDENCE.backed, ...E.EVIDENCE.weaker].forEach(n => assert(names.has(n), 'unknown exercise in evidence list: ' + n));
+  E.EVIDENCE.backed.forEach(n => assert(!E.EVIDENCE.weaker.includes(n), n + ' is in both lists'));
+});
+test('exercise names are safe to embed in HTML/JS (no quotes or angle brackets)', () => {
+  E.LIB.forEach(e => assert(!/["'<>&\\]/.test(e.name), 'unsafe characters in "' + e.name + '"'));
 });
 
 console.log('\nPlan structure');
@@ -121,10 +140,46 @@ test('core finisher never repeats the previous session\'s core move', () => {
     lastBySplit[p.splitCategory] = core;
   });
 });
-test('across 16 sessions the lifter sees lots of different exercises', () => {
+test('across one 16-session block the lifter sees 80+ different exercises', () => {
   const { plans } = simulate(16, { recovery: 70 });
   const all = new Set(); plans.forEach(p => p.exercises.forEach(e => all.add(e.name)));
-  assert(all.size >= 45, 'only ' + all.size + ' distinct exercises in a block');
+  assert(all.size >= 80, 'only ' + all.size + ' distinct exercises in a block');
+});
+test('over months, nearly the whole library gets used (nothing is dead weight)', () => {
+  const { plans } = simulate(160, { recovery: 70, seed: 4 });
+  const used = new Set(); plans.slice(32).forEach(p => p.exercises.forEach(e => used.add(e.name)));
+  const nonCore = E.LIB.filter(e => !e.core);
+  const share = nonCore.filter(e => used.has(e.name)).length / nonCore.length;
+  assert(share >= 0.85, 'only ' + (share * 100).toFixed(0) + '% of the library was ever used');
+});
+test('evidence nudge is gentle: backed lifts show up more often, but never crowd the rest out', () => {
+  const hist = [], counts = {};
+  for (let i = 0; i < 160; i++) {
+    const p = E.generate({ history: hist, recovery: 70, now: T0 + i * DAY, seed: 77000 + i });
+    if (i >= 32) p.exercises.forEach(e => counts[e.name] = (counts[e.name] || 0) + 1);
+    hist.push({ date: new Date(T0 + i * DAY).toISOString(), splitCategory: p.splitCategory, muscleGroups: p.muscleGroups, block: p.block, cardio: p.cardio,
+      exercises: p.exercises.map(e => ({ name: e.name, slot: e.slot, anchor: e.anchor, reps: e.reps, sets: [{ weight: '40', reps: '10', done: true }] })) });
+  }
+  const lib = E.LIB.filter(e => !e.core), mean = a => a.reduce((x, y) => x + y, 0) / a.length, rb = [], ru = [];
+  Object.values(E.SLOTS).flat().forEach(s => {
+    const pool = lib.filter(e => s.pats.includes(e.pat) && (!s.role || e.role === s.role));
+    const b = pool.filter(e => e.top), u = pool.filter(e => !e.top && !e.low);
+    if (b.length && u.length) { rb.push(mean(b.map(e => counts[e.name] || 0))); ru.push(mean(u.map(e => counts[e.name] || 0))); }
+  });
+  const ratio = mean(rb) / mean(ru);
+  assert(ratio > 1.15, 'backed lifts should be favoured (ratio ' + ratio.toFixed(2) + ')');
+  assert(ratio < 2.5, 'nudge is too strong — variety would suffer (ratio ' + ratio.toFixed(2) + ')');
+  assert(lib.filter(e => e.low && counts[e.name]).length >= 3, 'weaker lifts are de-prioritised, not banned');
+});
+test('trap work rotates in on Pull days only', () => {
+  const perSplit = {};
+  for (let i = 0; i < 200; i++) {
+    const split = E.SPLIT_CYCLE[i % 4];
+    const p = E.generate({ split, history: [], recovery: 70, seed: 5000 + i });
+    p.exercises.forEach(e => { if (e.pat === 'tr') perSplit[split] = (perSplit[split] || 0) + 1; });
+  }
+  assert(perSplit['Pull'] >= 10, 'traps should show up on Pull day (' + perSplit['Pull'] + ')');
+  assert.deepStrictEqual(Object.keys(perSplit), ['Pull'], 'traps leaked onto ' + Object.keys(perSplit));
 });
 
 console.log('\nAnchors & blocks');
@@ -241,6 +296,22 @@ test('deload trims load ~10%; long layoff eases back in', () => {
   const l = E.progress(ex('Barbell Bench Press'), [mkExp(100, [9, 9, 9], [8, 10], 40)], { lo: 8, hi: 10, sets: 3 });
   assert.strictEqual(l.kind, 'return'); assert(l.targets[0].w < 100);
 });
+test('a layoff is time away from TRAINING — an exercise that merely rotated out is not penalised', () => {
+  const mk = daysAgo => ({ id: 1, date: new Date(T0 - daysAgo * DAY).toISOString(), splitCategory: 'Push', muscleGroups: ['Chest'], block: { no: 1, week: 2, deload: false },
+    exercises: [{ name: 'Barbell Bench Press', reps: '8-10', sets: [1, 2, 3].map(() => ({ weight: '100', reps: '9', done: true })) }] });
+  const other = daysAgo => ({ id: 2, date: new Date(T0 - daysAgo * DAY).toISOString(), splitCategory: 'Legs', muscleGroups: ['Quads'], block: { no: 1, week: 2, deload: false },
+    exercises: [{ name: 'Leg Press', reps: '8-10', sets: [{ weight: '150', reps: '10', done: true }] }] });
+  const run = hist => E.exerciseFor('Barbell Bench Press', { history: hist, recovery: 70, now: T0, split: 'Push', slot: 'P1' });
+  // bench last done 60 days ago, but the lifter trained yesterday → no haircut
+  const rotated = run([mk(60), other(1)]);
+  assert.notStrictEqual(rotated.progression, 'return'); assert(rotated.targets[0].w >= 100, 'got ' + rotated.targets[0].w);
+  // genuinely away from the gym for ~4 weeks → ease back in 5%
+  const away30 = run([mk(31), other(30)]);
+  assert.strictEqual(away30.progression, 'return'); assert.strictEqual(away30.targets[0].w, 95);
+  // away 7 weeks → 10%
+  const away50 = run([mk(51), other(50)]);
+  assert.strictEqual(away50.progression, 'return'); assert.strictEqual(away50.targets[0].w, 90);
+});
 test('timed holds add seconds; bodyweight core adds reps', () => {
   const plank = E.progress(ex('Plank'), [mkExp(0, [30, 35, 30], [30, 45])], { lo: 30, hi: 45, sets: 3 });
   assert.deepStrictEqual(plank.targets.map(t => t.r), [35, 40, 35]);
@@ -257,7 +328,7 @@ test('strength is preserved across thousands of prescriptions (no systematic e1R
   [1, 2, 3].forEach(seed => {
     const perf = rngOf(seed), last = {};
     const hist = [];
-    for (let i = 0; i < 80; i++) {
+    for (let i = 0; i < 160; i++) {   // lifts come back less often now (212 exercises), so run longer for a solid sample
       const plan = E.generate({ history: hist, recovery: 70, now: T0 + i * DAY + 3600e3, seed: seed * 1000 + i });
       const sess = performSession(plan, i, perf, 40);
       hist.push(sess);

@@ -3844,13 +3844,28 @@ const EX_SLUG_MAP = [
   // art yet fall through to the emoji, which is better than showing the wrong movement.
   ['incline dumbbell curl',    'curl-db-incline'],
   ['incline hammer curl',      'curl-db-incline'],
+  ['incline dumbbell fly',     'fly-db-incline'],
+  ['dumbbell fly',             'fly-db'],
   ['reverse pec deck',         'rear-delt-fly'],
-  ['rear delt raise',          'rear-delt-fly'],
+  ['rear delt',                'rear-delt-fly'],      // raise / fly / row — beats the chest 'incline dumbbell' key
+  ['overhead cable',           'extension-overhead-cable'],
   ['dumbbell pullover',        'pullover-db'],
+  ['calf',                     'calf-raise'],         // 'leg press calf raise' must not show the leg press
+  ['stiff-leg deadlift',       'rdl-barbell'],
+  ['reverse hyper',            'reverse-hyper'],
+  ['nordic',                   'nordic-curl'],
+  ['standing single-leg curl', 'leg-curl-standing'],
+  ['slider leg curl',          'leg-curl-slider'],
+  ['stability ball leg curl',  'leg-curl-ball'],
+  ['pendulum squat',           'squat-pendulum'],
+  ['belt squat',               'squat-belt'],
+  ['v-squat',                  'squat-v'],
   ['split squat',              'squat-split'],
   ['sissy squat',              'squat-sissy'],
   ['smith machine squat',      'squat-smith'],
   ['smith squat',              'squat-smith'],
+  ['bench dip',                'dip-bench'],
+  ['copenhagen',               'plank-copenhagen'],
   // ── Chest ──
   ['smith incline',            'bench-smith-incline'],
   ['incline smith',            'bench-smith-incline'],
@@ -4358,7 +4373,12 @@ function woTargetLine(ex){
     const tgt=(t.w>0?t.w+'kg × ':'')+t.r+unit;
     return `<div class="wo-ex-target"><span class="wo-tgt-lbl">🎯 Target</span> ${tgt}${ex.lastText?` <span class="wo-tgt-last">· ${escapeHtml(ex.lastText)}</span>`:''}</div>`;
   }
-  if(ex.isNew)return `<div class="wo-ex-target new">First time — pick a weight that leaves ~2 reps in reserve</div>`;
+  if(ex.isNew){
+    const msg=ex.unit==='sec'?'First time — hold a time that leaves a few seconds spare'
+      :ex.bw?'First time — pick a rep count that leaves ~2 in reserve (add load once it feels easy)'
+      :'First time — pick a weight that leaves ~2 reps in reserve';
+    return `<div class="wo-ex-target new">${msg}</div>`;
+  }
   return '';
 }
 function woBadges(ex){
