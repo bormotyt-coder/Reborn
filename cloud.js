@@ -15,6 +15,7 @@ const _SYNC_EXACT = new Set([
   `${KEY}_wo_history`,
   `${KEY}_wo_pbs`,
   `${KEY}_wo_notes`,
+  `${KEY}_wo_prefs`,
   `${KEY}_routines`,
   `${KEY}_entries`,
   `${KEY}_quickitems`,

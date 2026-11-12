@@ -518,6 +518,7 @@ const WO_KEY      = `${KEY}_workout`;       // active/in-progress session
 const WO_HIST_KEY = `${KEY}_wo_history`;    // array of completed sessions
 const WO_PBS_KEY  = `${KEY}_wo_pbs`;        // personal bests per exercise
 const WO_NOTES_KEY = `${KEY}_wo_notes`;     // per-exercise persistent notes
+const WO_PREFS_KEY = `${KEY}_wo_prefs`;     // generator preferences (variety mode)
 
 // WHOOP ACTIVITY KEY (must be declared before BOOT runs — renderWhoopSnap reads activities)
 const WH_ACT_KEY = (ds) => `${KEY}_whoopActivities_${ds || todayKey()}`;
@@ -3695,78 +3696,51 @@ let _woSplitOverride = null;       // one-shot manual split override (else auto 
 
 // ── Utilities ──
 function woLoad(key,def){try{const v=localStorage.getItem(key);return v?JSON.parse(v):def;}catch{return def;}}
-function woSave(key,val){localStorage.setItem(key,JSON.stringify(val));if(typeof cloudPush==='function')cloudPush(key,val);}
-function woHistory(){return woLoad(WO_HIST_KEY,[]);}
-function woPBs(){return woLoad(WO_PBS_KEY,{});}
-function woNotes(){return woLoad(WO_NOTES_KEY,{});}
-function woCoreHistory(){return woLoad(`${KEY}_coreHistory`,[]);}
+
+// History / PBs / notes are read many times per render (every exercise card asks for
+// its ghost sets, PB and note). Parsing a year of history that often was the main
+// cost of tapping a set. This cache re-parses only when the stored string changes,
+// so it stays correct after cloud pulls and writes from any other code path.
+// NOTE: callers must treat the returned value as read-only (copy before mutating).
+const _woCache=new Map();
+function woLoadCached(key,def){
+  let raw;
+  try{raw=localStorage.getItem(key);}catch{return def;}
+  if(!raw)return def;
+  const hit=_woCache.get(key);
+  if(hit&&hit.raw===raw)return hit.val;
+  try{const val=JSON.parse(raw);_woCache.set(key,{raw,val});return val;}catch{return def;}
+}
+
+// The live session is saved on every keystroke. localStorage is written immediately
+// (crash-safe), but the cloud upsert is coalesced — one request per burst of typing
+// instead of one per digit. The local timestamp is stamped immediately so a cloud
+// pull can never clobber a newer local write while the push is pending.
+const _woPushTimers={};
+function _woFlushPush(key){
+  if(!_woPushTimers[key])return;
+  clearTimeout(_woPushTimers[key].t);
+  const val=_woPushTimers[key].val;delete _woPushTimers[key];
+  if(typeof cloudPush==='function')cloudPush(key,val);
+}
+function woSave(key,val){
+  localStorage.setItem(key,JSON.stringify(val));
+  if(typeof cloudPush!=='function')return;
+  if(key!==WO_KEY){cloudPush(key,val);return;}          // rare writes: push straight away
+  if(typeof _stampLocal==='function')_stampLocal(key,new Date().toISOString());
+  const prev=_woPushTimers[key];if(prev)clearTimeout(prev.t);
+  _woPushTimers[key]={val,t:setTimeout(()=>_woFlushPush(key),1500)};
+}
+// Never lose the trailing edit when the app is backgrounded or closed.
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')Object.keys(_woPushTimers).forEach(_woFlushPush);});
+window.addEventListener('pagehide',()=>{Object.keys(_woPushTimers).forEach(_woFlushPush);});
+
+function woHistory(){return woLoadCached(WO_HIST_KEY,[]);}
+function woPBs(){return woLoadCached(WO_PBS_KEY,{});}
+function woNotes(){return woLoadCached(WO_NOTES_KEY,{});}
+function woPrefs(){return woLoad(WO_PREFS_KEY,{variety:'balanced'});}
+function woSetPref(k,v){const p=Object.assign({},woPrefs());p[k]=v;woSave(WO_PREFS_KEY,p);}
 function epley(w,r){return r===1?w:Math.round(w*(1+r/30));}  // Epley 1RM formula
-
-// ── Core Exercise Auto-Include ──
-const CORE_EXERCISES = [
-  { name: 'Plank', icon: '🧘', sets: 3, reps: '30-45s', rest: 30, cue: 'Keep your body in a straight line from head to heels. Engage your core by pulling your belly button toward your spine.' },
-  { name: 'Dead Bug', icon: '🪲', sets: 3, reps: '10 each side', rest: 30, cue: 'Press your lower back into the floor. Move opposite arm and leg while maintaining core tension.' },
-  { name: 'Bird Dog', icon: '🐕', sets: 3, reps: '10 each side', rest: 30, cue: 'Extend opposite arm and leg while keeping hips square to the ground. Pause at the top.' },
-  { name: 'Hanging Leg Raise', icon: '🦵', sets: 3, reps: '10-12', rest: 45, cue: 'Control the movement — no swinging. Raise legs to parallel or higher, lower slowly.' },
-  { name: 'Cable Crunch', icon: '🔻', sets: 3, reps: '12-15', rest: 45, cue: 'Curl your spine, bringing your elbows toward your knees. Squeeze at the bottom.' },
-  { name: 'Ab Wheel Rollout', icon: '🛞', sets: 3, reps: '8-10', rest: 45, cue: 'Keep core braced, roll out as far as you can control, pull back using your abs.' },
-  { name: 'Pallof Press', icon: '🎯', sets: 3, reps: '10 each side', rest: 30, cue: 'Press straight out, resist rotation. Feel your obliques working to keep you stable.' },
-  { name: 'Russian Twist', icon: '🔄', sets: 3, reps: '15 each side', rest: 30, cue: 'Lean back slightly, rotate from your core not your arms. Keep feet elevated for extra challenge.' },
-  { name: 'Hollow Body Hold', icon: '🌙', sets: 3, reps: '20-30s', rest: 30, cue: 'Press lower back into floor, arms overhead, legs extended. Create a banana shape.' },
-  { name: 'Side Plank', icon: '📐', sets: 3, reps: '20-30s each', rest: 30, cue: 'Stack your feet or stagger them. Keep your body in a straight line, hips lifted.' },
-];
-
-function getNextCoreExercise() {
-  const history = woCoreHistory();
-  const recent = history.slice(-3); // Last 3 core exercises used
-  
-  // Filter out recently used exercises
-  let available = CORE_EXERCISES.filter(ex => !recent.includes(ex.name));
-  
-  // If all have been used recently, just pick from all
-  if (available.length === 0) {
-    available = CORE_EXERCISES;
-  }
-  
-  // Pick a random one from available
-  const selected = available[Math.floor(Math.random() * available.length)];
-  
-  // Update history (keep last 7 days worth)
-  history.push(selected.name);
-  if (history.length > 7) history.shift();
-  woSave(`${KEY}_coreHistory`, history);
-  
-  return { ...selected, muscle_group: 'Core', isAutoCore: true };
-}
-
-function appendCoreExercise(plan) {
-  if (!plan || !plan.exercises) return plan;
-
-  // Check if there's already a core/ab exercise — use word-boundary regex
-  // to avoid false matches like "Cable Row" or "C**ab**le Fly".
-  const CORE_PATTERNS = [
-    /\bplank\b/i, /\bcrunch/i, /\babs?\b/i, /\bcore\b/i,
-    /\bdead\s*bug\b/i, /\bbird\s*dog\b/i, /\bleg\s*raise\b/i,
-    /\bhanging\s*(knee|leg)\b/i, /\brussian\s*twist\b/i, /\bpallof\b/i,
-    /\bhollow\s*body\b/i, /\bab\s*wheel\b/i, /\bside\s*plank\b/i,
-    /\bwindshield\s*wiper\b/i, /\bv[- ]?up\b/i, /\bsit[- ]?up\b/i,
-    /\bdragon\s*flag\b/i, /\btoes?\s*to\s*bar\b/i,
-  ];
-  const isCore = (name) => {
-    const n = (name || '').toLowerCase();
-    return CORE_PATTERNS.some(rx => rx.test(n));
-  };
-
-  const hasCoreExercise = plan.exercises.some(ex => isCore(ex.name));
-
-  // If no core exercise, add one as the final exercise
-  if (!hasCoreExercise) {
-    const coreEx = getNextCoreExercise();
-    plan.exercises.push(coreEx);
-  }
-
-  return plan;
-}
 
 // ── Exercise Notes ──
 function getExerciseNote(exerciseName) {
@@ -3776,7 +3750,7 @@ function getExerciseNote(exerciseName) {
 }
 
 function saveExerciseNote(exerciseName, note) {
-  const notes = woNotes();
+  const notes = Object.assign({}, woNotes());   // copy — the cached object is shared
   const key = exerciseName.toLowerCase().trim();
   if (note && note.trim()) {
     notes[key] = note.trim();
@@ -3865,6 +3839,33 @@ const AVAILABLE_SLUGS = new Set([
 // is first-hit-wins (e.g. 'incline dumbbell press' must match before 'press').
 // Keys are lowercase substrings tested against exercise name.
 const EX_SLUG_MAP = [
+  // ── Specific-first guards ──
+  // Names a broader key further down would otherwise swallow (first hit wins). Slugs with no
+  // art yet fall through to the emoji, which is better than showing the wrong movement.
+  ['incline dumbbell curl',    'curl-db-incline'],
+  ['incline hammer curl',      'curl-db-incline'],
+  ['incline dumbbell fly',     'fly-db-incline'],
+  ['dumbbell fly',             'fly-db'],
+  ['reverse pec deck',         'rear-delt-fly'],
+  ['rear delt',                'rear-delt-fly'],      // raise / fly / row — beats the chest 'incline dumbbell' key
+  ['overhead cable',           'extension-overhead-cable'],
+  ['dumbbell pullover',        'pullover-db'],
+  ['calf',                     'calf-raise'],         // 'leg press calf raise' must not show the leg press
+  ['stiff-leg deadlift',       'rdl-barbell'],
+  ['reverse hyper',            'reverse-hyper'],
+  ['nordic',                   'nordic-curl'],
+  ['standing single-leg curl', 'leg-curl-standing'],
+  ['slider leg curl',          'leg-curl-slider'],
+  ['stability ball leg curl',  'leg-curl-ball'],
+  ['pendulum squat',           'squat-pendulum'],
+  ['belt squat',               'squat-belt'],
+  ['v-squat',                  'squat-v'],
+  ['split squat',              'squat-split'],
+  ['sissy squat',              'squat-sissy'],
+  ['smith machine squat',      'squat-smith'],
+  ['smith squat',              'squat-smith'],
+  ['bench dip',                'dip-bench'],
+  ['copenhagen',               'plank-copenhagen'],
   // ── Chest ──
   ['smith incline',            'bench-smith-incline'],
   ['incline smith',            'bench-smith-incline'],
@@ -4122,145 +4123,42 @@ function getRecentSessions(n=7){
   return woHistory().slice(-n).reverse();
 }
 
-// ── Last time muscle group was trained ──
-function getDaysSinceMuscle(){
-  const hist=woHistory();
-  const map={};
-  const today=new Date();
-  for(let i=hist.length-1;i>=0;i--){
-    const s=hist[i];
-    const daysAgo=Math.round((today-new Date(s.date))/(1000*60*60*24));
-    (s.muscleGroups||[]).forEach(m=>{
-      if(!(m in map))map[m]=daysAgo;
-    });
-  }
-  return map;
-}
-
-// ── Get exercises done in last N hours (for avoiding repeats) ──
-function getRecentExercises(hoursAgo = 48) {
-  const hist = woHistory();
-  const cutoff = Date.now() - (hoursAgo * 60 * 60 * 1000);
-  const exercises = new Set();
-  
-  for (let i = hist.length - 1; i >= 0; i--) {
-    const session = hist[i];
-    const sessionDate = new Date(session.date).getTime();
-    if (sessionDate < cutoff) break;
-    (session.exercises || []).forEach(ex => {
-      const name = ex.swappedTo || ex.name;
-      if (name) exercises.add(name);
-    });
-  }
-  return Array.from(exercises);
-}
-
-// ── Exercises from the last N sessions, with how often each appeared ──
-// Used to force variance across similar-type days (e.g. push→push).
-function getExerciseUsageMap(sessionCount = 5) {
-  const hist = woHistory();
-  const recent = hist.slice(-sessionCount);
-  const map = {};
-  recent.forEach(s => {
-    (s.exercises || []).forEach(ex => {
-      const name = ex.swappedTo || ex.name;
-      if (!name) return;
-      map[name] = (map[name] || 0) + 1;
-    });
-  });
-  return map;
-}
-
-// ── Recent exercises by muscle-group signature ──
-// Returns names done in the last N sessions that shared at least one muscle group.
-function getExercisesRepeatedOnSimilarDays(sessionCount = 3) {
-  const hist = woHistory();
-  if (hist.length === 0) return [];
-  const lastSession = hist[hist.length - 1];
-  const targetMuscles = new Set(lastSession.muscleGroups || []);
-  if (targetMuscles.size === 0) return [];
-
-  // Walk back through history; for sessions sharing ≥1 muscle group, collect exercises.
-  const names = new Set();
-  let found = 0;
-  for (let i = hist.length - 1; i >= 0 && found < sessionCount; i--) {
-    const s = hist[i];
-    const muscles = s.muscleGroups || [];
-    const shares = muscles.some(m => targetMuscles.has(m));
-    if (!shares) continue;
-    (s.exercises || []).forEach(ex => {
-      const n = ex.swappedTo || ex.name;
-      if (n) names.add(n);
-    });
-    found++;
-  }
-  return Array.from(names);
-}
-
 // ── Fixed split rotation ──
-// The sequence is hardcoded; the AI only fills in the exercises for whichever
-// split comes next. Rotation advances off the most recently COMPLETED session.
-const WO_SPLIT_CYCLE = ['Push', 'Pull', 'Arms & Shoulders', 'Legs'];
-const WO_SPLIT_MUSCLES = {
-  'Push':             ['Chest', 'Shoulders', 'Triceps'],
-  'Pull':             ['Back', 'Biceps', 'Rear Delts'],
-  'Arms & Shoulders': ['Shoulders', 'Biceps', 'Triceps'],
-  'Legs':             ['Quads', 'Hamstrings', 'Glutes', 'Calves'],
-};
-
-// Map a completed session onto one of the four cycle categories.
-// Prefers the explicit splitCategory saved on newer sessions; otherwise infers
-// from muscle groups / split name so legacy history still advances correctly.
-function classifySplit(session) {
-  if (!session) return null;
-  if (session.splitCategory && WO_SPLIT_CYCLE.includes(session.splitCategory)) return session.splitCategory;
-  const m = (session.muscleGroups || []).map(x => String(x).toLowerCase());
-  const has = k => m.some(x => x.includes(k));
-  if (has('quad') || has('hamstring') || has('glute') || has('calf') || has('calv') || has('leg')) return 'Legs';
-  if (has('chest')) return 'Push';
-  if (has('back') || has('lat')) return 'Pull';
-  if (has('shoulder') || has('bicep') || has('tricep') || has('delt') || has('arm')) return 'Arms & Shoulders';
-  const n = (session.splitName || '').toLowerCase();
-  if (n.includes('push')) return 'Push';
-  if (n.includes('pull')) return 'Pull';
-  if (n.includes('leg')) return 'Legs';
-  if (n.includes('arm') || n.includes('shoulder')) return 'Arms & Shoulders';
-  return null;
-}
-
-// The split to program today = the one after the last completed session's split.
-function getNextSplit() {
-  const hist = woHistory();
-  const last = hist.length ? hist[hist.length - 1] : null;
-  const lastCat = classifySplit(last);
-  if (!lastCat) return WO_SPLIT_CYCLE[0]; // no usable history → start at Push
-  const idx = WO_SPLIT_CYCLE.indexOf(lastCat);
-  return WO_SPLIT_CYCLE[(idx + 1) % WO_SPLIT_CYCLE.length];
-}
+// Push → Pull → Arms & Shoulders → Legs. The sequence, muscle map and classification
+// (including legacy sessions) live in workout-engine.js so the generator and the UI
+// can never disagree about what's next.
+// (Guarded: if a stale cached index.html ever loads this file without workout-engine.js, only the
+// workout tab degrades — the rest of the app must keep working. See renderWorkoutPage.)
+const _WO_ENGINE_OK = typeof WoEngine !== 'undefined';
+const WO_SPLIT_CYCLE = _WO_ENGINE_OK ? WoEngine.SPLIT_CYCLE : ['Push', 'Pull', 'Arms & Shoulders', 'Legs'];
+const WO_SPLIT_MUSCLES = _WO_ENGINE_OK ? WoEngine.SPLIT_MUSCLES : {};
+function classifySplit(session){ return _WO_ENGINE_OK ? WoEngine.classifySplit(session) : null; }
+function getNextSplit(){ return _WO_ENGINE_OK ? WoEngine.nextSplit(woHistory()) : WO_SPLIT_CYCLE[0]; }
 
 // ── Ghost Sets: Get last performed sets for an exercise ──
+// Memoised per (history identity, name): the history array is only replaced when
+// the stored string changes, so a WeakMap keyed on it invalidates automatically.
+const _woGhostMemo=new WeakMap();
 function getExerciseGhostSets(exerciseName) {
   const hist = woHistory();
-  const normalizedName = exerciseName.toLowerCase().trim();
-  
-  // Search backwards through history for the most recent session containing this exercise
-  for (let i = hist.length - 1; i >= 0; i--) {
+  let memo = _woGhostMemo.get(hist);
+  if (!memo) { memo = new Map(); _woGhostMemo.set(hist, memo); }
+  const normalizedName = WoEngine.canon(exerciseName);
+  if (memo.has(normalizedName)) return memo.get(normalizedName);
+
+  let found = null;
+  for (let i = hist.length - 1; i >= 0 && !found; i--) {
     const session = hist[i];
     if (!session.exercises) continue;
-    
-    const exercise = session.exercises.find(ex => {
-      const exName = (ex.swappedTo || ex.name || '').toLowerCase().trim();
-      return exName === normalizedName;
-    });
-    
+    const exercise = session.exercises.find(ex => WoEngine.canon(ex.swappedTo || ex.name) === normalizedName);
     if (exercise && exercise.sets && exercise.sets.length > 0) {
-      // Only return sets that were actually completed with data
-      const completedSets = exercise.sets.filter(s => s.done && s.weight && s.reps);
+      // Only sets that were actually completed with data (blank weight counts as 0 for bodyweight/timed work)
+      const completedSets = exercise.sets.filter(s => s.done && s.reps && (s.weight || s.weight === 0 || s.weight === '0' || s.weight === ''));
       if (completedSets.length > 0) {
-        return {
+        found = {
           date: session.date,
           sets: completedSets.map(s => ({
-            weight: parseFloat(s.weight),
+            weight: parseFloat(s.weight) || 0,
             reps: parseInt(s.reps),
             rpe: s.rpe || null
           }))
@@ -4268,34 +4166,17 @@ function getExerciseGhostSets(exerciseName) {
       }
     }
   }
-  return null; // No previous data found
-}
-
-// ── Get suggested weight/reps for next set based on previous set ──
-function getSuggestedNextSet(currentSets, ghostSets, setIndex) {
-  // If we have a completed previous set in this workout, use it
-  const lastCompletedSet = currentSets.slice(0, setIndex).reverse().find(s => s.done && s.weight && s.reps);
-  
-  if (lastCompletedSet) {
-    const weight = parseFloat(lastCompletedSet.weight);
-    const reps = parseInt(lastCompletedSet.reps);
-    // Suggest same weight, slightly fewer reps (fatigue) or same if first couple sets
-    const suggestedReps = setIndex < 2 ? reps : Math.max(reps - 1, Math.ceil(reps * 0.9));
-    return { weight, reps: suggestedReps, source: 'previous_set' };
-  }
-  
-  // Fall back to ghost data from last workout
-  if (ghostSets && ghostSets.sets && ghostSets.sets[setIndex]) {
-    const ghost = ghostSets.sets[setIndex];
-    return { weight: ghost.weight, reps: ghost.reps, source: 'last_workout' };
-  }
-  
-  // No suggestion available
-  return null;
+  memo.set(normalizedName, found);
+  return found;
 }
 
 // ── Render workout page (readiness) ──
 function renderWorkoutPage(){
+  if(!_WO_ENGINE_OK){
+    const el=gv('wo-split-picker');
+    if(el)el.innerHTML='<div class="wo-split-picker-card">The workout engine didn\'t load. Close and reopen the app (or refresh) to pick up the latest version.</div>';
+    return;
+  }
   const morning=whoopSnaps[0];
   if(morning?.recovery){
     _woRecovery=morning.recovery;
@@ -4377,16 +4258,32 @@ function renderSplitPicker(){
   const el=gv('wo-split-picker');if(!el)return;
   const autoSplit=getNextSplit();
   const selected=_woSplitOverride||autoSplit;
+  const B=WoEngine.blockInfo(woHistory().length);
+  const variety=woPrefs().variety==='max'?'max':'balanced';
   const chips=WO_SPLIT_CYCLE.map(name=>{
     const isSel=name===selected;
     const isAuto=name===autoSplit;
     return `<button class="wo-split-chip${isSel?' sel':''}" onclick="pickSplit('${name.replace(/'/g,"\\'")}')">${name}${isAuto?' <span class="wo-split-next">next</span>':''}</button>`;
   }).join('');
+  const blockTag=B.deload
+    ?`<span class="wo-block-tag deload" title="${escapeAttr(B.blurb)}">Deload week</span>`
+    :`<span class="wo-block-tag" title="${escapeAttr(B.blurb)}">${B.phaseName} block · wk ${B.week+1}/4</span>`;
   el.innerHTML=`<div class="wo-split-picker-card">
-    <div class="wo-split-picker-label">Today's Split ${_woSplitOverride?'<span class="wo-split-override">override</span>':''}</div>
+    <div class="wo-split-picker-label"><span>Today's Split ${_woSplitOverride?'<span class="wo-split-override">override</span>':''}</span>${blockTag}</div>
     <div class="wo-split-chips">${chips}</div>
+    <div class="wo-variety-row">
+      <span class="wo-variety-lbl">Variety</span>
+      <button class="wo-variety-chip${variety==='balanced'?' sel':''}" onclick="setVariety('balanced')">Balanced</button>
+      <button class="wo-variety-chip${variety==='max'?' sel':''}" onclick="setVariety('max')">Max</button>
+    </div>
+    <div class="wo-variety-hint">${variety==='max'
+      ?'Every lift rotates every session. Progress is still tracked per exercise whenever it comes back.'
+      :'Your main lifts stay for the 4-week block so you can add load; everything else rotates every session.'}</div>
+    <button class="wo-gen-btn" onclick="generateWorkout()">⚡ Generate workout</button>
   </div>`;
 }
+
+function setVariety(v){woSetPref('variety',v==='max'?'max':'balanced');renderSplitPicker();}
 
 // Set a manual override (or clear it back to auto when tapping the auto split).
 function pickSplit(name){
@@ -4409,186 +4306,98 @@ function renderLastSession(){
   </div>`;
 }
 
-// ── AI Workout Generation ──
-async function generateWorkout(){
-  const loader=gv('wo-generating');
-  if(loader){
-    loader.style.display='flex';
-    loader.innerHTML=`<div class="wo-gen-spinner"></div><div class="wo-gen-text">Generating your workout...</div>`;
-  }
-  
-  // Set up retry feedback
-  setRetryCallback(({attempt, maxRetries, reason}) => {
-    if(loader){
-      const textEl = loader.querySelector('.wo-gen-text');
-      if(textEl) textEl.textContent = `Retry ${attempt}/${maxRetries-1}... ${reason || ''}`;
-    }
-  });
+// ── Workout generation (local engine — instant, offline, enforced variety) ──
+// All selection, periodisation and progression logic is in workout-engine.js.
+function woEngineInput(extra){
+  return Object.assign({history:woHistory(),recovery:_woRecovery,prefs:woPrefs(),now:Date.now()},extra||{});
+}
 
-  const yest=getYesterdayNutrition();
-  const rec=_woRecovery||'unknown';
-  const sleepSnap=whoopSnaps[0]||{};
-  const recentSessions=getRecentSessions(7);
-  const todaySplit=_woSplitOverride||getNextSplit();
-  const todayMuscles=WO_SPLIT_MUSCLES[todaySplit];
-  const pbs=woPBs();
-  const daysAgo=getDaysSinceMuscle();
-  const recentExercises = getRecentExercises(240); // 10 days
-  const similarDayExercises = getExercisesRepeatedOnSimilarDays(3);
-  const usageMap = getExerciseUsageMap(6);
-  const overusedList = Object.entries(usageMap)
-    .filter(([,count]) => count >= 2)
-    .sort((a,b) => b[1]-a[1])
-    .map(([n,c]) => `${n} (${c}×)`);
+function woToast(text){
+  const existing=document.querySelector('.wo-suggestion-toast');
+  if(existing)existing.remove();
+  const toast=document.createElement('div');
+  toast.className='wo-suggestion-toast';
+  toast.textContent=text;
+  document.body.appendChild(toast);
+  setTimeout(()=>toast.classList.add('show'),10);
+  setTimeout(()=>{toast.classList.remove('show');setTimeout(()=>toast.remove(),300);},2200);
+}
 
-  // Build context string
-  const histSummary=recentSessions.map(s=>`${new Date(s.date).toLocaleDateString('en-US',{weekday:'short'})}: ${s.splitName} (${(s.muscleGroups||[]).join(', ')})`).join('\n');
-  const pbSummary=Object.entries(pbs).slice(0,20).map(([ex,pb])=>`${ex}: ${pb.weight}kg x${pb.reps} (1RM ~${pb.oneRM}kg)`).join('\n');
-  const avoidExercises = recentExercises.length > 0
-    ? `\nEXERCISES DONE IN LAST 10 DAYS — strongly prefer alternatives for variance:\n${recentExercises.join(', ')}`
-    : '';
-  const similarDayAvoid = similarDayExercises.length > 0
-    ? `\nEXERCISES FROM THE LAST 3 TRAINING DAYS THAT SHARED MUSCLE GROUPS — rotate away from these to force variance session-to-session:\n${similarDayExercises.join(', ')}`
-    : '';
-  const overusedStr = overusedList.length > 0
-    ? `\nOVERUSED EXERCISES (appeared in 2+ of last 6 sessions) — replace with underrated alternatives from the brief:\n${overusedList.join(', ')}`
-    : '';
-
-  const woSystem=`You are an evidence-based strength & hypertrophy coach for a 26-year-old male, 89.1kg, 173cm, 25.1% body fat, goal is fat loss while preserving lean mass (target 64kg lean mass). He trains FASTED in the morning before his first meal. He's an intermediate lifter — past the beginner phase but still making solid progress. Talk to him like a knowledgeable training partner, not a textbook.
-
-═══ TRAINING PHILOSOPHY & EXERCISE SCIENCE BRIEF ═══
-
-1. MECHANICAL TENSION is the primary hypertrophy driver. Prioritize exercises that load the target muscle through a full ROM, especially in the LENGTHENED (stretched) position — research consistently shows stretched-position training produces superior growth. Examples: incline DB curls (biceps stretched at bottom), overhead tricep extensions (long head stretched), Romanian deadlifts (hamstrings loaded at full hip flexion), cable flyes from low pulleys (chest stretched).
-
-2. MIND-MUSCLE CONNECTION (MMC) CUES — every exercise needs a specific internal-focus cue that tells the lifter WHERE to feel the contraction and HOW to initiate the rep:
-   - BAD cue: "keep good form" or "go slow" (too vague)
-   - GOOD cue: "Initiate by driving your elbows back and squeezing your shoulder blades — you should feel your mid-traps and rhomboids fire before your arms bend" (cable row)
-   - GOOD cue: "Push the floor away from you, don't think about pushing the bar up — feel your quads do the work out of the hole" (squat)
-   - Always specify: what muscle should be contracting, what the lifter should feel, a visualization or movement initiation point
-
-3. PROGRESSIVE OVERLOAD METHODS — rotate these to keep driving adaptation:
-   - Straight sets: standard sets across (default for heavy compounds)
-   - Rest-pause: hit near-failure, rack it, rest 15-20s, grind out 3-5 more reps. Great for machines and isolation moves where form breakdown is low-risk
-   - Drop set: on the LAST set, reduce weight ~25% and immediately rep to failure. Best for isolation/cables
-   - Myo-reps: one activation set to ~2 RIR, then 4-5 mini-sets of 3-5 reps with only 10-15s rest between. Insanely time-efficient for accessories
-   - Lengthened partials: after hitting failure on full reps, keep going with partial reps in the bottom (stretched) portion only. Emerging research shows massive hypertrophy stimulus from this technique
-
-4. UNDERRATED EXERCISES — vary the selection, don't default to the same basics every session:
-   Chest: low-to-high cable fly, chest-focused dip (lean forward), svend press, slight-decline DB press, hammer strength incline press, pec deck fly, machine chest press, Smith flat/incline press
-   Back: chest-supported T-bar row, meadows row, straight-arm cable pulldown, seal row, single-arm lat pulldown, plate-loaded row machine, hammer strength pulldown, machine low row, assisted pull-up machine (slow negatives)
-   Shoulders: cable Y-raise, Lu raise (front raise to press), prone incline lateral raise, behind-the-neck press (light), machine lateral raise, reverse pec deck (rear delts), Smith overhead press, machine shoulder press
-   Biceps: incline DB curl, spider curl, bayesian cable curl, preacher curl EZ-bar (wide grip for short head), machine preacher curl, cable hammer curl (rope)
-   Triceps: overhead cable extension (rope), JM press, cross-body cable pushdown, skull crusher (to forehead), machine tricep dip, tricep press machine, Smith close-grip bench
-   Quads: heel-elevated goblet squat, sissy squat, leg press feet low & narrow, pendulum squat, Spanish squat, hack squat machine, Smith squat (heels elevated), leg extension (lengthened partials), belt squat machine
-   Hamstrings: Nordic curl, seated leg curl (most lengthened position), single-leg RDL, slider hamstring curl, lying leg curl machine, glute-ham raise machine, Smith RDL
-   Glutes: barbell hip thrust, 45° back extension, cable pull-through, B-stance RDL, step-up with forward lean, Smith hip thrust, glute drive machine, hip abduction machine (lean forward)
-
-5. SESSION STRUCTURE:
-   - Start with 1-2 heavy compounds (mechanical tension focus, straight sets)
-   - Move to moderate-load work (8-12 reps, controlled tempo)
-   - Finish with isolation/cable work using intensity techniques (rest-pause, drop sets, myo-reps, lengthened partials)
-   - Include at least ONE exercise per primary muscle that loads it in the lengthened/stretched position
-
-Rules:
-- 6-8 exercises (fewer if recovery < 40)
-- If recovery >= 67: heavy compound focus, 4-5 sets, 5-8 reps, straight sets on compounds
-- If recovery 34-66: moderate volume, 3-4 sets, 8-12 reps, lean on intensity techniques for efficiency
-- If recovery < 34: light/technique focus, 3 sets, 12-15 reps, prioritize MMC and lengthened partials
-- Fasted training: avoid maximal CNS-heavy lifts if recovery < 50
-- Do NOT repeat muscle groups trained in last 48 hours unless recovery > 80
-- VARIANCE RULE (critical): never prescribe the same exercise across two consecutive sessions that share muscle groups. If the user did Barbell Bench Press last push day, today pick a different primary chest press (incline DB, hammer strength incline, Smith incline, etc). At least 50% of today's exercises must be different from the most recent same-muscle-group session. An AI-generated plan that mirrors the previous same-muscle-group day is a failure.
-- Include at least one lengthened-position exercise per primary muscle group
-- Mix up exercise selection — pull from the underrated exercises list, don't just default to barbell bench/squat/deadlift every time
-- intensityTechnique: one of "straight sets", "rest-pause", "drop set", "myo-reps", "lengthened partials" — use straight sets for heavy compounds, rotate techniques on accessories
-- cue: MUST be a specific MMC cue — what muscle to feel, where to initiate, a visualization. Never generic
-- suggestedWeight: fill in if PB exists for that exercise (suggest same or slight increase), else null
-- Cardio: fasted morning = prefer steady state (incline walk, moderate bike). Only recommend HIIT if recovery > 80
-- iconSlug: pick ONE slug from the list below that best matches the exercise. If no slug fits, omit the field entirely (do NOT invent new slugs).
-  Chest: bench-barbell-flat, bench-barbell-incline, bench-db-flat, bench-db-incline, bench-smith-incline, press-smith-flat, cable-fly, pec-deck, press-machine-chest
-  Back: pullup, lat-pulldown, pulldown-single-arm, pulldown-hammer, row-cable-seated, row-tbar, row-db-single-arm, row-barbell-bent, row-machine, row-meadows, pullover-cable, face-pull
-  Shoulders: ohp-barbell, press-db-seated, press-machine-shoulder, lateral-raise-db, lateral-raise-cable, lateral-raise-machine, lateral-raise-prone, rear-delt-fly, raise-lu
-  Biceps: curl-db-incline, curl-barbell, curl-preacher, curl-cable-bayesian, curl-hammer-db, curl-hammer-cable
-  Triceps: pushdown-cable-rope, extension-overhead-cable, skullcrusher, dip, dip-machine, press-jm
-  Quads: squat-barbell-back, squat-front, squat-goblet, squat-spanish, leg-press, hack-squat, leg-extension
-  Hams/Glutes: rdl-barbell, rdl-single-leg, leg-curl-seated, leg-curl-lying, hip-thrust-barbell, back-extension-45, hip-abduction
-  Full-body: deadlift-conventional, deadlift-sumo, lunge-db, lunge-reverse, step-up-db, calf-raise
-  Core: plank, plank-side, cable-crunch, hanging-leg-raise, ab-wheel, dead-bug
-  Cardio: treadmill, stairmaster, bike-upright, rower-machine, elliptical
-- Return ONLY valid JSON, no markdown, no explanation.
-
-JSON format (this is a FORMAT example only — do NOT copy its split/exercises; choose today's split from the recent-training context):
-{"splitName":"<split for today>","muscleGroups":["<muscle>","<muscle>"],"coachNote":"2-line rationale referencing recovery data and how it shaped today's plan","exercises":[{"name":"<exercise>","iconSlug":"bench-db-incline","cue":"specific MMC cue","intensityTechnique":"straight sets","sets":4,"reps":"6-8","rest":120,"lastWeight":null,"suggestedWeight":null,"alternatives":["alt1","alt2"]}],"cardio":{"machine":"Treadmill","iconSlug":"treadmill","duration":15,"speed":6.5,"incline":8,"unit":"km/h","rationale":"one line"}}`;
-
-  const prompt=`═══ TODAY'S CONTEXT ═══
-- WHOOP Recovery: ${rec}%
-- Sleep: ${sleepSnap.sleep!=null?(()=>{const hh=Math.floor(sleepSnap.sleep),mm=Math.round((sleepSnap.sleep-hh)*60);return hh+'h'+(mm>0?' '+mm+'m':'');})():'unknown'}
-- HRV: ${sleepSnap.hrv||'unknown'}
-- Yesterday's nutrition: ${Math.round(yest.p||0)}g protein, ${Math.round(yest.cal||0)} kcal, ${Math.round(yest.c||0)}g carbs
-
-MOST RECENT SESSION: ${recentSessions[0]?`${recentSessions[0].splitName} — ${(recentSessions[0].muscleGroups||[]).join(', ')||'?'}`:'None yet'}
-
-═══ TODAY'S SPLIT IS FIXED (NON-NEGOTIABLE) ═══
-The split rotation is hardcoded: Push → Pull → Arms & Shoulders → Legs → (repeat).
-TODAY = ${todaySplit}. Target ONLY these muscle groups: ${todayMuscles.join(', ')}.
-- "muscleGroups" in your JSON MUST be exactly: ${JSON.stringify(todayMuscles)}
-- "splitName" MUST reflect the ${todaySplit} day (e.g. "${todaySplit} — ...").
-- Every exercise MUST train one of those muscle groups. Do NOT program any other split. Do NOT substitute a different day.
-Your ONLY job is choosing the best exercises for a ${todaySplit} day given recovery, PBs, and variance.
-
-RECENT TRAINING (last 7 sessions):
-${histSummary||'No recent sessions logged'}
-
-DAYS SINCE MUSCLE GROUP TRAINED:
-${Object.entries(daysAgo).map(([m,d])=>`${m}: ${d} days ago`).join(', ')||'No history'}
-${avoidExercises}
-${similarDayAvoid}
-${overusedStr}
-
-PERSONAL BESTS:
-${pbSummary||'No PBs yet — first session'}
-
-Generate a workout split for today. Return ONLY valid JSON.`;
-
+function generateWorkout(){
+  if(_woSession&&_woSession.inProgress){woToast('Finish your current workout first');return;}
+  const loader=gv('wo-generating');if(loader)loader.style.display='none';
+  const split=_woSplitOverride||getNextSplit();
   try{
-    const data=await callAI({model:'claude-sonnet-4-6',max_tokens:2000,system:woSystem,messages:[{role:'user',content:prompt}]});
-    const rawText=aiText(data);
-    if(!rawText)throw new Error('Empty response from API');
-    
-    // Use robust JSON extraction
-    _woPlan = extractJSON(rawText);
-    if(!_woPlan || !_woPlan.exercises){
-      throw new Error('Could not parse workout plan');
-    }
-
-    // Pin the rotation category so the next session advances deterministically,
-    // regardless of how the AI phrased splitName/muscleGroups.
-    _woPlan.splitCategory = todaySplit;
-    if(!_woPlan.splitName) _woPlan.splitName = todaySplit;
-    if(!Array.isArray(_woPlan.muscleGroups) || !_woPlan.muscleGroups.length) _woPlan.muscleGroups = todayMuscles.slice();
-
-    // Auto-append a core exercise if none present
-    _woPlan = appendCoreExercise(_woPlan);
-
+    _woPlan=WoEngine.generate(woEngineInput({split}));
     // Override was a one-shot; clear it so the next auto rotation resumes.
-    _woSplitOverride = null;
+    _woSplitOverride=null;
     renderSplitPicker();
-
-    renderWorkoutPreview();
+    renderWorkoutPreview(true);
   }catch(e){
-    console.error('[reBorn] Workout gen error:', e);
-    const msg=_apiErrMsg(e);
+    console.error('[reBorn] Workout gen error:',e);
     const el=gv('wo-plan-preview');
     if(el){
       el.style.display='block';
-      el.innerHTML=`<div style="margin:16px;padding:14px 16px;background:rgba(196,91,82,0.06);border:1px solid rgba(196,91,82,0.16);border-radius:16px;font-size:13px;color:var(--red);line-height:1.6"><strong>Workout generation failed</strong><br>${msg}<br><button onclick="generateWorkout()" style="margin-top:10px;padding:8px 16px;background:var(--blue2);color:#fff;border:none;border-radius:8px;font-size:13px;cursor:pointer">Try Again</button></div>`;
+      el.innerHTML=`<div style="margin:16px;padding:14px 16px;background:rgba(196,91,82,0.06);border:1px solid rgba(196,91,82,0.16);border-radius:16px;font-size:13px;color:var(--red);line-height:1.6"><strong>Couldn't build a workout</strong><br>${escapeHtml(e&&e.message||'Unknown error')}<br><button onclick="generateWorkout()" style="margin-top:10px;padding:8px 16px;background:var(--blue2);color:#fff;border:none;border-radius:8px;font-size:13px;cursor:pointer">Try Again</button></div>`;
     }
-  }finally{
-    clearRetryCallback();
-    if(loader)loader.style.display='none';
   }
 }
 
-function renderWorkoutPreview(){
+// Same split, brand-new selection.
+function rerollWorkout(){
+  if(!_woPlan)return;
+  try{
+    _woPlan=WoEngine.generate(woEngineInput({split:_woPlan.splitCategory}));
+    renderWorkoutPreview(true);
+  }catch(e){console.error('[reBorn] Reroll error:',e);woToast('Could not reroll');}
+}
+
+// Swap a single exercise in the preview for a fresh pick from the same slot.
+function swapPreviewExercise(i){
+  if(!_woPlan)return;
+  const n=WoEngine.swapOne(_woPlan,i,woEngineInput());
+  if(!n){woToast('No other options for this slot');return;}
+  renderWorkoutPreview();
+}
+
+// Cardio spec chips — new plans carry `specs`; older sessions/routines fall back to the legacy fields.
+function woCardioSpecs(c){
+  if(c.specs&&c.specs.length)return c.specs;
+  return [{v:c.duration,l:'min'},{v:c.speed,l:c.unit},{v:(c.incline??0)+'%',l:'incline'}];
+}
+
+function woTargetLine(ex){
+  const unit=ex.unit==='sec'?'s':'';
+  if(ex.targets&&ex.targets[0]){
+    const t=ex.targets[0];
+    const tgt=(t.w>0?t.w+'kg × ':'')+t.r+unit;
+    return `<div class="wo-ex-target"><span class="wo-tgt-lbl">🎯 Target</span> ${tgt}${ex.lastText?` <span class="wo-tgt-last">· ${escapeHtml(ex.lastText)}</span>`:''}</div>`;
+  }
+  if(ex.isNew){
+    const msg=ex.unit==='sec'?'First time — hold a time that leaves a few seconds spare'
+      :ex.bw?'First time — pick a rep count that leaves ~2 in reserve (add load once it feels easy)'
+      :'First time — pick a weight that leaves ~2 reps in reserve';
+    return `<div class="wo-ex-target new">${msg}</div>`;
+  }
+  return '';
+}
+function woBadges(ex){
+  const b=[];
+  if(ex.isNew)b.push('<span class="wo-badge new">NEW</span>');
+  switch(ex.progression){
+    case 'up':b.push('<span class="wo-badge up">↑ add load</span>');break;
+    case 'shift-up':b.push('<span class="wo-badge up">↑ heavier zone</span>');break;
+    case 'shift-down':b.push('<span class="wo-badge">lighter, more reps</span>');break;
+    case 'deload':b.push('<span class="wo-badge deload">deload</span>');break;
+    case 'return':b.push('<span class="wo-badge">easing back in</span>');break;
+    case 'reset':b.push('<span class="wo-badge deload">reset</span>');break;
+  }
+  if(ex.held)b.push('<span class="wo-badge anchor">main lift</span>');
+  if(ex.len&&ex.role==='isolation')b.push('<span class="wo-badge len">stretch</span>');
+  return b.length?`<div class="wo-badges">${b.join('')}</div>`:'';
+}
+
+function renderWorkoutPreview(animate){
   if(!_woPlan)return;
   const nameEl=gv('wpp-name');const noteEl=gv('wpp-note');
   const exEl=gv('wpp-exercises');const cardioEl=gv('wpp-cardio');
@@ -4600,47 +4409,67 @@ function renderWorkoutPreview(){
       <div class="wo-ex-preview">
         <div class="wo-ex-icon">${getExIcon(ex.name, ex.iconSlug) || ex.icon || '💪'}</div>
         <div class="wo-ex-info">
-          <div class="wo-ex-name"><a href="https://www.youtube.com/results?search_query=${encodeURIComponent(ex.name+' proper form')}" target="_blank" rel="noopener" class="wo-ex-link" onclick="event.stopPropagation()">${ex.name}</a></div>
-          <div class="wo-ex-meta">${ex.sets} sets · ${ex.reps} reps · ${ex.rest}s rest</div>
-          <div class="wo-ex-cue">${ex.cue||''}</div>
-          ${ex.intensityTechnique&&ex.intensityTechnique!=='straight sets'?`<div class="wo-ex-intensity">⚡ ${ex.intensityTechnique}</div>`:''}
+          <div class="wo-ex-name"><a href="https://www.youtube.com/results?search_query=${encodeURIComponent(ex.name+' proper form')}" target="_blank" rel="noopener" class="wo-ex-link" onclick="event.stopPropagation()">${escapeHtml(ex.name)}</a></div>
+          <div class="wo-ex-meta">${ex.sets} sets · ${escapeHtml(ex.reps)}${ex.unit==='sec'?'':' reps'} · ${ex.rest}s rest</div>
+          ${woBadges(ex)}
+          ${woTargetLine(ex)}
+          <div class="wo-ex-cue">${escapeHtml(ex.cue||'')}</div>
+          ${ex.intensityTechnique&&ex.intensityTechnique!=='straight sets'?`<div class="wo-ex-intensity">⚡ ${escapeHtml(ex.intensityTechnique)}${ex.techNote?` <span class="wo-tech-note">— ${escapeHtml(ex.techNote)}</span>`:''}</div>`:''}
         </div>
-        ${ex.lastWeight?`<div class="wo-ex-last">${ex.lastWeight}kg</div>`:''}
+        ${ex.slot?`<button class="wo-ex-swap" onclick="swapPreviewExercise(${i})" title="Swap for something different" aria-label="Swap exercise">🔀</button>`:''}
       </div>`).join('');
   }
   if(cardioEl&&_woPlan.cardio){
     const c=_woPlan.cardio;
+    const specs=woCardioSpecs(c);
     cardioEl.innerHTML=`<div class="wo-cardio-preview">
       <div class="wo-cardio-icon">${getExIcon(c.machine, c.iconSlug) || c.icon || '🏃'}</div>
       <div class="wo-cardio-info">
-        <div class="wo-cardio-title">${c.machine} · ${c.duration} min</div>
-        <div class="wo-cardio-meta">${c.speed} ${c.unit} · ${c.incline}% incline</div>
-        <div class="wo-cardio-rat">${c.rationale||''}</div>
+        <div class="wo-cardio-title">${escapeHtml(c.machine)} · ${c.duration} min</div>
+        <div class="wo-cardio-meta">${specs.slice(1).map(sp=>escapeHtml(sp.v)+' '+escapeHtml(sp.l)).join(' · ')}</div>
+        <div class="wo-cardio-rat">${escapeHtml(c.rationale||'')}</div>
       </div>
     </div>`;
   }
-  if(preview)preview.style.display='block';
+  if(preview){
+    preview.style.display='block';
+    if(animate){
+      preview.classList.remove('wo-preview-pop');void preview.offsetWidth;preview.classList.add('wo-preview-pop');
+      preview.scrollIntoView({behavior:'smooth',block:'start'});
+    }
+  }
 }
 
 // ── Start / Active Workout ──
+// Fresh set rows for an exercise. Targets (tw/tr) are shown as placeholders and are
+// adopted on ✓ if the lifter leaves the boxes blank — one tap to log "as prescribed".
+function woNewSets(ex){
+  const n=Array.isArray(ex.sets)?ex.sets.length:(parseInt(ex.sets)||3);
+  return Array.from({length:n},(_,si)=>{
+    const s={weight:'',reps:'',rpe:'',done:false};
+    const t=ex.targets&&ex.targets[si];
+    if(t){s.tw=t.w;s.tr=t.r;}
+    return s;
+  });
+}
+function woSessionExercise(ex){
+  return {...ex, sets:woNewSets(ex), collapsed:false, swappedTo:null};
+}
+
 function startWorkout(){
   if(!_woPlan)return;
-  // Build session object
   _woSession={
     id: Date.now(),
     date: new Date().toISOString(),
-    plan: _woPlan,
+    coachNote: _woPlan.coachNote||'',
     splitName: _woPlan.splitName,
     splitCategory: _woPlan.splitCategory||null,
     muscleGroups: _woPlan.muscleGroups||[],
+    block: _woPlan.block||null,
+    recovery: _woRecovery??null,
     inProgress: true,
     startTime: Date.now(),
-    exercises: (_woPlan.exercises||[]).map(ex=>({
-      ...ex,
-      sets: Array.from({length:ex.sets},()=>({weight:'',reps:'',rpe:'',done:false})),
-      collapsed: false,
-      swappedTo: null,
-    })),
+    exercises: (_woPlan.exercises||[]).map(woSessionExercise),
     cardio: _woPlan.cardio?{..._woPlan.cardio,done:false,actualDuration:null}:null,
   };
   woSave(WO_KEY,_woSession);
@@ -4652,7 +4481,7 @@ function showActiveWorkout(){
   gv('wo-active-view').style.display='block';
   const nameEl=gv('wo-split-name');const noteEl=gv('wo-split-note');
   if(nameEl)nameEl.textContent=_woSession.splitName||'';
-  if(noteEl)noteEl.textContent=_woSession.plan?.coachNote||'';
+  if(noteEl)noteEl.textContent=_woSession.coachNote||_woSession.plan?.coachNote||'';
   renderExercises();
   renderCardioSection();
   startElapsedTimer();
@@ -4674,58 +4503,75 @@ function startElapsedTimer(){
 function renderExercises(){
   const el=gv('wo-exercises');if(!el||!_woSession)return;
   el.innerHTML=_woSession.exercises.map((ex,ei)=>renderExerciseCard(ex,ei)).join('');
+  _restRedraw();
   // If a next-set suggestion is pending, re-display the effort rating (it was wiped by innerHTML).
   if (_currentSuggestion && typeof _currentSuggestion.ei === 'number') {
     showEffortRating(_currentSuggestion.ei);
   }
 }
 
+// Re-render ONE card in place. Tapping ✓ used to rebuild every card (and re-read the
+// whole history for each); now only the card that changed is touched, so scroll
+// position, typing focus and other cards' timers are left alone.
+function renderExerciseCardAt(ei){
+  const ex=_woSession&&_woSession.exercises[ei];
+  const old=gv('wo-ex-'+ei);
+  if(!ex||!old){renderExercises();return;}
+  old.outerHTML=renderExerciseCard(ex,ei);
+  _restRedraw();
+  if (_currentSuggestion && _currentSuggestion.ei === ei) showEffortRating(ei);
+}
+
+function woOneRM(ex,s){
+  if(ex.unit==='sec')return null;
+  const w=parseFloat(s.weight),r=parseInt(s.reps);
+  return(w>0&&r>0)?epley(w,r):null;
+}
+
 function renderExerciseCard(ex,ei){
   const pbs=woPBs();
   const exName = ex.swappedTo || ex.name;
+  const timed = ex.unit === 'sec';
   const pb=pbs[exName];
-  const pbLine=pb?`<div class="wo-pb-badge">PB: ${pb.weight}kg × ${pb.reps} → 1RM ${pb.oneRM}kg</div>`:'';
+  const pbLine=(pb&&!timed)?`<div class="wo-pb-badge">PB: ${pb.weight}kg × ${pb.reps} → 1RM ${pb.oneRM}kg</div>`:'';
 
-  // Get ghost sets from last workout
+  // Ghost sets from the last time this exercise was done
   const ghostData = getExerciseGhostSets(exName);
   const ghostSets = ghostData?.sets || [];
 
   const setsHtml=ex.sets.map((s,si)=>{
-    const oneRM=s.weight&&s.reps?epley(parseFloat(s.weight),parseInt(s.reps)):null;
-    
-    // Ghost set data for this specific set
+    const oneRM=woOneRM(ex,s);
     const ghost = ghostSets[si];
     let ghostText = '—';
     let trendIndicator = '';
-    
+
     if (ghost) {
-      ghostText = `${ghost.weight}×${ghost.reps}`;
-      // Show trend if current set is complete
-      if (s.weight && s.reps && s.done) {
-        const currentVolume = parseFloat(s.weight) * parseInt(s.reps);
-        const ghostVolume = ghost.weight * ghost.reps;
-        if (currentVolume > ghostVolume) {
-          trendIndicator = '<span class="wo-trend-up">↑</span>';
-        } else if (currentVolume < ghostVolume) {
-          trendIndicator = '<span class="wo-trend-down">↓</span>';
-        } else {
-          trendIndicator = '<span class="wo-trend-same">=</span>';
-        }
+      ghostText = timed ? `${ghost.reps}s` : (ghost.weight>0 ? `${ghost.weight}×${ghost.reps}` : `BW×${ghost.reps}`);
+      if (s.done && s.reps) {
+        // volume if loaded, otherwise reps decide (bodyweight / timed work)
+        const cur = (parseFloat(s.weight)||1) * parseInt(s.reps);
+        const prev = (ghost.weight||1) * ghost.reps;
+        trendIndicator = cur > prev ? '<span class="wo-trend-up">↑</span>'
+                       : cur < prev ? '<span class="wo-trend-down">↓</span>'
+                       : '<span class="wo-trend-same">=</span>';
       }
     }
-    
-    return `<div class="wo-set-row ${s.done?'done':''}">
+
+    const hasTarget = s.tw != null || s.tr != null;
+    const wPh = (s.tw != null && s.tw > 0) ? s.tw : 'kg';
+    const rPh = s.tr != null ? s.tr : (timed ? 'sec' : 'reps');
+    return `<div class="wo-set-row ${s.done?'done':''}" id="wo-set-${ei}-${si}">
       <div class="wo-set-num">${si+1}</div>
       <div class="wo-set-ghost">${ghostText}${trendIndicator}</div>
-      <input class="wo-set-inp" type="number" placeholder="kg" value="${s.weight}"
+      <input class="wo-set-inp${hasTarget?' has-target':''}" type="number" inputmode="decimal" placeholder="${wPh}" value="${s.weight}"
         oninput="setExerciseSet(${ei},${si},'weight',this.value)" min="0" step="0.5">
       <span class="wo-set-x">×</span>
-      <input class="wo-set-inp wo-set-reps" type="number" placeholder="reps" value="${s.reps}"
+      <input class="wo-set-inp wo-set-reps${hasTarget?' has-target':''}" type="number" inputmode="numeric" placeholder="${rPh}" value="${s.reps}"
         oninput="setExerciseSet(${ei},${si},'reps',this.value)" min="0">
       <div class="wo-set-1rm" style="${oneRM?'color:var(--blue2)':'color:var(--muted)'}">
         ${oneRM?oneRM+'kg':'—'}
       </div>
-      <button class="wo-set-done-btn ${s.done?'active':''}" onclick="toggleSetDone(${ei},${si})">✓</button>
+      <button class="wo-set-done-btn ${s.done?'active':''}" onclick="toggleSetDone(${ei},${si})" aria-label="Mark set ${si+1} done">✓</button>
     </div>`;
   }).join('');
 
@@ -4734,33 +4580,37 @@ function renderExerciseCard(ex,ei){
 
   // Get saved note for this exercise
   const savedNote = getExerciseNote(exName);
-  const noteHtml = savedNote 
-    ? `<div class="wo-ex-note" onclick="openNoteModal(${ei})"><span class="wo-ex-note-icon">📝</span><span class="wo-ex-note-text">${savedNote}</span></div>`
+  const noteHtml = savedNote
+    ? `<div class="wo-ex-note" onclick="openNoteModal(${ei})"><span class="wo-ex-note-icon">📝</span><span class="wo-ex-note-text">${escapeHtml(savedNote)}</span></div>`
     : '';
 
-  const altHtml=(ex.alternatives||[]).map(a=>{
+  // Alternatives are addressed by index — no name ever has to survive an HTML attribute.
+  const altHtml=(ex.alternatives||[]).map((a,ai)=>{
     const isBackToOriginal = (a === ex.name) && !!ex.swappedTo && a !== ex.swappedTo;
     const icon = isBackToOriginal ? '↺' : '↻';
     const cls = isBackToOriginal ? 'wo-alt-btn wo-alt-btn-back' : 'wo-alt-btn';
-    return `<button class="${cls}" onclick="swapExercise(${ei},'${a.replace(/'/g,"\\'")}')">${icon} ${a}</button>`;
+    return `<button class="${cls}" onclick="swapExercise(${ei},${ai})">${icon} ${escapeHtml(a)}</button>`;
   }).join('');
 
+  const repsLbl = timed ? 'Secs' : 'Reps';
   return `<div class="wo-ex-card ${ex.collapsed?'collapsed':''}" id="wo-ex-${ei}">
     <div class="wo-ex-card-hdr" onclick="toggleExCollapse(${ei})">
-      <div class="wo-ex-card-icon">${getExIcon(ex.name, ex.iconSlug) || ex.icon || '💪'}</div>
+      <div class="wo-ex-card-icon">${getExIcon(exName, ex.swappedTo?null:ex.iconSlug) || ex.icon || '💪'}</div>
       <div class="wo-ex-card-title">
-        <div class="wo-ex-card-name"><a href="https://www.youtube.com/results?search_query=${encodeURIComponent(exName+' proper form')}" target="_blank" rel="noopener" class="wo-ex-link" onclick="event.stopPropagation()">${exName}</a>${savedNote ? '<span class="wo-note-indicator">📝</span>' : ''}</div>
-        <div class="wo-ex-card-meta">${ex.sets.length} sets · ${ex.reps||ex.sets[0]?.reps||'—'} reps · ${ex.rest}s rest</div>
+        <div class="wo-ex-card-name"><a href="https://www.youtube.com/results?search_query=${encodeURIComponent(exName+' proper form')}" target="_blank" rel="noopener" class="wo-ex-link" onclick="event.stopPropagation()">${escapeHtml(exName)}</a>${savedNote ? '<span class="wo-note-indicator">📝</span>' : ''}</div>
+        <div class="wo-ex-card-meta">${ex.sets.length} sets · ${escapeHtml(ex.reps||ex.sets[0]?.reps||'—')}${timed?'':' reps'} · ${ex.rest}s rest</div>
       </div>
       <div class="wo-ex-card-check" id="wo-ex-check-${ei}">${ex.sets.every(s=>s.done)?'✅':'○'}</div>
     </div>
     <div class="wo-ex-card-body">
-      <div class="wo-ex-cue-line">💡 ${ex.cue||''}</div>
+      <div class="wo-ex-cue-line">💡 ${escapeHtml(ex.cue||'')}</div>
+      ${woTargetLine(ex)}
+      ${ex.warmup?`<div class="wo-ex-warmup">🔥 ${escapeHtml(ex.warmup)}</div>`:''}
       ${noteHtml}
-      ${ex.intensityTechnique&&ex.intensityTechnique!=='straight sets'?`<div class="wo-ex-intensity">⚡ ${ex.intensityTechnique}</div>`:''}
+      ${ex.intensityTechnique&&ex.intensityTechnique!=='straight sets'?`<div class="wo-ex-intensity">⚡ ${escapeHtml(ex.intensityTechnique)}${ex.techNote?` <span class="wo-tech-note">— ${escapeHtml(ex.techNote)}</span>`:''}</div>`:''}
       ${pbLine}
       <div class="wo-sets-header">
-        <span>Set</span><span>Last${ghostDateHint?'':''}</span><span>Weight</span><span></span><span>Reps</span><span>1RM</span><span></span>
+        <span>Set</span><span>Last</span><span>Weight</span><span></span><span>${repsLbl}</span><span>1RM</span><span></span>
       </div>
       ${ghostDateHint}
       ${setsHtml}
@@ -4783,70 +4633,80 @@ function renderCardioSection(){
       <div class="wo-cardio-icon-big">${getExIcon(c.machine, c.iconSlug) || c.icon || '🏃'}</div>
       <div>
         <div class="wo-cardio-card-title">Cardio Finisher</div>
-        <div class="wo-cardio-card-sub">${c.machine}</div>
+        <div class="wo-cardio-card-sub">${escapeHtml(c.machine)}</div>
       </div>
       <button class="wo-cardio-done-btn ${c.done?'active':''}" onclick="toggleCardioDone()">✓</button>
     </div>
     <div class="wo-cardio-specs">
-      <div class="wo-cs"><div class="wo-cs-v">${c.duration}</div><div class="wo-cs-l">min</div></div>
-      <div class="wo-cs"><div class="wo-cs-v">${c.speed}</div><div class="wo-cs-l">${c.unit}</div></div>
-      <div class="wo-cs"><div class="wo-cs-v">${c.incline}%</div><div class="wo-cs-l">incline</div></div>
+      ${woCardioSpecs(c).map(sp=>`<div class="wo-cs"><div class="wo-cs-v">${escapeHtml(sp.v)}</div><div class="wo-cs-l">${escapeHtml(sp.l)}</div></div>`).join('')}
     </div>
-    <div class="wo-cardio-rat">${c.rationale||''}</div>
+    <div class="wo-cardio-rat">${escapeHtml(c.rationale||'')}</div>
   </div>`;
 }
 
 // ── Set logging ──
+// Live 1RM readout for one row. (The old selector used :nth-child on a parent that
+// also holds headers and hints, so it never matched and the 1RM never updated.)
+function woRefreshOneRM(ei,si){
+  const ex=_woSession&&_woSession.exercises[ei];if(!ex)return;
+  const row=gv(`wo-set-${ei}-${si}`);if(!row)return;
+  const oneRM=woOneRM(ex,ex.sets[si]);
+  const rm=row.querySelector('.wo-set-1rm');
+  if(rm){rm.textContent=oneRM?oneRM+'kg':'—';rm.style.color=oneRM?'var(--blue2)':'var(--muted)';}
+}
+
 function setExerciseSet(ei,si,field,val){
   if(!_woSession)return;
   _woSession.exercises[ei].sets[si][field]=val;
-  // Update 1RM display live
-  const s=_woSession.exercises[ei].sets[si];
-  const row=document.querySelector(`#wo-ex-${ei} .wo-set-row:nth-child(${si+1})`);
-  if(row){
-    const oneRM=s.weight&&s.reps?epley(parseFloat(s.weight),parseInt(s.reps)):null;
-    const rm=row.querySelector('.wo-set-1rm');
-    if(rm){rm.textContent=oneRM?oneRM+'kg':'—';rm.style.color=oneRM?'var(--blue2)':'var(--muted)';}
-  }
+  woRefreshOneRM(ei,si);
   woSave(WO_KEY,_woSession);
 }
 
 function toggleSetDone(ei,si){
   if(!_woSession)return;
-  const set=_woSession.exercises[ei].sets[si];
+  const ex=_woSession.exercises[ei];
+  const set=ex.sets[si];
+  const name=ex.swappedTo||ex.name;
+  const timed=ex.unit==='sec';
   set.done=!set.done;
-  // Update PB if completing a set
-  if(set.done && set.weight && set.reps){
-    const ex=_woSession.exercises[ei];
-    const name=ex.swappedTo||ex.name;
-    const pbs=woPBs();
-    const oneRM=epley(parseFloat(set.weight),parseInt(set.reps));
-    if(!pbs[name]||oneRM>pbs[name].oneRM){
-      pbs[name]={weight:parseFloat(set.weight),reps:parseInt(set.reps),oneRM,date:new Date().toISOString()};
-      woSave(WO_PBS_KEY,pbs);
+
+  if(set.done){
+    // One-tap logging: anything left blank adopts the prescribed target.
+    if((set.weight===''||set.weight==null)){
+      if(set.tw!=null)set.weight=String(set.tw);
+      else if(ex.bw||timed)set.weight='0';            // bodyweight / holds: no added load
     }
-    // Show effort rating for next set suggestion
-    const nextSetIndex = si + 1;
-    if (nextSetIndex < ex.sets.length && !ex.sets[nextSetIndex].done) {
-      _currentSuggestion = { ei, nextSetIndex, baseWeight: parseFloat(set.weight), baseReps: parseInt(set.reps) };
+    if((set.reps===''||set.reps==null)&&set.tr!=null)set.reps=String(set.tr);
+
+    const w=parseFloat(set.weight),r=parseInt(set.reps);
+    if(!timed&&w>0&&r>0){
+      // Personal best: only a beaten PB is news; the very first log just becomes the baseline.
+      const pbs=Object.assign({},woPBs());
+      const oneRM=epley(w,r);
+      const prev=pbs[name];
+      if(!prev||oneRM>prev.oneRM){
+        pbs[name]={weight:w,reps:r,oneRM,date:new Date().toISOString()};
+        woSave(WO_PBS_KEY,pbs);
+        if(prev){
+          const hits=(_woSession.pbHits=_woSession.pbHits||[]);
+          const i=hits.findIndex(h=>h.name===name);
+          const rec={name,weight:w,reps:r,oneRM,prevOneRM:prev.oneRM};
+          if(i>=0)hits[i]=rec;else hits.push(rec);
+          woToast(`🏆 New PB — ${name}: ${w}kg × ${r} (1RM ${oneRM}kg)`);
+        }
+      }
+    }
+    // Offer the effort rating for the next set
+    const nextSetIndex=si+1;
+    if(!timed&&w>0&&r>0&&nextSetIndex<ex.sets.length&&!ex.sets[nextSetIndex].done){
+      _currentSuggestion={ei,nextSetIndex,baseWeight:w,baseReps:r};
     }
   }
   woSave(WO_KEY,_woSession);
-  // Re-render just the check icon
-  const check=gv(`wo-ex-check-${ei}`);
-  if(check)check.textContent=_woSession.exercises[ei].sets.every(s=>s.done)?'✅':'○';
-  // Re-render exercises
-  renderExercises();
-  // Start rest timer AFTER render (so the element exists)
+  renderExerciseCardAt(ei);
   if(set.done){
-    const rest=_woSession.exercises[ei].rest||90;
-    setTimeout(()=>{
-      startRestTimer(ei,rest);
-    }, 50);
-    // Show effort rating for next-set suggestion (if one is pending)
-    if(_currentSuggestion && _currentSuggestion.ei === ei){
-      setTimeout(()=>showEffortRating(ei), 50);
-    }
+    startRestTimer(ei,ex.rest||90);
+    if(_currentSuggestion&&_currentSuggestion.ei===ei)showEffortRating(ei);
   }
 }
 
@@ -4882,193 +4742,106 @@ function hideEffortRating(ei) {
 
 function applyEffortSuggestion(effort) {
   if (!_currentSuggestion || !_woSession) return;
-  
+
   const { ei, nextSetIndex, baseWeight, baseReps } = _currentSuggestion;
   const ex = _woSession.exercises[ei];
   const nextSet = ex.sets[nextSetIndex];
-  
+
   if (!nextSet || nextSet.done) { _currentSuggestion = null; return; }
-  
-  let suggestedWeight, suggestedReps;
-  
-  switch (effort) {
-    case 'easy':
-      // Increase weight by 2.5-5kg
-      suggestedWeight = baseWeight + (baseWeight >= 50 ? 5 : 2.5);
-      suggestedReps = baseReps;
-      break;
-    case 'good':
-      // Keep same
-      suggestedWeight = baseWeight;
-      suggestedReps = baseReps;
-      break;
-    case 'hard':
-      // Keep weight, maybe reduce reps by 1
-      suggestedWeight = baseWeight;
-      suggestedReps = Math.max(baseReps - 1, 1);
-      break;
-    default:
-      suggestedWeight = baseWeight;
-      suggestedReps = baseReps;
+
+  let suggestedWeight = baseWeight, suggestedReps = baseReps;
+  if (effort === 'easy') {
+    suggestedWeight = baseWeight + (baseWeight >= 50 ? 5 : 2.5);   // bump the load
+  } else if (effort === 'hard') {
+    suggestedReps = Math.max(baseReps - 1, 1);                     // same load, one fewer rep
   }
-  
-  // Apply to next set
-  nextSet.weight = suggestedWeight;
-  nextSet.reps = suggestedReps;
+
+  nextSet.weight = String(suggestedWeight);
+  nextSet.reps = String(suggestedReps);
   woSave(WO_KEY, _woSession);
-  
+
   hideEffortRating(ei);
-  
-  // Re-render and show toast
-  renderExercises();
+
+  // Patch just that row's inputs — a full re-render would wipe the running rest timer.
+  const row = gv(`wo-set-${ei}-${nextSetIndex}`);
+  if (row) {
+    const inputs = row.querySelectorAll('input');
+    if (inputs[0]) inputs[0].value = nextSet.weight;
+    if (inputs[1]) inputs[1].value = nextSet.reps;
+    woRefreshOneRM(ei, nextSetIndex);
+  }
   showSuggestionToast(suggestedWeight, suggestedReps, effort);
   _currentSuggestion = null;
 }
 
 function showSuggestionToast(weight, reps, effort) {
-  const existing = document.querySelector('.wo-suggestion-toast');
-  if (existing) existing.remove();
-  
   const emoji = effort === 'easy' ? '📈' : effort === 'hard' ? '📉' : '➡️';
-  const toast = document.createElement('div');
-  toast.className = 'wo-suggestion-toast';
-  toast.innerHTML = `${emoji} Next set: ${weight}kg × ${reps}`;
-  document.body.appendChild(toast);
-  
-  setTimeout(() => toast.classList.add('show'), 10);
-  setTimeout(() => {
-    toast.classList.remove('show');
-    setTimeout(() => toast.remove(), 300);
-  }, 2000);
+  woToast(`${emoji} Next set: ${weight}kg × ${reps}`);
 }
 
 function toggleExCollapse(ei){
   if(!_woSession)return;
   _woSession.exercises[ei].collapsed=!_woSession.exercises[ei].collapsed;
-  renderExercises();
+  renderExerciseCardAt(ei);
 }
 
 function addSet(ei){
   if(!_woSession)return;
-  _woSession.exercises[ei].sets.push({weight:'',reps:'',rpe:'',done:false});
+  const sets=_woSession.exercises[ei].sets;
+  const last=sets[sets.length-1];
+  const ns={weight:'',reps:'',rpe:'',done:false};
+  if(last&&last.tw!=null){ns.tw=last.tw;ns.tr=last.tr;}   // extra set inherits the target
+  sets.push(ns);
   woSave(WO_KEY,_woSession);
-  renderExercises();
+  renderExerciseCardAt(ei);
 }
 
-// ── AI Suggest More Exercises ──
-async function suggestMoreExercises() {
+// ── Suggest more exercises (local) ──
+// Finds the least-covered muscles of today's split and proposes low-recovery-cost
+// isolation work for them, preferring stretched-position movements you haven't done lately.
+function suggestMoreExercises() {
   if (!_woSession) return;
-  
   const suggestEl = gv('wo-suggested-exercises');
-  const btn = document.querySelector('.wo-add-exercises-btn');
   if (!suggestEl) return;
-  
-  // Show loading state
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner-sm"></span> Generating...';
-  suggestEl.innerHTML = '';
-  
-  // Build context about current workout
-  const currentExercises = _woSession.exercises.map(ex => ex.swappedTo || ex.name);
-  const muscleGroups = _woSession.muscleGroups || [];
-  const splitName = _woSession.splitName || '';
-  
-  const prompt = `Based on this ${splitName} workout targeting ${muscleGroups.join(', ')}, suggest 2-3 complementary exercises to add.
 
-Current exercises: ${currentExercises.join(', ')}
-
-Return ONLY valid JSON array (no markdown, no backticks):
-[
-  {
-    "name": "Exercise Name",
-    "sets": 3,
-    "reps": "10-12",
-    "rest": 60,
-    "muscle_group": "primary muscle",
-    "reason": "brief reason why this complements the workout"
+  const extras = WoEngine.suggestExtras(_woSession, woEngineInput({ recovery: _woSession.recovery ?? null }));
+  if (!extras.length) {
+    suggestEl.innerHTML = `<div class="wo-suggest-error">Nothing more to add — today's plan already covers this split.</div>`;
+    return;
   }
-]
-
-Requirements:
-- Suggest exercises that complement what's already in the workout
-- Target any undertrained muscle groups
-- Avoid repeating exercises already listed
-- Keep it practical for a gym setting`;
-
-  try {
-    const data = await callAI({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 500,
-      messages: [{ role: 'user', content: prompt }]
-    });
-    
-    const responseText = data?.content?.[0]?.text || '';
-    const suggestions = extractJSON(responseText);
-    
-    if (!suggestions || !Array.isArray(suggestions)) {
-      throw new Error('Invalid response format');
-    }
-    
-    // Render suggestion cards
-    suggestEl.innerHTML = `
-      <div class="wo-suggest-title">Suggested Exercises</div>
-      ${suggestions.map((s, i) => `
-        <div class="wo-suggest-card">
-          <div class="wo-suggest-card-top">
-            <div class="wo-suggest-card-icon">${getExIcon(s.name)}</div>
-            <div class="wo-suggest-card-info">
-              <div class="wo-suggest-card-name">${s.name}</div>
-              <div class="wo-suggest-card-meta">${s.sets} sets · ${s.reps} reps · ${s.muscle_group}</div>
-            </div>
-            <button class="wo-suggest-add-btn" onclick="addSuggestedExercise(${i})">+ Add</button>
+  window._suggestedExercises = extras;
+  suggestEl.innerHTML = `
+    <div class="wo-suggest-title">Suggested Exercises</div>
+    ${extras.map((s, i) => `
+      <div class="wo-suggest-card">
+        <div class="wo-suggest-card-top">
+          <div class="wo-suggest-card-icon">${getExIcon(s.name)}</div>
+          <div class="wo-suggest-card-info">
+            <div class="wo-suggest-card-name">${escapeHtml(s.name)}</div>
+            <div class="wo-suggest-card-meta">${s.sets} sets · ${escapeHtml(s.reps)} reps · ${escapeHtml(s.muscle)}</div>
           </div>
-          <div class="wo-suggest-card-reason">${s.reason}</div>
+          <button class="wo-suggest-add-btn" onclick="addSuggestedExercise(${i})">+ Add</button>
         </div>
-      `).join('')}
-    `;
-    
-    // Store suggestions for adding
-    window._suggestedExercises = suggestions;
-    
-  } catch (e) {
-    console.error('[reBorn] Suggest exercises error:', e);
-    suggestEl.innerHTML = `<div class="wo-suggest-error">Failed to generate suggestions. <button onclick="suggestMoreExercises()">Try Again</button></div>`;
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = '+ Add Exercises (AI Suggest)';
-  }
+        <div class="wo-suggest-card-reason">${escapeHtml(s.reason)}</div>
+      </div>
+    `).join('')}
+  `;
 }
 
 function addSuggestedExercise(index) {
   if (!_woSession || !window._suggestedExercises?.[index]) return;
-  
+
   const s = window._suggestedExercises[index];
-  const newExercise = {
-    name: s.name,
-    icon: getExIcon(s.name),
-    iconSlug: getExIconSlug(s.name),
-    sets: Array.from({ length: s.sets }, () => ({ weight: '', reps: '', rpe: '', done: false })),
-    reps: s.reps,
-    rest: s.rest || 60,
-    alternatives: [],
-    cue: getExerciseCue(s.name),
-    collapsed: false,
-    swappedTo: null,
-  };
-  
-  _woSession.exercises.push(newExercise);
+  _woSession.exercises.push(woSessionExercise({ ...s, icon: getExIcon(s.name), iconSlug: getExIconSlug(s.name) }));
   woSave(WO_KEY, _woSession);
   renderExercises();
-  
-  // Remove the added suggestion from UI
+
   const cards = document.querySelectorAll('.wo-suggest-card');
   if (cards[index]) {
     cards[index].style.opacity = '0.5';
-    cards[index].querySelector('.wo-suggest-add-btn').textContent = '✓ Added';
-    cards[index].querySelector('.wo-suggest-add-btn').disabled = true;
+    const btn = cards[index].querySelector('.wo-suggest-add-btn');
+    if (btn) { btn.textContent = '✓ Added'; btn.disabled = true; }
   }
-  
-  // Scroll to the new exercise
   setTimeout(() => {
     const newExEl = gv(`wo-ex-${_woSession.exercises.length - 1}`);
     if (newExEl) newExEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -5147,36 +4920,53 @@ function getExerciseCue(exerciseName) {
   return 'Focus on the target muscle, control the movement, full range of motion.';
 }
 
-function swapExercise(ei,newName){
+function swapExercise(ei,ai){
   if(!_woSession)return;
   const ex = _woSession.exercises[ei];
   if (!ex) return;
+  const newName = typeof ai === 'number' ? (ex.alternatives||[])[ai] : ai;
+  if (!newName) return;
 
   // The exercise currently visible (before swap).
   const currentDisplayed = ex.swappedTo || ex.name;
 
   // Remove the chosen new exercise from the alternatives pool…
-  if (Array.isArray(ex.alternatives)) {
-    ex.alternatives = ex.alternatives.filter(a => a !== newName);
-  } else {
-    ex.alternatives = [];
-  }
+  ex.alternatives = Array.isArray(ex.alternatives) ? ex.alternatives.filter(a => a !== newName) : [];
 
   // …and add the previously-displayed exercise to the pool so the user can swap back.
   if (currentDisplayed && currentDisplayed !== newName &&
       !ex.alternatives.includes(currentDisplayed)) {
     ex.alternatives.unshift(currentDisplayed); // put "swap back" first
   }
-
-  // Cap alternatives list — keep it scannable.
   if (ex.alternatives.length > 4) ex.alternatives = ex.alternatives.slice(0, 4);
 
   ex.swappedTo = newName;
   ex.icon = getExIcon(newName);
   ex.iconSlug = getExIconSlug(newName);
-  ex.cue = getExerciseCue(newName);
+
+  // Everything that depends on the movement is re-derived: cue, units, targets, warm-up.
+  const lib = WoEngine.byName(newName);
+  ex.cue = lib ? lib.cue : getExerciseCue(newName);
+  ex.unit = lib ? lib.unit : 'reps';
+  ex.bw = lib ? lib.bw : false;
+  const fresh = lib ? WoEngine.exerciseFor(newName, woEngineInput({
+    block: _woSession.block, split: _woSession.splitCategory, slot: ex.slot, recovery: _woSession.recovery ?? null,
+  })) : null;
+  if (fresh) {
+    ex.targets = fresh.targets; ex.progression = fresh.progression; ex.lastText = fresh.lastText;
+    ex.isNew = fresh.isNew; ex.warmup = fresh.warmup; ex.muscle = fresh.muscle; ex.held = false;
+    ex.intensityTechnique = 'straight sets'; ex.techNote = null;
+  } else {
+    ex.targets = null; ex.lastText = ''; ex.warmup = null; ex.isNew = true;
+  }
+  // Untouched sets pick up the new targets; anything already logged is left as typed.
+  ex.sets.forEach((s, si) => {
+    if (s.done || s.weight !== '' || s.reps !== '') return;
+    const t = ex.targets && ex.targets[si];
+    if (t) { s.tw = t.w; s.tr = t.r; } else { delete s.tw; delete s.tr; }
+  });
   woSave(WO_KEY, _woSession);
-  renderExercises();
+  renderExerciseCardAt(ei);
 }
 
 function toggleCardioDone(){
@@ -5186,69 +4976,89 @@ function toggleCardioDone(){
   renderCardioSection();
 }
 
-// ── Rest timer (enhanced) ──
-let _restTimerState = { ei: null, remaining: 0, total: 0 };
+// ── Rest timer ──
+// Derived from an end timestamp rather than counted down tick by tick, so it stays
+// accurate when the phone throttles timers in a locked / backgrounded app.
+let _restTimerState = { ei: null, endAt: 0, total: 0, active: false, shown: -1 };
+
+function _restRemaining() { return Math.max(0, Math.ceil((_restTimerState.endAt - Date.now()) / 1000)); }
+
+function _restDraw(force) {
+  const st = _restTimerState;
+  if (!st.active) return;
+  const el = gv(`wo-rest-timer-${st.ei}`);
+  if (!el) return;
+  const remaining = _restRemaining();
+  if (!force && remaining === st.shown && el.style.display === 'flex') return;
+  st.shown = remaining;
+  el.style.display = 'flex';
+  const mins = Math.floor(remaining / 60);
+  const secsLeft = remaining % 60;
+  const timeStr = mins > 0 ? `${mins}:${secsLeft.toString().padStart(2, '0')}` : `${secsLeft}s`;
+  const progress = st.total > 0 ? (st.total - remaining) / st.total : 0;
+  const isUrgent = remaining <= 10;
+  const isPulsing = remaining <= 5 && remaining > 0;
+  el.innerHTML = `
+    <div class="rest-timer-content ${isUrgent ? 'urgent' : ''} ${isPulsing ? 'pulsing' : ''}">
+      <div class="rest-timer-bar" style="width: ${progress * 100}%"></div>
+      <div class="rest-timer-time">${timeStr}</div>
+      <div class="rest-timer-btns">
+        <button class="rest-timer-btn" onclick="addRestTime(30)">+30s</button>
+        <button class="rest-timer-btn skip" onclick="skipRestTimer()">Skip</button>
+      </div>
+    </div>
+  `;
+}
+// After a card is re-rendered its timer element is brand new — paint the running timer back in.
+function _restRedraw() { _restDraw(true); }
 
 function startRestTimer(ei, secs) {
+  // only one timer at a time: clear the previous exercise's display
+  const prev = _restTimerState;
+  if (prev.ei !== null && prev.ei !== ei) {
+    const pe = gv(`wo-rest-timer-${prev.ei}`);
+    if (pe) { pe.style.display = 'none'; pe.innerHTML = ''; }
+  }
   if (_woRestInt) clearInterval(_woRestInt);
-  
-  _restTimerState = { ei, remaining: secs, total: secs };
-  
-  const el = gv(`wo-rest-timer-${ei}`);
-  if (!el) return;
-  
-  el.style.display = 'flex';
-  
-  const renderTimer = () => {
-    const mins = Math.floor(_restTimerState.remaining / 60);
-    const secsLeft = _restTimerState.remaining % 60;
-    const timeStr = mins > 0 
-      ? `${mins}:${secsLeft.toString().padStart(2, '0')}` 
-      : `${secsLeft}s`;
-    
-    const progress = (_restTimerState.total - _restTimerState.remaining) / _restTimerState.total;
-    const isUrgent = _restTimerState.remaining <= 10;
-    const isPulsing = _restTimerState.remaining <= 5 && _restTimerState.remaining > 0;
-    
-    el.innerHTML = `
-      <div class="rest-timer-content ${isUrgent ? 'urgent' : ''} ${isPulsing ? 'pulsing' : ''}">
-        <div class="rest-timer-bar" style="width: ${progress * 100}%"></div>
-        <div class="rest-timer-time">${timeStr}</div>
-        <div class="rest-timer-btns">
-          <button class="rest-timer-btn" onclick="addRestTime(30)">+30s</button>
-          <button class="rest-timer-btn skip" onclick="skipRestTimer()">Skip</button>
-        </div>
-      </div>
-    `;
-  };
-  
-  const update = () => {
-    if (_restTimerState.remaining <= 0) {
-      // Timer complete
-      el.innerHTML = `<div class="rest-timer-done">Go! 💪</div>`;
-      clearInterval(_woRestInt);
-      playRestChime();
-      if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-      setTimeout(() => { el.style.display = 'none'; }, 2000);
-      return;
-    }
-    renderTimer();
-    _restTimerState.remaining--;
-  };
-  
-  update();
-  _woRestInt = setInterval(update, 1000);
+  _restTimerState = { ei, endAt: Date.now() + secs * 1000, total: secs, active: true, shown: -1 };
+  _restDraw(true);
+  _woRestInt = setInterval(_restTick, 500);
 }
 
+function _restTick() {
+  const st = _restTimerState;
+  if (!st.active) { if (_woRestInt) clearInterval(_woRestInt); return; }
+  if (_restRemaining() <= 0) {
+    st.active = false;
+    clearInterval(_woRestInt);
+    const ei = st.ei;
+    const el = gv(`wo-rest-timer-${ei}`);
+    if (el) { el.style.display = 'flex'; el.innerHTML = `<div class="rest-timer-done">Go! 💪</div>`; }
+    playRestChime();
+    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+    setTimeout(() => {
+      const e2 = gv(`wo-rest-timer-${ei}`);
+      if (e2 && !(_restTimerState.active && _restTimerState.ei === ei)) e2.style.display = 'none';
+    }, 2000);
+    return;
+  }
+  _restDraw(false);
+}
+// Catch up immediately when the app comes back to the foreground.
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') _restTick(); });
+
 function addRestTime(secs) {
-  _restTimerState.remaining += secs;
+  if (!_restTimerState.active) return;
+  _restTimerState.endAt += secs * 1000;
   _restTimerState.total += secs;
+  _restDraw(true);
 }
 
 function skipRestTimer() {
   if (_woRestInt) clearInterval(_woRestInt);
+  _restTimerState.active = false;
   const el = gv(`wo-rest-timer-${_restTimerState.ei}`);
-  if (el) el.style.display = 'none';
+  if (el) { el.style.display = 'none'; el.innerHTML = ''; }
 }
 
 function playRestChime() {
@@ -5407,9 +5217,40 @@ function _buildChimeAudioEl() {
 })();
 
 // ── Finish workout ──
+// A pending (debounced) cloud push of the live session must be cancelled whenever the
+// session ends — otherwise it could re-upload a stale in-progress copy after we delete it.
+function _woCancelPush(key){
+  if(_woPushTimers[key]){clearTimeout(_woPushTimers[key].t);delete _woPushTimers[key];}
+}
+function _woClearLiveSession(){
+  _woCancelPush(WO_KEY);
+  localStorage.removeItem(WO_KEY);
+  if(typeof cloudDelete==='function')cloudDelete(WO_KEY);
+}
+
+function discardWorkout(){
+  if(_woTimerInt)clearInterval(_woTimerInt);
+  if(_woRestInt)clearInterval(_woRestInt);
+  _restTimerState.active=false;
+  _currentSuggestion=null;
+  _woSession=null;_woPlan=null;
+  _woClearLiveSession();
+  gv('wo-active-view').style.display='none';
+  gv('wo-generate-view').style.display='block';
+  const prev=gv('wo-plan-preview');if(prev)prev.style.display='none';
+  renderWorkoutPage();
+}
+
 async function finishWorkout(){
   if(!_woSession)return;
+  // Saving an empty session would advance the split rotation for nothing — offer to discard instead.
+  if(!_woSession.exercises.some(ex=>ex.sets.some(s=>s.done))){
+    if(window.confirm('No sets logged yet. Discard this workout instead of saving it?'))discardWorkout();
+    return;
+  }
   if(_woTimerInt)clearInterval(_woTimerInt);
+  if(_woRestInt)clearInterval(_woRestInt);
+  _restTimerState.active=false;
   _woSession.inProgress=false;
   _woSession.endTime=Date.now();
   const durMins=Math.round((_woSession.endTime-_woSession.startTime)/60000);
@@ -5426,6 +5267,18 @@ async function finishWorkout(){
 
   // Show strain rating BEFORE saving to history
   showStrainRating(_woSession);
+}
+
+// History keeps what happened, not how it was planned: drops the plan copy, the
+// alternatives list and per-set target placeholders (roughly halves each session's size).
+function woCompactSession(session){
+  const c={...session};
+  delete c.plan;
+  c.exercises=(session.exercises||[]).map(ex=>{
+    const {alternatives,targets,warmup,collapsed,lastText,techNote,...rest}=ex;
+    return {...rest,sets:ex.sets.map(({tw,tr,...r})=>r)};
+  });
+  return c;
 }
 
 function showStrainRating(session) {
@@ -5478,15 +5331,14 @@ function saveStrainAndFinish() {
   });
   save(whoopLogsKey, logs);
 
-  // Save to history
-  const hist = woHistory();
-  hist.push(session);
+  // Save to history (copy — the cached array is shared and must stay read-only)
+  const hist = woHistory().slice();
+  hist.push(woCompactSession(session));
   woSave(WO_HIST_KEY, hist);
   // Clear the active session locally AND in the cloud. Without the cloud
   // delete, the finished session survived on the server and cloudPull restored
   // it on the next load — the ended workout came back as still in-progress.
-  localStorage.removeItem(WO_KEY);
-  if (typeof cloudDelete === 'function') cloudDelete(WO_KEY);
+  _woClearLiveSession();
 
   // Remove strain modal
   const strainModal = gv('wo-strain-modal');
@@ -5500,23 +5352,22 @@ function saveStrainAndFinish() {
 }
 
 function showWorkoutSummary(session){
-  // Build PB highlights
-  const pbs=woPBs();
-  const pbHtml=session.exercises.map(ex=>{
-    const name=ex.swappedTo||ex.name;
-    const pb=pbs[name];
-    if(!pb)return '';
-    return `<div class="wo-sum-pb">🏆 ${name}: ${pb.weight}kg × ${pb.reps} → 1RM <strong>${pb.oneRM}kg</strong></div>`;
-  }).filter(Boolean).join('');
+  // PB highlights: only records actually broken in THIS session (previously every
+  // exercise that had any PB at all was listed, whenever it was set).
+  const pbHtml=(session.pbHits||[]).map(h=>
+    `<div class="wo-sum-pb"><span>🏆</span><span class="wo-sum-pb-txt">${escapeHtml(h.name)}: ${h.weight}kg × ${h.reps} → 1RM <strong>${h.oneRM}kg</strong></span><span class="wo-sum-pb-up">+${Math.round((h.oneRM-h.prevOneRM)*10)/10}kg</span></div>`
+  ).join('');
+  const setsDone=(session.exercises||[]).reduce((a,ex)=>a+ex.sets.filter(s=>s.done).length,0);
 
   const strainColor = session.strain >= 18 ? '#ef4444' : session.strain >= 14 ? '#f97316' : session.strain >= 10 ? '#eab308' : '#22c55e';
 
   const html=`<div class="wo-summary-modal" id="wo-sum-modal">
     <div class="wo-sum-inner">
       <div class="wo-sum-title">Workout Complete 💪</div>
-      <div class="wo-sum-split">${session.splitName}</div>
+      <div class="wo-sum-split">${escapeHtml(session.splitName||'')}</div>
       <div class="wo-sum-stats">
         <div class="wo-ss"><div class="wo-ss-v">${session.duration}</div><div class="wo-ss-l">minutes</div></div>
+        <div class="wo-ss"><div class="wo-ss-v">${setsDone}</div><div class="wo-ss-l">sets</div></div>
         <div class="wo-ss"><div class="wo-ss-v">${session.totalVolume?.toLocaleString()}</div><div class="wo-ss-l">kg volume</div></div>
         <div class="wo-ss"><div class="wo-ss-v" style="color:${strainColor}">${session.strain || '—'}</div><div class="wo-ss-l">strain</div></div>
       </div>
@@ -5548,13 +5399,21 @@ function saveAsRoutine(){
   const name=window.prompt('Name this routine:',session.splitName||'My Routine');
   if(!name||!name.trim())return;
   const routines=load(WO_ROUTINES_KEY,[]);
+  const c=session.cardio;
   routines.push({
     id:Date.now().toString(36),
     name:name.trim(),
     splitName:session.splitName||'',
+    splitCategory:session.splitCategory||null,
     muscleGroups:session.muscleGroups||[],
-    exercises:(session.exercises||[]).map(({name,sets,reps,rest,cue,icon,alternatives})=>({name,sets,reps,rest,cue,icon,alternatives})),
-    cardio:session.cardio?{type:session.cardio.type,duration:session.cardio.duration,intensity:session.cardio.intensity}:null,
+    // `sets` is a COUNT. (It used to be the logged-sets array, so a loaded routine had 0 sets.)
+    exercises:(session.exercises||[]).map(ex=>({
+      name:ex.swappedTo||ex.name,
+      sets:Array.isArray(ex.sets)?ex.sets.length:(parseInt(ex.sets)||3),
+      reps:ex.reps||'',rest:ex.rest||90,cue:ex.cue||'',icon:ex.icon,
+      intensityTechnique:ex.intensityTechnique||'straight sets',
+    })),
+    cardio:(c&&c.machine)?{machine:c.machine,key:c.key,iconSlug:c.iconSlug,duration:c.duration,specs:c.specs,speed:c.speed,unit:c.unit,incline:c.incline,rationale:c.rationale}:null,
     savedAt:new Date().toISOString()
   });
   save(WO_ROUTINES_KEY,routines);
@@ -5589,15 +5448,31 @@ function showRoutinesModal(){
 function loadRoutine(id){
   const r=load(WO_ROUTINES_KEY,[]).find(x=>x.id===id);
   if(!r)return;
+  const hist=woHistory(),now=Date.now();
+  const exercises=(r.exercises||[]).map(rx=>{
+    // legacy routines stored the logged-sets array in `sets`
+    const sets=Array.isArray(rx.sets)?rx.sets.length:(parseInt(rx.sets)||3);
+    const lib=WoEngine.byName(rx.name);
+    const t=WoEngine.targetsFor(rx.name,{history:hist,now,sets,reps:rx.reps});
+    return {
+      name:rx.name,sets,reps:rx.reps||'8-12',rest:rx.rest||90,
+      cue:rx.cue||(lib?lib.cue:getExerciseCue(rx.name)),icon:rx.icon,
+      unit:lib?lib.unit:'reps',bw:lib?lib.bw:false,
+      intensityTechnique:rx.intensityTechnique||'straight sets',
+      targets:t?t.targets:null,lastText:t?t.lastText:'',isNew:t?t.isNew:false,progression:t?t.kind:null,
+      alternatives:[],
+    };
+  });
   _woPlan={
     splitName:r.splitName,
+    splitCategory:r.splitCategory||null,
     muscleGroups:r.muscleGroups||[],
-    coachNote:'Loaded from saved routine.',
-    exercises:r.exercises||[],
-    cardio:r.cardio||null
+    coachNote:'Loaded from saved routine — targets refreshed from your history.',
+    exercises,
+    cardio:(r.cardio&&r.cardio.machine)?r.cardio:null   // very old routines stored a different cardio shape
   };
   const m=gv('wo-routines-modal');if(m)m.remove();
-  renderWorkoutPreview();
+  renderWorkoutPreview(true);
 }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -5625,6 +5500,7 @@ function showWorkoutHistory(){
 function closeWorkoutHistory(){
   const el=gv('wo-hist-modal');if(el)el.remove();
   _woHistMode=false;
+  _woHistLimit=30;
 }
 
 function woHistBack(){
@@ -5633,24 +5509,30 @@ function woHistBack(){
   gv('wo-hist-back-btn').style.display=_woHistPage==='list'?'none':'block';
 }
 
+let _woHistLimit=30;
 function renderHistoryList(){
   const el=gv('wo-hist-content');if(!el)return;
-  const hist=woHistory().reverse();
+  const all=woHistory();                        // shared cached array — read only
   const titleEl=gv('wo-hist-title');if(titleEl)titleEl.textContent='History';
   const backBtn=gv('wo-hist-back-btn');if(backBtn)backBtn.style.display='none';
 
-  if(!hist.length){
+  if(!all.length){
     el.innerHTML=`<div class="wo-hist-empty">No workouts yet.<br>Complete your first session!</div>`;
     return;
   }
 
-  el.innerHTML=hist.map((s,i)=>{
+  // Newest first, paged. Rows carry an index, not a copy of the whole session in an attribute.
+  const shown=Math.min(_woHistLimit,all.length);
+  let html='';
+  for(let k=0;k<shown;k++){
+    const idx=all.length-1-k;
+    const s=all[idx];
     const date=new Date(s.date).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
-    return `<div class="wo-hist-row" onclick="renderHistoryDetail(${JSON.stringify(s).replace(/"/g,'&quot;')})">
+    html+=`<div class="wo-hist-row" onclick="openHistSession(${idx})">
       <div class="wo-hr-left">
-        <div class="wo-hr-split">${s.splitName||'Workout'}</div>
+        <div class="wo-hr-split">${escapeHtml(s.splitName||'Workout')}</div>
         <div class="wo-hr-date">${date}</div>
-        <div class="wo-hr-muscles">${(s.muscleGroups||[]).map(m=>`<span class="wo-muscle-chip">${m}</span>`).join('')}</div>
+        <div class="wo-hr-muscles">${(s.muscleGroups||[]).map(m=>`<span class="wo-muscle-chip">${escapeHtml(m)}</span>`).join('')}</div>
       </div>
       <div class="wo-hr-right">
         <div class="wo-hr-vol">${s.totalVolume?.toLocaleString()||'—'}<span class="wo-hr-unit">kg</span></div>
@@ -5658,8 +5540,12 @@ function renderHistoryList(){
         <div class="wo-hr-arrow">›</div>
       </div>
     </div>`;
-  }).join('');
+  }
+  if(shown<all.length)html+=`<button class="wo-hist-more" onclick="woHistMore()">Show older (${all.length-shown} more)</button>`;
+  el.innerHTML=html;
 }
+function woHistMore(){_woHistLimit+=30;renderHistoryList();}
+function openHistSession(idx){const s=woHistory()[idx];if(s)renderHistoryDetail(s);}
 
 function renderHistoryDetail(session){
   if(typeof session==='string'){try{session=JSON.parse(session);}catch{return;}}
@@ -5676,7 +5562,7 @@ function renderHistoryDetail(session){
     const bestSet=doneSets.reduce((b,s)=>epley(parseFloat(s.weight),parseInt(s.reps))>epley(parseFloat(b.weight||0),parseInt(b.reps||1))?s:b,doneSets[0]);
     return `<div class="wo-det-ex" onclick="renderExerciseProgression('${name.replace(/'/g,"\\'")}')">
       <div class="wo-det-ex-top">
-        <div class="wo-det-ex-name">${getExIcon(name, ex.iconSlug) || ex.icon || '💪'} ${name}</div>
+        <div class="wo-det-ex-name">${getExIcon(name, ex.iconSlug) || ex.icon || '💪'} ${escapeHtml(name)}</div>
         <div class="wo-det-ex-arrow">›</div>
       </div>
       <div class="wo-det-sets">
@@ -5713,7 +5599,7 @@ function renderExerciseProgression(exName){
   hist.forEach(session=>{
     (session.exercises||[]).forEach(ex=>{
       const name=ex.swappedTo||ex.name;
-      if(name===exName){
+      if(WoEngine.canon(name)===WoEngine.canon(exName)){      // "Incline DB Press" and "Incline Dumbbell Press" are one lift
         const doneSets=ex.sets.filter(s=>s.done&&s.weight&&s.reps);
         if(doneSets.length){
           const best=doneSets.reduce((b,s)=>epley(parseFloat(s.weight),parseInt(s.reps))>epley(parseFloat(b.weight||0),parseInt(b.reps||1))?s:b,doneSets[0]);

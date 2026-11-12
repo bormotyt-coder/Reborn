@@ -367,7 +367,7 @@
     <div id="wo-last-session"></div>
     <div id="wo-generating" class="wo-generating" style="display:none">
       <div class="coach-spin"></div>
-      <span>Generating your split…</span>
+      <span>Building your workout…</span>
     </div>
     <div id="wo-plan-preview" style="display:none">
       <div class="wo-plan-header">
@@ -375,6 +375,7 @@
           <div class="wo-split-name" id="wpp-name"></div>
           <div class="wo-split-note" id="wpp-note"></div>
         </div>
+        <button class="wo-reroll-btn" onclick="rerollWorkout()" title="Generate a different workout" aria-label="Generate a different workout">🔀</button>
         <button class="wo-start-btn" onclick="startWorkout()">Start →</button>
       </div>
       <div id="wpp-exercises"></div>
@@ -396,7 +397,7 @@
     </div>
     <div id="wo-exercises"></div>
     <div id="wo-add-exercises-section" style="display:none">
-      <button class="wo-add-exercises-btn" onclick="suggestMoreExercises()">+ Add Exercises (AI Suggest)</button>
+      <button class="wo-add-exercises-btn" onclick="suggestMoreExercises()">+ Add Exercises</button>
       <div id="wo-suggested-exercises"></div>
     </div>
     <div id="wo-cardio-section"></div>
@@ -1150,6 +1151,7 @@
 </div>
 
 <script src="data.js"></script>
+<script src="workout-engine.js"></script>
 <script src="app.js"></script>
 <script src="cloud.js"></script>
 <script>
