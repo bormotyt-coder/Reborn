@@ -386,6 +386,13 @@
       </div>
       <div id="wpp-exercises" class="wo-ex-list"></div>
       <div id="wpp-cardio"></div>
+      <!-- Appears once the header's Start button scrolls out of view -->
+      <div class="wo-start-dock" id="wo-start-dock" aria-hidden="true">
+        <button class="wo-start-btn" onclick="startWorkout()" tabindex="-1">
+          <span>Start workout</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </button>
+      </div>
     </div>
   </div>
 
@@ -612,7 +619,10 @@
 
 </div><!-- #app -->
 
-<!-- ═══ BOTTOM NAV — 3 tabs ═══ -->
+<!-- Rest timer dock — app-wide so it follows you to other tabs mid-rest -->
+<div id="wo-rest-dock" class="wo-rest-timer" style="display:none" role="timer" aria-live="off"></div>
+
+<!-- ═══ BOTTOM NAV ═══ -->
 <nav class="bnav">
   <div class="bnav-inner">
     <span class="nb-ind" aria-hidden="true"></span>
