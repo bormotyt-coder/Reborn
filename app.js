@@ -4402,6 +4402,82 @@ function openSwapSheet(ei){
   acts.push({label:'Cancel',style:'cancel'});
   woSheet({title:'Swap for…',message:'Same movement pattern, different equipment or angle.',actions:acts,className:'wo-sheet-menu'});
 }
+// ══════════════════════════════════════════════════════════════════════════
+// Live recalibration — re-plan the lifts you haven't started whenever the
+// session deviates from the plan (swap, remove, add, or a big rep shortfall).
+// The engine decides; this applies it, explains it, and offers Undo.
+// ══════════════════════════════════════════════════════════════════════════
+function woDoneCount(){return _woSession?_woSession.exercises.reduce((a,e)=>a+(e.sets||[]).filter(s=>s.done).length,0):0;}
+function woRecalibrate(){
+  if(!_woSession||!_woSession.basePlan||typeof WoEngine.recalibrate!=='function')return;
+  let res;
+  try{res=WoEngine.recalibrate(_woSession,woEngineInput({recovery:_woSession.recovery??null}));}
+  catch(e){console.error('[reBorn] recalibrate',e);return;}
+  const changes=(res&&res.changes)||[];
+  if(!changes.length)return;
+  const snap={ex:JSON.stringify(_woSession.exercises),restEi:_restTimerState.ei,done:woDoneCount()};
+  changes.forEach(c=>{
+    if(c.type==='replace'){
+      const nx=woSessionExercise(c.exercise);
+      nx.recal={reason:c.reason,from:c.from};
+      _woSession.exercises[c.index]=nx;
+    }else if(c.type==='sets'){
+      const ex=_woSession.exercises[c.index];if(!ex)return;
+      while(ex.sets.length>c.to){const last=ex.sets[ex.sets.length-1];if(last.done||last.weight!==''||last.reps!=='')break;ex.sets.pop();}
+      while(ex.sets.length<c.to){const last=ex.sets[ex.sets.length-1]||{};const ns={weight:'',reps:'',rpe:'',done:false};if(last.tw!=null){ns.tw=last.tw;ns.tr=last.tr;}ex.sets.push(ns);}
+      ex.recal={reason:c.reason};
+    }
+  });
+  changes.filter(c=>c.type==='insert').sort((a,b)=>b.index-a.index).forEach(c=>{
+    const nx=woSessionExercise(c.exercise);nx.recal={reason:c.reason};
+    _woSession.exercises.splice(c.index,0,nx);
+    if(_restTimerState.ei!=null&&_restTimerState.ei>=c.index)_restTimerState.ei++;
+    if(_currentSuggestion&&_currentSuggestion.ei>=c.index)_currentSuggestion.ei++;
+  });
+  woSave(WO_KEY,_woSession);
+  renderExercises();
+  woHaptic([8,40,8]);
+  woRecalBanner(changes,snap);
+}
+function woRecalLine(c){
+  if(c.type==='replace')return `<b>${escapeHtml(c.from)}</b> → <b>${escapeHtml(c.to)}</b>`;
+  if(c.type==='sets')return `<b>${escapeHtml(c.name)}</b>: ${c.from} → ${c.to} sets`;
+  return `Added <b>${escapeHtml(c.to)}</b>`;
+}
+let _woRecalTimer=null;
+function woRecalBanner(changes,snap){
+  document.querySelectorAll('.wo-recal-banner').forEach(b=>b.remove());
+  const el=document.createElement('div');
+  el.className='wo-recal-banner';el.setAttribute('role','status');
+  const more=changes.length>1?`<div class="wo-recal-more">and ${changes.length-1} more change${changes.length>2?'s':''}</div>`:'';
+  el.innerHTML=`<div class="wo-recal-ico">${woIco('sparkles')}</div>
+    <div class="wo-recal-txt" role="button" tabindex="0"><div class="wo-recal-title">Plan adjusted</div><div class="wo-recal-line">${woRecalLine(changes[0])}</div>${more}</div>
+    <button class="wo-recal-undo">Undo</button>`;
+  document.body.appendChild(el);
+  requestAnimationFrame(()=>el.classList.add('show'));
+  const hide=()=>{clearTimeout(_woRecalTimer);el.classList.remove('show');setTimeout(()=>el.remove(),300);};
+  el.querySelector('.wo-recal-undo').onclick=()=>{woRecalUndo(changes,snap);hide();};
+  el.querySelector('.wo-recal-txt').onclick=()=>{
+    const first=changes.reduce((m,c)=>Math.min(m,c.index),Infinity);
+    const card=gv('wo-ex-'+first);if(card)card.scrollIntoView({behavior:'smooth',block:'start'});
+    hide();
+  };
+  clearTimeout(_woRecalTimer);_woRecalTimer=setTimeout(hide,8000);
+}
+function woRecalUndo(changes,snap){
+  if(!_woSession)return;
+  if(woDoneCount()!==snap.done){woToast('Can’t undo — you’ve logged sets since');return;}
+  let exs;try{exs=JSON.parse(snap.ex);}catch(e){return;}
+  // Pin what the lifter chose to keep, so the next recalibration leaves it alone.
+  changes.forEach(c=>{if(c.type!=='insert'&&exs[c.index])exs[c.index].keep=true;});
+  _woSession.exercises=exs;
+  _restTimerState.ei=snap.restEi;
+  _currentSuggestion=null;
+  woSave(WO_KEY,_woSession);
+  renderExercises();
+  woToast('Kept your original plan');
+}
+
 // Keep anything that refers to exercises by index consistent after a structural change.
 function woReindex(map){
   if(_restTimerState&&_restTimerState.ei!=null){const n=map(_restTimerState.ei);_restTimerState.ei=n<0?null:n;}
@@ -4416,6 +4492,7 @@ async function woRemoveExercise(ei){
   woReindex(i=>i===ei?-1:(i>ei?i-1:i));
   woSave(WO_KEY,_woSession);
   renderExercises();
+  woRecalibrate();
 }
 function woDeleteSet(ei,si){
   const ex=_woSession&&_woSession.exercises[ei];if(!ex)return;
@@ -4912,6 +4989,8 @@ function startWorkout(){
     inProgress: true,
     startTime: Date.now(),
     exercises: (_woPlan.exercises||[]).map(woSessionExercise),
+    // The plan as generated — live recalibration measures every deviation against this.
+    basePlan: (_woPlan.exercises||[]).map(e=>({slot:e.slot||null,name:e.name,sets:Array.isArray(e.sets)?e.sets.length:(parseInt(e.sets)||3)})),
     cardio: _woPlan.cardio?{..._woPlan.cardio,done:false,actualDuration:null}:null,
   };
   woSave(WO_KEY,_woSession);
@@ -4933,6 +5012,9 @@ function openSessionMenu(){
 
 function showActiveWorkout(){
   woSessionChrome(true);
+  if(_woSession&&!_woSession.basePlan){
+    _woSession.basePlan=_woSession.exercises.map(e=>({slot:e.slot||null,name:e.name,sets:(e.sets||[]).length}));
+  }
   gv('wo-generate-view').style.display='none';
   gv('wo-active-view').style.display='block';
   const nameEl=gv('wo-split-name');const noteEl=gv('wo-split-note');
@@ -5089,6 +5171,7 @@ function renderExerciseCard(ex,ei){
       <button class="wo-icon-btn wo-ex-more" onclick="event.stopPropagation();openExMenu(${ei})" aria-label="Exercise options">${woIco('more')}</button>
     </div>
     <div class="wo-ex-card-body">
+      ${ex.recal&&!doneCount?`<div class="wo-recal-note">${woIco('sparkles')}<span>${escapeHtml(ex.recal.reason)}</span></div>`:''}
       ${woTargetLine(ex)}
       ${ex.cue?`<div class="wo-ex-cue-line" onclick="this.classList.toggle('open')">${escapeHtml(ex.cue)}</div>`:''}
       ${ex.warmup?`<div class="wo-ex-warmup">Warm-up: ${escapeHtml(ex.warmup)}</div>`:''}
@@ -5202,6 +5285,7 @@ function toggleSetDone(ei,si){
   renderExerciseCardAt(ei);
   // The "current" highlight may have moved to another card — repaint those too.
   new Set([curBefore,curAfter]).forEach(i=>{if(i>=0&&i!==ei)renderExerciseCardAt(i);});
+  if(set.done)woRecalibrate();
   if(set.done){
     const row=gv(`wo-set-${ei}-${si}`);if(row)row.classList.add('just-done');
     if(woUi().autoRest)startRestTimer(ei,ex.rest||90);
@@ -5337,9 +5421,10 @@ function addSuggestedExercise(index) {
   if (!_woSession || !window._suggestedExercises?.[index]) return;
 
   const s = window._suggestedExercises[index];
-  _woSession.exercises.push(woSessionExercise({ ...s, icon: getExIcon(s.name), iconSlug: getExIconSlug(s.name) }));
+  _woSession.exercises.push(Object.assign(woSessionExercise({ ...s, icon: getExIcon(s.name), iconSlug: getExIconSlug(s.name) }), { addedByUser: true }));
   woSave(WO_KEY, _woSession);
   renderExercises();
+  woRecalibrate();
 
   const cards = document.querySelectorAll('.wo-suggest-card');
   if (cards[index]) {
@@ -5472,6 +5557,7 @@ function swapExercise(ei,ai){
   });
   woSave(WO_KEY, _woSession);
   renderExerciseCardAt(ei);
+  woRecalibrate();
 }
 
 function toggleCardioDone(){

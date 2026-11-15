@@ -1079,10 +1079,249 @@
     return out;
   }
 
+  // ── Live recalibration ───────────────────────────────────────────────────
+  // When the lifter deviates mid-session (swaps, removes or adds a lift, or falls
+  // short of their reps), re-plan the exercises they haven't started so the
+  // session as a whole still does its job.
+  //
+  // Idempotent by design: the desired state is recomputed from the plan
+  // snapshotted at start (session.basePlan) + what is now fixed, never from the
+  // previous adjustment — so repeated triggers can't stack.
+  //
+  // Fractional set counting: a press also trains triceps/front delts, so
+  // compounds credit their secondary muscles with part of a set.
+  const SECONDARY = {
+    pf: { Triceps: 0.5, Shoulders: 0.25 }, pi: { Shoulders: 0.5, Triceps: 0.5 }, pd: { Triceps: 0.75, Shoulders: 0.25 },
+    ohp: { Triceps: 0.5 }, tc: { Chest: 0.25 },
+    vp: { Biceps: 0.5 }, hr: { Biceps: 0.5, 'Rear Delts': 0.5 },
+    sq: { Glutes: 0.5 }, lp: { Glutes: 0.25 }, lg: { Glutes: 0.5, Hamstrings: 0.25 },
+    hg: { Glutes: 0.5 }, gb: { Hamstrings: 0.5 }, gt: { Hamstrings: 0.25 },
+  };
+  function contrib(e, sets, into, sign) {
+    if (!e || !(sets > 0)) return;
+    const s = sign || 1;
+    into[e.muscle] = (into[e.muscle] || 0) + s * sets;
+    const sec = e.role === 'c' ? SECONDARY[e.pat] : null;
+    if (sec) Object.keys(sec).forEach(m => { into[m] = (into[m] || 0) + s * sets * sec[m]; });
+  }
+  function setCount(ex) { return Array.isArray(ex.sets) ? ex.sets.length : (parseInt(ex.sets) || 0); }
+  function touchedEx(ex) {
+    return Array.isArray(ex.sets) && ex.sets.some(s => s && (s.done || (s.weight !== '' && s.weight != null) || (s.reps !== '' && s.reps != null)));
+  }
+
+  function recalibrate(session, input) {
+    const split = session && session.splitCategory;
+    const base = session && session.basePlan;
+    if (!split || !SLOTS[split] || !Array.isArray(base) || !base.length) return { changes: [] };
+    const ctx = newCtx(Object.assign({}, input, { seed: 1 }));
+    if (session.block) ctx.block = restoreBlock(session.block);
+    if (session.recovery != null) ctx.tier = tierOf(session.recovery);
+    const T = ctx.tier;
+
+    const exs = session.exercises || [];
+    const nameOf = ex => ex.swappedTo || ex.name;
+    const libOf = ex => byName(nameOf(ex));
+    const baseBySlot = new Map(base.filter(b => b.slot).map(b => [b.slot, b]));
+    // Open = an engine-chosen lift the lifter hasn't touched or pinned.
+    const isOpen = ex => !!ex.slot && ex.slot !== 'CORE' && !ex.swappedTo && !ex.addedByUser && !ex.keep &&
+      !touchedEx(ex) && !!libOf(ex) && !!slotById(split, ex.slot);
+    const open = exs.map(isOpen);
+
+    // What the lifter changed relative to the snapshot.
+    const changed = [];              // { e, baseE, ex }
+    exs.forEach((ex, i) => {
+      if (open[i]) return;
+      const e = libOf(ex); if (!e) return;
+      const b = ex.slot ? baseBySlot.get(ex.slot) : null;
+      const be = b ? byName(b.name) : null;
+      if (ex.addedByUser || !be || be.key !== e.key) changed.push({ e, baseE: be, ex });
+    });
+    const presentSlots = new Set(exs.map(ex => ex.slot).filter(Boolean));
+    const removed = base.filter(b => b.slot && !presentSlots.has(b.slot)).map(b => byName(b.name)).filter(Boolean);
+    // Patterns the lifter introduced, and ones they dropped (preferred when re-picking).
+    const introduced = new Map();    // pat → exercise that introduced it
+    changed.forEach(c => { if (!c.baseE || c.baseE.pat !== c.e.pat) introduced.set(c.e.pat, c.e); });
+    const lost = new Set();
+    changed.forEach(c => { if (c.baseE && c.baseE.pat !== c.e.pat) lost.add(c.baseE.pat); });
+    removed.forEach(e => lost.add(e.pat));
+
+    // Session state built from everything fixed, then each open slot in order.
+    const st = { names: new Set(), pats: new Set(), equip: {}, cost3: 0 };
+    exs.forEach((ex, i) => { if (!open[i]) { const e = libOf(ex); if (e) takeInto(st, e); } });
+    const avoidNames = new Set(removed.map(e => e.key));
+
+    const conflictOf = (e, slot) => {
+      if (introduced.has(e.pat) && slot.pats.length > 1) return { kind: 'overlap', by: introduced.get(e.pat) };
+      if (e.cost === 3 && st.cost3 >= T.max3) return { kind: 'fatigue' };
+      return null;
+    };
+    const desired = [];               // per index: { e, slot, reason, kind } for open lifts
+    exs.forEach((ex, i) => {
+      if (!open[i]) return;
+      const slot = slotById(split, ex.slot);
+      const cur = libOf(ex);
+      const b = baseBySlot.get(ex.slot);
+      const be = (b && byName(b.name)) || cur;
+      let pick = null, reason = null, kind = null;
+      const cBase = st.names.has(be.key) ? { kind: 'dup' } : conflictOf(be, slot);
+      if (!cBase) {
+        pick = be;
+        if (cur.key !== be.key) { kind = 'revert'; reason = 'Back to the original pick — nothing overlaps it now.'; }
+      } else if (cur.key !== be.key && !st.names.has(cur.key) && !conflictOf(cur, slot)) {
+        pick = cur;                                   // an earlier adjustment still holds — keep it stable
+      } else {
+        const bad = new Set(introduced.keys());
+        const sub = Object.assign({}, slot, { pats: slot.pats.filter(p => !bad.has(p)) });
+        if (!sub.pats.length) sub.pats = slot.pats.slice();
+        const ranked = pickFor(sub, st, ctx, avoidNames, { ranked: true, noJitter: true }) || [];
+        const okRank = ranked.filter(e => !(e.cost === 3 && st.cost3 >= T.max3));
+        const choice = okRank.find(e => lost.has(e.pat)) || okRank[0] || null;
+        if (choice && choice.key !== cur.key) {
+          pick = choice; kind = 'replace';
+          if (cBase.kind === 'overlap') {
+            reason = cBase.by.name + ' already covers the ' + PAT_LABEL[be.pat] +
+              (choice.pat !== be.pat ? ' — switched to a ' + PAT_LABEL[choice.pat] + ' for a different angle.' : ' — switched to a different variation.');
+          } else if (cBase.kind === 'fatigue') {
+            reason = 'Enough heavy, fatiguing lifts today — ' + choice.name + ' trains the same muscles with less systemic fatigue.';
+          } else {
+            reason = be.name + ' is already in today\'s session.';
+          }
+        } else {
+          pick = cur;
+        }
+      }
+      takeInto(st, pick);
+      desired[i] = { e: pick, slot, reason, kind };
+    });
+
+    // ── Volume: compare effective sets per muscle to the snapshot ──
+    const baseVol = {};
+    base.forEach(b => contrib(byName(b.name), b.sets, baseVol));
+    // desired sets start from the snapshot, never from an earlier adjustment
+    exs.forEach((ex, i) => {
+      if (!desired[i]) return;
+      const b = baseBySlot.get(ex.slot);
+      desired[i].sets = desired[i].baseSets = b ? b.sets : setCount(ex);
+    });
+    const vol = {};
+    exs.forEach((ex, i) => contrib(desired[i] ? desired[i].e : libOf(ex), desired[i] ? desired[i].sets : setCount(ex), vol));
+    // Direct (primary-muscle) sets — deficits are judged on these only: losing a press's
+    // incidental triceps work isn't a reason to add triceps sets.
+    const direct = (list, n) => { const o = {}; list.forEach((e, k) => { if (e) o[e.muscle] = (o[e.muscle] || 0) + n[k]; }); return o; };
+    const baseDirect = direct(base.map(b => byName(b.name)), base.map(b => b.sets));
+    const curDirect = direct(exs.map((ex, i) => desired[i] ? desired[i].e : libOf(ex)), exs.map((ex, i) => desired[i] ? desired[i].sets : setCount(ex)));
+    let addBudget = 3;                                  // most sets a recalibration may add to the session
+    const notes = {};                                  // index → [reason]
+    const note = (i, r) => { (notes[i] = notes[i] || []).push(r); };
+    const openFor = (m, iso) => exs.map((ex, i) => i).filter(i => desired[i] && desired[i].e.muscle === m &&
+      (iso == null || (iso ? desired[i].e.role === 'i' : (desired[i].e.role === 'c' && !desired[i].slot.anchor))));
+    const sourceOf = m => {
+      const c = changed.find(x => x.e.muscle === m || (x.e.role === 'c' && SECONDARY[x.e.pat] && SECONDARY[x.e.pat][m]));
+      return c ? c.e.name : null;
+    };
+    const inserts = [];
+    // Two or more lifts removed reads as "I'm short on time": don't refill the session.
+    const shortening = removed.length >= 2;
+    const hits = (e, m) => e && (e.muscle === m || (e.role === 'c' && SECONDARY[e.pat] && SECONDARY[e.pat][m] >= 0.5));
+    Object.keys(Object.assign({}, baseVol, vol)).forEach(m => {
+      if (m === 'Core') return;
+      let diff = (vol[m] || 0) - (baseVol[m] || 0);
+      if (diff >= 1.5) {
+        const src = sourceOf(m);
+        for (const i of openFor(m, true).reverse().concat(openFor(m, false).reverse())) {
+          if (diff < 1) break;
+          if (desired[i].sets <= 2) continue;
+          desired[i].sets--; diff -= 1;
+          note(i, m + ' already got extra work' + (src ? ' from ' + src : '') + ' — one set fewer here.');
+        }
+      }
+      const dDiff = (curDirect[m] || 0) - (baseDirect[m] || 0);
+      if (diff < 1.5 && dDiff <= -1.5 && !shortening) {
+        let want = Math.min(2, Math.ceil(-dDiff / 2), addBudget);   // make up about half, at most 2 sets
+        const lostFrom = removed.find(e => hits(e, m)) || (changed.find(c => hits(c.baseE, m) && !hits(c.e, m)) || {}).baseE;
+        const anchors = exs.map((ex, i) => i).filter(i => desired[i] && desired[i].e.muscle === m && desired[i].slot.anchor);
+        for (const i of openFor(m, true).concat(openFor(m, false), anchors)) {
+          if (want <= 0) break;
+          if (desired[i].sets >= desired[i].baseSets + 1 || desired[i].sets >= 5) continue;
+          desired[i].sets++; want--; addBudget--;
+          note(i, '+1 set to make up the ' + m.toLowerCase() + ' volume' + (lostFrom ? ' lost with ' + lostFrom.name : '') + '.');
+        }
+        if (want >= 2 && !openFor(m).length && !removed.some(e => e.muscle === m)) {
+          // nothing left for this muscle — slot in one low-cost isolation lift
+          const cands = SLOTS[split].filter(s => PAT_MUSCLE[s.pats[0]] === m).sort((a, b) => (a.role === 'i' ? 0 : 1) - (b.role === 'i' ? 0 : 1));
+          for (const s of cands) {
+            const e = pickFor(Object.assign({}, s, { role: s.role || 'i' }), st, ctx, avoidNames, { noJitter: true });
+            if (!e) continue;
+            takeInto(st, e);
+            const built = buildExercise(e, s, ctx);
+            built.held = false;
+            const n = Math.max(2, Math.min(built.sets, want + 1));
+            addBudget -= n;
+            inserts.push({ e, built, sets: n, reason: 'Added to replace the ' + m.toLowerCase() + ' work' + (lostFrom ? ' from ' + lostFrom.name : '') + '.' });
+            break;
+          }
+        }
+      }
+    });
+
+    // ── Performance: big rep shortfalls on fixed lifts → trim that muscle's remaining work ──
+    exs.forEach((ex, i) => {
+      if (open[i] || !Array.isArray(ex.sets)) return;
+      const e = libOf(ex); if (!e || e.unit === 'sec') return;
+      const lo = ex.repLo || (parseRange(ex.reps) || [])[0];
+      const done = ex.sets.filter(s => s && s.done && parseFloat(s.reps) > 0);
+      if (!lo || done.length < 2) return;
+      const short = done.filter((s, k) => {
+        const tr = s.tr != null ? s.tr : lo;
+        return parseFloat(s.reps) <= Math.min(tr, lo) - 2;
+      });
+      if (short.length < Math.ceil(done.length / 2)) return;
+      const targetsM = [e.muscle].concat(e.role === 'c' && SECONDARY[e.pat] ? Object.keys(SECONDARY[e.pat]).filter(m => SECONDARY[e.pat][m] >= 0.5) : []);
+      targetsM.forEach(m => {
+        const list = openFor(m, true).concat(openFor(m, false));
+        const j = list.find(k => desired[k].sets > 2 && !(notes[k] || []).some(r => r.startsWith('Reps dropped')));
+        if (j == null) return;
+        desired[j].sets--;
+        note(j, 'Reps dropped on ' + e.name + ' — one set fewer of ' + m.toLowerCase() + ' work to keep quality high.');
+      });
+    });
+
+    // ── Diff against the live session ──
+    const changes = [];
+    exs.forEach((ex, i) => {
+      const d = desired[i]; if (!d) return;
+      const cur = libOf(ex);
+      const why = [d.reason].concat(notes[i] || []).filter(Boolean).join(' ');
+      if (d.e.key !== cur.key) {
+        const built = buildExercise(d.e, d.slot, ctx);
+        built.held = false;
+        if (built.targets) built.targets = built.targets.slice(0, d.sets);
+        while (built.targets && built.targets.length < d.sets) built.targets.push(Object.assign({}, built.targets[built.targets.length - 1]));
+        built.sets = d.sets;
+        const used = new Set(exs.map(x => canon(nameOf(x)))); used.add(built.libKey);
+        const ranked = pickFor(d.slot, { names: used, pats: new Set(), equip: {}, cost3: 0 }, ctx, new Set(), { ranked: true, noJitter: true });
+        built.alternatives = (ranked || []).slice(0, 4).map(x => x.name);
+        changes.push({ type: 'replace', index: i, from: nameOf(ex), to: built.name, exercise: built, reason: why || 'Re-planned around your changes.' });
+      } else if (d.sets !== setCount(ex)) {
+        changes.push({ type: 'sets', index: i, name: nameOf(ex), from: setCount(ex), to: d.sets, reason: why });
+      }
+    });
+    if (inserts.length) {
+      let at = exs.length;
+      while (at > 0 && (exs[at - 1].isAutoCore || exs[at - 1].slot === 'CORE')) at--;
+      inserts.forEach(ins => {
+        ins.built.sets = ins.sets;
+        if (ins.built.targets) ins.built.targets = ins.built.targets.slice(0, ins.sets);
+        changes.push({ type: 'insert', index: at, to: ins.built.name, exercise: ins.built, reason: ins.reason });
+      });
+    }
+    return { changes };
+  }
+
   const api = {
     LIB, SPLIT_CYCLE, SPLIT_MUSCLES, PHASES, TECH_NOTES, PAT_MUSCLE, SLOTS, EVIDENCE: { backed: BACKED, weaker: WEAKER },
     BLOCK_SESSIONS, SESSIONS_PER_WEEK,
-    generate, swapOne, exerciseFor, targetsFor, alternativesFor, suggestExtras,
+    generate, swapOne, exerciseFor, targetsFor, alternativesFor, suggestExtras, recalibrate,
     blockInfo, restoreBlock, tierOf, nextSplit, classifySplit, byName, canon, parseRange, roundW, progress, buildIndex,
   };
   root.WoEngine = api;
