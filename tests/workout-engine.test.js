@@ -105,7 +105,7 @@ test('plans never duplicate an exercise and stay on-split', () => {
     assert.strictEqual(new Set(names).size, names.length, 'dupes in plan ' + i);
     p.exercises.forEach(e => assert(SPLIT_OK[p.splitCategory].includes(e.muscle), e.name + ' (' + e.muscle + ') off-split on ' + p.splitCategory));
     assert.deepStrictEqual(p.muscleGroups, E.SPLIT_MUSCLES[p.splitCategory]);
-    assert(p.exercises[p.exercises.length - 1].isAutoCore, 'core finisher missing');
+    assert(p.exercises[0].isAutoCore && p.exercises[1].isAutoCore, 'core block must open the session');
   });
 });
 test('rotation follows Push → Pull → Arms & Shoulders → Legs', () => {
@@ -131,14 +131,39 @@ test('≥50% of lifts differ from the last same-split session — every time, an
     });
   });
 });
-test('core finisher never repeats the previous session\'s core move', () => {
+test('core moves never repeat from the previous session of the same split', () => {
   const { plans } = simulate(40, { recovery: 70 });
   const lastBySplit = {};
   plans.forEach(p => {
-    const core = p.exercises[p.exercises.length - 1].name;
-    if (lastBySplit[p.splitCategory]) assert.notStrictEqual(core, lastBySplit[p.splitCategory]);
+    const core = p.exercises.filter(e => e.isAutoCore).map(e => e.name);
+    if (lastBySplit[p.splitCategory]) core.forEach(n => assert(!lastBySplit[p.splitCategory].includes(n), n + ' repeated'));
     lastBySplit[p.splitCategory] = core;
   });
+});
+
+test('core comes FIRST, every session: one abs move, then one obliques move', () => {
+  const { plans } = simulate(48);
+  plans.forEach(p => {
+    const [a, o] = p.exercises;
+    assert(a.isAutoCore && a.focus === 'Abs' && ['cf', 'cx'].includes(E.byName(a.name).pat), 'first should be abs: ' + a.name);
+    assert(o.isAutoCore && o.focus === 'Obliques' && ['cl', 'cr'].includes(E.byName(o.name).pat), 'second should be obliques: ' + o.name);
+    assert(!p.exercises.slice(2).some(e => e.isAutoCore), 'no core after the main work');
+  });
+});
+
+test('obliques slot rotates through real oblique work (side bends, side planks, rotations)', () => {
+  const { plans } = simulate(64);
+  const seen = new Set(plans.map(p => p.exercises[1].name));
+  assert(seen.size >= 6, 'obliques slot too repetitive: ' + [...seen].join(', '));
+  assert(!seen.has('Bird Dog'), 'Bird Dog is a stability drill, not oblique work');
+});
+
+test('Legs day keeps core to 2 sets per move so the trunk is fresh for squats and hinges', () => {
+  const { plans } = simulate(32, { recovery: 75 });
+  plans.filter(p => p.splitCategory === 'Legs').forEach(p => p.exercises.filter(e => e.isAutoCore).forEach(e => {
+    assert(e.sets <= 2, e.name + ' has ' + e.sets + ' sets on Legs day');
+    if (e.targets) assert(e.targets.length === e.sets);
+  }));
 });
 test('across one 16-session block the lifter sees 80+ different exercises', () => {
   const { plans } = simulate(16, { recovery: 70 });
@@ -367,7 +392,7 @@ console.log('\nRecovery gating');
 test('poor recovery → short, light session with no max-effort lifts and no HIIT', () => {
   const { plans } = simulate(32, { recovery: 25 });
   plans.forEach(p => {
-    assert(p.exercises.length <= 6, 'too many exercises: ' + p.exercises.length);
+    assert(p.exercises.length <= 7, 'too many exercises: ' + p.exercises.length);   // 5 lifts + 2 core
     p.exercises.forEach(e => assert(E.byName(e.name).cost < 3, e.name + ' is max-effort'));
     assert(p.cardio.duration <= 15 && !/Sprint|Interval/.test(p.cardio.machine));
   });
@@ -378,7 +403,7 @@ test('low recovery (34–49) drops max-effort lifts and trims compound sets', ()
 });
 test('great recovery (≥80) gets the bonus slot and may get HIIT', () => {
   const { plans } = simulate(32, { recovery: 90 });
-  assert(plans.every(p => p.exercises.length === 9 || p.block.deload), 'expected 8 slots + core');
+  assert(plans.every(p => p.exercises.length === 10 || p.block.deload), 'expected 8 slots + 2 core');
   assert(plans.some(p => /Sprint|Interval/.test(p.cardio.machine)), 'HIIT never offered at 90% recovery');
 });
 test('no recovery entered → treated as moderate, and says so', () => {
@@ -443,6 +468,151 @@ test('legacy (pre-engine, AI-era) history is understood: names normalise, no cra
   const p = E.generate({ split: 'Push', history: legacy, recovery: 70, seed: 4, now: Date.parse('2026-01-06') });
   assert(!p.exercises.some(e => e.name === 'Incline Dumbbell Press'), 'should avoid last push day\'s incline DB press');
   assert.strictEqual(E.classifySplit({ muscleGroups: ['Lateral Delts', 'Biceps'] }), 'Arms & Shoulders', '"lateral" must not read as "lat" → Pull');
+});
+
+
+console.log('\nLive recalibration');
+// A live tracker session built from a plan, the way app.js does it.
+function liveSession(plan) {
+  return {
+    splitCategory: plan.splitCategory, block: plan.block, recovery: plan.tier.rec,
+    basePlan: plan.exercises.map(e => ({ slot: e.slot, name: e.name, sets: e.sets })),
+    exercises: plan.exercises.map(e => Object.assign({}, e, {
+      sets: Array.from({ length: e.sets }, () => ({ weight: '', reps: '', done: false })), swappedTo: null,
+    })),
+  };
+}
+function applyChanges(sess, changes) {
+  changes.forEach(c => {
+    if (c.type === 'replace') sess.exercises[c.index] = Object.assign({}, c.exercise, { sets: Array.from({ length: c.exercise.sets }, () => ({ weight: '', reps: '', done: false })) });
+    else if (c.type === 'sets') { const a = sess.exercises[c.index].sets; while (a.length > c.to) a.pop(); while (a.length < c.to) a.push({ weight: '', reps: '', done: false }); }
+    else if (c.type === 'insert') sess.exercises.splice(c.index, 0, Object.assign({}, c.exercise, { sets: Array.from({ length: c.exercise.sets }, () => ({ weight: '', reps: '', done: false })) }));
+  });
+}
+const recIn = sess => ({ history: [], recovery: sess.recovery, now: T0 });
+// A Push plan whose P3 is a flat/incline press (so P1 can be swapped onto P3's pattern).
+function pushPlanWithPressP3() {
+  for (let seed = 1; seed < 400; seed++) {
+    const plan = E.generate({ split: 'Push', history: [], recovery: 72, seed, now: T0 });
+    const p1 = plan.exercises.find(e => e.slot === 'P1'), p3 = plan.exercises.find(e => e.slot === 'P3');
+    if (p1 && p3 && (p3.pat === 'pf' || p3.pat === 'pi') && p3.pat !== p1.pat) return { plan, p1, p3 };
+  }
+  throw new Error('no suitable plan');
+}
+
+test('untouched session → no changes (nothing to fix)', () => {
+  for (let seed = 1; seed <= 20; seed++) {
+    const plan = E.generate({ split: ['Push', 'Pull', 'Arms & Shoulders', 'Legs'][seed % 4], history: [], recovery: 70, seed, now: T0 });
+    const r = E.recalibrate(liveSession(plan), recIn({ recovery: 70 }));
+    assert.strictEqual(r.changes.length, 0, plan.splitCategory + ' seed ' + seed + ': ' + JSON.stringify(r.changes.map(c => c.reason)));
+  }
+});
+
+test('swap A onto C\'s angle → C is re-picked to a different angle (preferring the one A dropped)', () => {
+  const { plan, p1, p3 } = pushPlanWithPressP3();
+  const sess = liveSession(plan);
+  const i1 = sess.exercises.findIndex(e => e.slot === 'P1'), i3 = sess.exercises.findIndex(e => e.slot === 'P3');
+  const sameAngle = E.LIB.find(e => e.pat === p3.pat && e.role === 'c' && e.name !== p3.name && e.name !== p1.name);
+  sess.exercises[i1].swappedTo = sameAngle.name;
+  const r = E.recalibrate(sess, recIn(sess));
+  const c = r.changes.find(x => x.index === i3 && x.type === 'replace');
+  assert(c, 'P3 should be replaced: ' + JSON.stringify(r.changes));
+  assert.notStrictEqual(c.exercise.pat, p3.pat, 'new P3 must not repeat the angle the swap introduced');
+  assert.strictEqual(c.exercise.pat, p1.pat, 'should prefer the angle the swap dropped');
+  assert(/already covers/.test(c.reason), c.reason);
+});
+
+test('recalibration is idempotent — applying it and running again changes nothing', () => {
+  const { plan, p3 } = pushPlanWithPressP3();
+  const sess = liveSession(plan);
+  const i1 = sess.exercises.findIndex(e => e.slot === 'P1');
+  sess.exercises[i1].swappedTo = E.LIB.find(e => e.pat === p3.pat && e.role === 'c' && e.name !== p3.name).name;
+  applyChanges(sess, E.recalibrate(sess, recIn(sess)).changes);
+  assert.deepStrictEqual(E.recalibrate(sess, recIn(sess)).changes, []);
+});
+
+test('undoing the swap reverts the re-picked lift to the original plan', () => {
+  const { plan, p3 } = pushPlanWithPressP3();
+  const sess = liveSession(plan);
+  const i1 = sess.exercises.findIndex(e => e.slot === 'P1'), i3 = sess.exercises.findIndex(e => e.slot === 'P3');
+  sess.exercises[i1].swappedTo = E.LIB.find(e => e.pat === p3.pat && e.role === 'c' && e.name !== p3.name).name;
+  applyChanges(sess, E.recalibrate(sess, recIn(sess)).changes);
+  sess.exercises[i1].swappedTo = null;                       // lifter swaps back
+  const r = E.recalibrate(sess, recIn(sess));
+  const c = r.changes.find(x => x.index === i3);
+  assert(c && c.type === 'replace' && c.to === p3.name, 'P3 should return to ' + p3.name + ': ' + JSON.stringify(r.changes));
+});
+
+test('logged, started, pinned and "keep" lifts are never touched', () => {
+  const { plan, p3 } = pushPlanWithPressP3();
+  const i1 = plan.exercises.findIndex(e => e.slot === 'P1'), i3 = plan.exercises.findIndex(e => e.slot === 'P3');
+  const swapTo = E.LIB.find(e => e.pat === p3.pat && e.role === 'c' && e.name !== p3.name).name;
+  [s => { s.exercises[i3].sets[0].done = true; s.exercises[i3].sets[0].reps = '8'; },
+   s => { s.exercises[i3].sets[0].weight = '30'; },
+   s => { s.exercises[i3].keep = true; }].forEach(mark => {
+    const sess = liveSession(plan);
+    sess.exercises[i1].swappedTo = swapTo;
+    mark(sess);
+    const r = E.recalibrate(sess, recIn(sess));
+    assert(!r.changes.some(c => c.index === i3), JSON.stringify(r.changes));
+  });
+});
+
+test('removing a lift → its muscle\'s volume is made up on the remaining open lifts', () => {
+  const plan = E.generate({ split: 'Push', history: [], recovery: 72, seed: 3, now: T0 });
+  const sess = liveSession(plan);
+  const fly = sess.exercises.findIndex(e => e.slot === 'P4');
+  assert(fly >= 0);
+  sess.exercises.splice(fly, 1);
+  const r = E.recalibrate(sess, recIn(sess));
+  const chest = r.changes.filter(c => (c.type === 'sets' && c.to > c.from) || c.type === 'insert');
+  assert(chest.length, 'expected chest volume to be topped up: ' + JSON.stringify(r.changes));
+  chest.forEach(c => assert(/chest/i.test(c.reason), c.reason));
+  r.changes.filter(c => c.type === 'sets').forEach(c => assert(c.to - c.from <= 1 && c.to <= 5, 'one extra set max'));
+});
+
+test('adding extra triceps work → remaining triceps lifts lose a set (never below 2)', () => {
+  const plan = E.generate({ split: 'Push', history: [], recovery: 72, seed: 5, now: T0 });
+  const sess = liveSession(plan);
+  const extra = E.LIB.find(e => e.muscle === 'Triceps' && e.role === 'i' && !plan.exercises.some(x => x.name === e.name));
+  sess.exercises.splice(2, 0, { name: extra.name, addedByUser: true, slot: null, sets: [{}, {}, {}].map(() => ({ weight: '', reps: '', done: false })) });
+  const r = E.recalibrate(sess, recIn(sess));
+  const trims = r.changes.filter(c => c.type === 'sets' && c.to < c.from);
+  assert(trims.length, JSON.stringify(r.changes));
+  trims.forEach(c => { assert(c.to >= 2); assert(/triceps/i.test(c.reason) && c.reason.includes(extra.name), c.reason); });
+});
+
+test('big rep shortfall on a press → one fewer set of that muscle later (not more)', () => {
+  const plan = E.generate({ split: 'Push', history: [], recovery: 72, seed: 7, now: T0 });
+  const sess = liveSession(plan);
+  const i1 = sess.exercises.findIndex(e => e.slot === 'P1');
+  const lo = sess.exercises[i1].repLo;
+  sess.exercises[i1].sets.forEach((s, k) => { if (k < 3) { s.done = true; s.weight = '80'; s.reps = String(lo - 3); } });
+  const r = E.recalibrate(sess, recIn(sess));
+  const t = r.changes.filter(c => c.type === 'sets');
+  assert(t.length && t.every(c => c.to === c.from - 1 && c.to >= 2), JSON.stringify(r.changes));
+  assert(t.some(c => /Reps dropped/.test(c.reason)));
+  // hitting reps normally → no trim
+  const ok = liveSession(plan);
+  ok.exercises[i1].sets.forEach((s, k) => { if (k < 3) { s.done = true; s.weight = '80'; s.reps = String(lo + 1); } });
+  assert.deepStrictEqual(E.recalibrate(ok, recIn(ok)).changes, []);
+});
+
+test('recalibration never duplicates a lift or leaves the split, across many random swaps', () => {
+  const rnd = rngOf(11);
+  for (let n = 0; n < 150; n++) {
+    const split = ['Push', 'Pull', 'Arms & Shoulders', 'Legs'][n % 4];
+    const plan = E.generate({ split, history: [], recovery: 40 + Math.round(rnd() * 50), seed: n, now: T0 });
+    const sess = liveSession(plan);
+    const k = Math.floor(rnd() * sess.exercises.length);
+    const alt = (sess.exercises[k].alternatives || [])[0];
+    if (alt) sess.exercises[k].swappedTo = alt;
+    applyChanges(sess, E.recalibrate(sess, recIn(sess)).changes);
+    const names = sess.exercises.map(e => E.canon(e.swappedTo || e.name));
+    assert.strictEqual(new Set(names).size, names.length, 'duplicate after recal: ' + names.join(', '));
+    sess.exercises.forEach(e => { const lib = E.byName(e.swappedTo || e.name); assert(lib && SPLIT_OK[split].includes(lib.muscle), split + ': ' + (e.swappedTo || e.name)); });
+    assert.deepStrictEqual(E.recalibrate(sess, recIn(sess)).changes, [], 'not idempotent for ' + split + ' #' + n);
+  }
 });
 
 console.log('\nPerformance');

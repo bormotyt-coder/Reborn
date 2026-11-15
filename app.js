@@ -541,7 +541,17 @@ function renderAll(){
 // NAV
 const PAGE_ORDER=['today','workout','fast','coach','progress'];
 let _currentPage='today';
+// Glide the nav pill under the active tab; hide it on pages without a tab (Progress).
+function syncNavIndicator(){
+  const inner=document.querySelector('.bnav-inner');if(!inner)return;
+  const tabs=[...inner.querySelectorAll('.nb')];
+  const i=tabs.findIndex(b=>b.classList.contains('active'));
+  inner.classList.toggle('no-ind',i<0);
+  if(i>=0)inner.style.setProperty('--nb-i',i);
+}
+
 function showPage(id,btn){
+  if(btn&&btn.classList&&btn.classList.contains('nb')&&id!==_currentPage)woHaptic(6);
   const fromIdx=PAGE_ORDER.indexOf(_currentPage);
   const toIdx=PAGE_ORDER.indexOf(id);
   const dir=toIdx>=fromIdx?1:-1;
@@ -568,10 +578,7 @@ function showPage(id,btn){
   incoming.scrollTop=0;
   _currentPage=id;
   
-  // Apply page-specific color theme
-  document.body.classList.remove('theme-today','theme-progress','theme-workout','theme-fast','theme-coach');
-  const themeMap = { today:'theme-today', progress:'theme-progress', workout:'theme-workout', fast:'theme-fast', coach:'theme-coach' };
-  if(themeMap[id]) document.body.classList.add(themeMap[id]);
+  syncNavIndicator();
   
   _updateFab(id);
   if(id==='progress'){renderProgressPage();buildCalendar();}
@@ -3805,309 +3812,101 @@ function saveNoteFromModal(ei) {
   renderExercises();
 }
 
-// ── Exercise icon system ──
-// Two-tier lookup:
-//   1. Slug match → returns an <img> tag pointing at icons/<slug>.png (if available)
-//   2. Emoji fallback from EX_ICONS keyword map
-//
-// AVAILABLE_SLUGS is the gate. As PNGs are added to the icons/ folder,
-// also add their slug here and the system picks them up automatically.
-// Slugs listed in EX_SLUG_MAP but NOT in AVAILABLE_SLUGS fall through to emoji,
-// so it's safe to pre-populate the map with slugs whose art isn't ready yet.
-const AVAILABLE_SLUGS = new Set([
-  // Batch 1 — chest
-  'bench-barbell-flat','bench-barbell-incline','bench-db-flat','bench-db-incline','bench-smith-incline',
-  // Batch 2 — chest/back
-  'cable-fly','pec-deck','pullup','lat-pulldown','row-cable-seated',
-  // Batch 3 — back
-  'row-tbar','row-db-single-arm','row-barbell-bent','row-machine','pullover-cable',
-  // Batch 4 — shoulders
-  'ohp-barbell','press-db-seated','lateral-raise-db','lateral-raise-cable','rear-delt-fly',
-  // Batch 5 — biceps + 1 triceps
-  'curl-db-incline','curl-barbell','curl-preacher','curl-cable-bayesian','pushdown-cable-rope',
-  // Batch 6 — triceps + quads
-  'extension-overhead-cable','skullcrusher','dip','squat-barbell-back','squat-front',
-  // Batch 7 — quads + hams
-  'leg-press','hack-squat','leg-extension','rdl-barbell','leg-curl-seated',
-  // Batch 8 — hams/glutes/deadlifts
-  'leg-curl-lying','hip-thrust-barbell','back-extension-45','deadlift-conventional','deadlift-sumo',
-  // Batch 9 — lunge + core
-  'lunge-db','plank','cable-crunch','hanging-leg-raise','ab-wheel',
-]);
-
-// Ordered keyword → slug map. Longer/more specific keys FIRST because matching
-// is first-hit-wins (e.g. 'incline dumbbell press' must match before 'press').
-// Keys are lowercase substrings tested against exercise name.
-const EX_SLUG_MAP = [
-  // ── Specific-first guards ──
-  // Names a broader key further down would otherwise swallow (first hit wins). Slugs with no
-  // art yet fall through to the emoji, which is better than showing the wrong movement.
-  ['incline dumbbell curl',    'curl-db-incline'],
-  ['incline hammer curl',      'curl-db-incline'],
-  ['incline dumbbell fly',     'fly-db-incline'],
-  ['dumbbell fly',             'fly-db'],
-  ['reverse pec deck',         'rear-delt-fly'],
-  ['rear delt',                'rear-delt-fly'],      // raise / fly / row — beats the chest 'incline dumbbell' key
-  ['overhead cable',           'extension-overhead-cable'],
-  ['dumbbell pullover',        'pullover-db'],
-  ['calf',                     'calf-raise'],         // 'leg press calf raise' must not show the leg press
-  ['stiff-leg deadlift',       'rdl-barbell'],
-  ['reverse hyper',            'reverse-hyper'],
-  ['nordic',                   'nordic-curl'],
-  ['standing single-leg curl', 'leg-curl-standing'],
-  ['slider leg curl',          'leg-curl-slider'],
-  ['stability ball leg curl',  'leg-curl-ball'],
-  ['pendulum squat',           'squat-pendulum'],
-  ['belt squat',               'squat-belt'],
-  ['v-squat',                  'squat-v'],
-  ['split squat',              'squat-split'],
-  ['sissy squat',              'squat-sissy'],
-  ['smith machine squat',      'squat-smith'],
-  ['smith squat',              'squat-smith'],
-  ['bench dip',                'dip-bench'],
-  ['copenhagen',               'plank-copenhagen'],
-  // ── Chest ──
-  ['smith incline',            'bench-smith-incline'],
-  ['incline smith',            'bench-smith-incline'],
-  ['smith flat',               'press-smith-flat'],
-  ['incline dumbbell press',   'bench-db-incline'],
-  ['incline db press',         'bench-db-incline'],
-  ['incline dumbbell',         'bench-db-incline'],
-  ['incline bench',            'bench-barbell-incline'],
-  ['incline barbell',          'bench-barbell-incline'],
-  ['dumbbell bench',           'bench-db-flat'],
-  ['db bench',                 'bench-db-flat'],
-  ['flat dumbbell',            'bench-db-flat'],
-  ['bench press',              'bench-barbell-flat'],
-  ['flat bench',               'bench-barbell-flat'],
-  ['barbell bench',            'bench-barbell-flat'],
-  ['cable fly',                'cable-fly'],
-  ['low-to-high',              'cable-fly'],
-  ['low to high',              'cable-fly'],
-  ['chest fly',                'cable-fly'],
-  ['pec deck fly',             'pec-deck'],
-  ['pec deck',                 'pec-deck'],
-  ['machine chest press',      'press-machine-chest'],
-  ['chest press',              'press-machine-chest'],
-  // ── Back ──
-  ['pull-up',                  'pullup'],
-  ['pull up',                  'pullup'],
-  ['pullup',                   'pullup'],
-  ['chin-up',                  'pullup'],
-  ['chin up',                  'pullup'],
-  ['single-arm lat',           'pulldown-single-arm'],
-  ['single arm lat',           'pulldown-single-arm'],
-  ['one-arm lat',              'pulldown-single-arm'],
-  ['hammer strength pulldown', 'pulldown-hammer'],
-  ['hammer pulldown',          'pulldown-hammer'],
-  ['machine low row',          'pulldown-hammer'],
-  ['lat pulldown',             'lat-pulldown'],
-  ['pulldown',                 'lat-pulldown'],
-  ['straight-arm',             'pullover-cable'],
-  ['straight arm cable',       'pullover-cable'],
-  ['pullover',                 'pullover-cable'],
-  ['chest-supported',          'row-tbar'],
-  ['chest supported',          'row-tbar'],
-  ['t-bar row',                'row-tbar'],
-  ['t bar row',                'row-tbar'],
-  ['meadows row',              'row-meadows'],
-  ['single-arm row',           'row-db-single-arm'],
-  ['single arm row',           'row-db-single-arm'],
-  ['one-arm db row',           'row-db-single-arm'],
-  ['dumbbell row',             'row-db-single-arm'],
-  ['seated cable row',         'row-cable-seated'],
-  ['cable row',                'row-cable-seated'],
-  ['seated row',               'row-cable-seated'],
-  ['bent-over row',            'row-barbell-bent'],
-  ['bent over row',            'row-barbell-bent'],
-  ['barbell row',              'row-barbell-bent'],
-  ['plate-loaded row',         'row-machine'],
-  ['machine row',              'row-machine'],
-  ['face pull',                'face-pull'],
-  // ── Shoulders ──
-  ['overhead press',           'ohp-barbell'],
-  ['ohp',                      'ohp-barbell'],
-  ['military press',           'ohp-barbell'],
-  ['machine shoulder',         'press-machine-shoulder'],
-  ['seated dumbbell press',    'press-db-seated'],
-  ['seated db press',          'press-db-seated'],
-  ['shoulder press',           'press-db-seated'],
-  ['db shoulder',              'press-db-seated'],
-  ['machine lateral',          'lateral-raise-machine'],
-  ['cable lateral',            'lateral-raise-cable'],
-  ['prone incline lateral',    'lateral-raise-prone'],
-  ['prone lateral',            'lateral-raise-prone'],
-  ['lateral raise',            'lateral-raise-db'],
-  ['side raise',               'lateral-raise-db'],
-  ['lu raise',                 'raise-lu'],
-  ['reverse pec deck',         'rear-delt-fly'],
-  ['rear delt',                'rear-delt-fly'],
-  // ── Biceps ──
-  ['incline dumbbell curl',    'curl-db-incline'],
-  ['incline db curl',          'curl-db-incline'],
-  ['incline curl',             'curl-db-incline'],
-  ['preacher curl',            'curl-preacher'],
-  ['preacher',                 'curl-preacher'],
-  ['bayesian',                 'curl-cable-bayesian'],
-  ['cable hammer curl',        'curl-hammer-cable'],
-  ['hammer curl',              'curl-hammer-db'],
-  ['barbell curl',             'curl-barbell'],
-  ['ez-bar curl',              'curl-barbell'],
-  ['ez bar curl',              'curl-barbell'],
-  // ── Triceps ──
-  ['rope pushdown',            'pushdown-cable-rope'],
-  ['tricep pushdown',          'pushdown-cable-rope'],
-  ['cable pushdown',           'pushdown-cable-rope'],
-  ['pushdown',                 'pushdown-cable-rope'],
-  ['overhead tricep',          'extension-overhead-cable'],
-  ['overhead extension',       'extension-overhead-cable'],
-  ['tricep extension',         'extension-overhead-cable'],
-  ['skullcrusher',             'skullcrusher'],
-  ['skull crusher',            'skullcrusher'],
-  ['jm press',                 'press-jm'],
-  ['machine tricep dip',       'dip-machine'],
-  ['machine dip',              'dip-machine'],
-  ['assisted dip',             'dip-machine'],
-  ['dip',                      'dip'],
-  // ── Quads ──
-  ['front squat',              'squat-front'],
-  ['back squat',               'squat-barbell-back'],
-  ['barbell squat',            'squat-barbell-back'],
-  ['spanish squat',            'squat-spanish'],
-  ['heel-elevated goblet',     'squat-goblet'],
-  ['heel elevated goblet',     'squat-goblet'],
-  ['goblet squat',             'squat-goblet'],
-  ['goblet',                   'squat-goblet'],
-  ['hack squat',               'hack-squat'],
-  ['leg press',                'leg-press'],
-  ['leg extension',            'leg-extension'],
-  ['squat',                    'squat-barbell-back'],
-  // ── Hamstrings/glutes ──
-  ['single-leg rdl',           'rdl-single-leg'],
-  ['single leg rdl',           'rdl-single-leg'],
-  ['b-stance rdl',             'rdl-single-leg'],
-  ['romanian deadlift',        'rdl-barbell'],
-  ['rdl',                      'rdl-barbell'],
-  ['seated leg curl',          'leg-curl-seated'],
-  ['lying leg curl',           'leg-curl-lying'],
-  ['leg curl',                 'leg-curl-seated'],
-  ['hip thrust',               'hip-thrust-barbell'],
-  ['back extension',           'back-extension-45'],
-  ['hyperextension',           'back-extension-45'],
-  ['hip abduction',            'hip-abduction'],
-  ['sumo deadlift',            'deadlift-sumo'],
-  ['deadlift',                 'deadlift-conventional'],
-  ['step-up',                  'step-up-db'],
-  ['step up',                  'step-up-db'],
-  ['reverse lunge',            'lunge-reverse'],
-  ['lunge',                    'lunge-db'],
-  ['calf raise',               'calf-raise'],
-  ['calf',                     'calf-raise'],
-  // ── Core ──
-  ['side plank',               'plank-side'],
-  ['plank',                    'plank'],
-  ['cable crunch',             'cable-crunch'],
-  ['hanging leg raise',        'hanging-leg-raise'],
-  ['hanging knee raise',       'hanging-leg-raise'],
-  ['ab wheel',                 'ab-wheel'],
-  ['ab rollout',               'ab-wheel'],
-  ['dead bug',                 'dead-bug'],
-  ['deadbug',                  'dead-bug'],
-  // ── Cardio ──
-  ['treadmill',                'treadmill'],
-  ['stairmaster',              'stairmaster'],
-  ['stair climber',            'stairmaster'],
-  ['stair',                    'stairmaster'],
-  ['rower',                    'rower-machine'],
-  ['rowing machine',           'rower-machine'],
-  ['row machine',              'rower-machine'],
-  ['elliptical',               'elliptical'],
-  ['bike',                     'bike-upright'],
-  ['cycling',                  'bike-upright'],
-];
-
-// Emoji fallback map (original behavior) — used when no slug is available.
-const EX_ICONS={
-  // compounds
-  'squat':'🏋️','deadlift':'🏋️','bench':'💪','row':'🔄','press':'💪','pull':'🔄',
-  'lunge':'🦵','hip thrust':'🍑','rdl':'🔄','sumo':'🏋️',
-  // isolation
-  'curl':'💪','extension':'🦵','fly':'💪','raise':'💪','shrug':'💪',
-  'kickback':'💪','pushdown':'💪',
-  // cable/machine
-  'cable':'🔁','machine':'⚙️','lat pulldown':'🔁','leg press':'⚙️',
-  'leg curl':'⚙️','leg extension':'⚙️','chest press':'⚙️',
-  // cardio
-  'treadmill':'🏃','stair':'🪜','bike':'🚴','row machine':'🚣','elliptical':'🏃',
-  'walk':'🚶',
+// ── Exercise icon system: generated muscle maps ──
+// One uniform style for every exercise: a front/back figure with the primary
+// muscle in the brand colour and secondary muscles dimmed. Driven by the
+// engine's exercise metadata, so all 200+ movements are covered automatically.
+const MM_BODY='<ellipse cx="50" cy="15" rx="9" ry="11"/><path d="M45 24h10v9H45z"/>'+
+  '<path d="M31 37Q50 31 69 37Q72 52 68 70Q65 88 64 104H36Q35 88 32 70Q28 52 31 37Z"/>'+
+  '<ellipse cx="28" cy="43" rx="8" ry="8.5"/><ellipse cx="72" cy="43" rx="8" ry="8.5"/>'+
+  '<rect x="17" y="46" width="10" height="36" rx="5"/><rect x="73" y="46" width="10" height="36" rx="5"/>'+
+  '<rect x="15.5" y="81" width="9" height="32" rx="4.5"/><rect x="75.5" y="81" width="9" height="32" rx="4.5"/>'+
+  '<ellipse cx="20" cy="118" rx="4.5" ry="5.5"/><ellipse cx="80" cy="118" rx="4.5" ry="5.5"/>'+
+  '<path d="M36 101H64L66.5 121H33.5Z"/>'+
+  '<rect x="33.5" y="113" width="15.5" height="50" rx="7.5"/><rect x="51" y="113" width="15.5" height="50" rx="7.5"/>'+
+  '<rect x="35.5" y="161" width="11.5" height="33" rx="5.5"/><rect x="53" y="161" width="11.5" height="33" rx="5.5"/>'+
+  '<ellipse cx="41" cy="196" rx="6" ry="3"/><ellipse cx="59" cy="196" rx="6" ry="3"/>';
+const MM_FRONT={
+  chest:'<path d="M34 44Q42 40 49 43V58Q41 62 34 56Z"/><path d="M66 44Q58 40 51 43V58Q59 62 66 56Z"/>',
+  delts:'<ellipse cx="28" cy="43.5" rx="6.3" ry="7"/><ellipse cx="72" cy="43.5" rx="6.3" ry="7"/>',
+  biceps:'<ellipse cx="22" cy="63" rx="3.6" ry="11"/><ellipse cx="78" cy="63" rx="3.6" ry="11"/>',
+  obliques:'<path d="M35 62L41 63.5V96Q37.5 91 36 83Q34.5 73 35 62Z"/><path d="M65 62L59 63.5V96Q62.5 91 64 83Q65.5 73 65 62Z"/>',
+  abs:'<path d="M42.5 63h15v31q-7.5 6-15 0z"/>',
+  quads:'<ellipse cx="41.3" cy="136" rx="6" ry="19"/><ellipse cx="58.7" cy="136" rx="6" ry="19"/>',
+  shins:'<ellipse cx="41.2" cy="174" rx="3.6" ry="11"/><ellipse cx="58.8" cy="174" rx="3.6" ry="11"/>',
 };
-
-// Some exercises are visually close enough that it's fine to render a more
-// general icon when the specific one isn't available. e.g. a "Single-Arm Lat
-// Pulldown" looks enough like a "Lat Pulldown" that using the latter's icon
-// is more helpful than falling back to a generic emoji.
-// Conversely, a "Spanish Squat" (quad-dominant, heels elevated) renders with
-// radically different equipment than a "Back Squat" (barbell) — those must
-// NOT silently downgrade. The default behavior is "no downgrade"; only the
-// mappings below are allowed to resolve to a different slug.
-const SAFE_DOWNGRADES = {
-  'pulldown-single-arm': 'lat-pulldown',
-  'pulldown-hammer':     'lat-pulldown',
-  'row-meadows':         'row-db-single-arm',
-  'curl-hammer-db':      'curl-barbell',
-  'curl-hammer-cable':   'curl-cable-bayesian',
-  'lunge-reverse':       'lunge-db',
-  'step-up-db':          'lunge-db',
-  'rdl-single-leg':      'rdl-barbell',
-  'squat-goblet':        'squat-front',     // both front-loaded, upright torso
-  'lateral-raise-machine': 'lateral-raise-db',
-  'lateral-raise-prone': 'rear-delt-fly',   // both rear-delt-focused
-  'press-machine-shoulder': 'press-db-seated',
-  'press-smith-flat':    'bench-barbell-flat',
-  'dip-machine':         'dip',
-  'plank-side':          'plank',
+const MM_BACK={
+  traps:'<path d="M41 36L50 30.5L59 36L55.5 53H44.5Z"/>',
+  reardelts:'<ellipse cx="28" cy="44" rx="6" ry="6.3"/><ellipse cx="72" cy="44" rx="6" ry="6.3"/>',
+  lats:'<path d="M34 50Q42 53 48.5 57V86Q40 80 35 69Z"/><path d="M66 50Q58 53 51.5 57V86Q60 80 65 69Z"/>',
+  triceps:'<ellipse cx="22" cy="62" rx="3.6" ry="11"/><ellipse cx="78" cy="62" rx="3.6" ry="11"/>',
+  lowback:'<path d="M45 88h10v12h-10z"/>',
+  glutes:'<ellipse cx="43" cy="112" rx="7.2" ry="7.6"/><ellipse cx="57" cy="112" rx="7.2" ry="7.6"/>',
+  hams:'<ellipse cx="41.3" cy="141" rx="5.6" ry="16"/><ellipse cx="58.7" cy="141" rx="5.6" ry="16"/>',
+  calves:'<ellipse cx="41.2" cy="172" rx="4.6" ry="10.5"/><ellipse cx="58.8" cy="172" rx="4.6" ry="10.5"/>',
 };
-
-// Look up a slug for a given exercise name. Returns a string slug (guaranteed
-// to be in AVAILABLE_SLUGS) or null.
-// Logic:
-//   1. Find the first keyword match in EX_SLUG_MAP (most specific wins).
-//   2. If that slug is available → return it.
-//   3. If not, check SAFE_DOWNGRADES → return the fallback slug if available.
-//   4. Otherwise return null (caller renders emoji).
-// This prevents e.g. "Spanish Squat" from silently matching a generic 'squat'
-// keyword and rendering as a barbell back squat.
-function getExIconSlug(name){
-  if(!name) return null;
-  const n = String(name).toLowerCase();
-  for(const [kw, slug] of EX_SLUG_MAP){
-    if(n.includes(kw)){
-      if(AVAILABLE_SLUGS.has(slug)) return slug;
-      const downgrade = SAFE_DOWNGRADES[slug];
-      if(downgrade && AVAILABLE_SLUGS.has(downgrade)) return downgrade;
-      return null; // first match wins — don't silently fall through to wrong art
-    }
+const MM_BACK_REGIONS=new Set(Object.keys(MM_BACK));
+// Muscle (engine vocabulary) → drawn regions; Back depends on the movement.
+function mmRegionsOf(muscle,pat){
+  switch(muscle){
+    case 'Chest':return['chest'];
+    case 'Shoulders':return['delts'];
+    case 'Rear Delts':return['reardelts'];
+    case 'Back':return pat==='tr'?['traps']:pat==='hr'?['lats','traps']:['lats'];
+    case 'Biceps':return['biceps'];
+    case 'Triceps':return['triceps'];
+    case 'Quads':return['quads'];
+    case 'Hamstrings':return['hams'];
+    case 'Glutes':return['glutes'];
+    case 'Calves':return['calves'];
+    case 'Core':return pat==='cl'||pat==='cr'?['obliques']:['abs'];
   }
-  return null;
+  return[];
 }
+function mmHighlight(names){
+  const p=new Set(),sec=new Set();
+  (names||[]).forEach(n=>{
+    const m=WoEngine.musclesOf(n);if(!m)return;
+    mmRegionsOf(m.primary,m.pat).forEach(r=>p.add(r));
+    if(m.pat==='hg'){p.add('hams');p.add('glutes');sec.add('lowback');}
+    if(m.pat==='cl'||m.pat==='cr')sec.add('abs');     // oblique work braces the abs too
+    if(m.pat==='cx')sec.add('obliques');               // anti-extension holds load the sides
+    m.secondary.forEach(x=>mmRegionsOf(x,m.pat).forEach(r=>{if(!p.has(r))sec.add(r);}));
+  });
+  return {p,s:sec};
+}
+function mmSvg(view,hi,crop,cls){
+  const R=view==='front'?MM_FRONT:MM_BACK;
+  const parts=Object.keys(R).map(k=>`<g class="${hi.p.has(k)?'mm-p':hi.s.has(k)?'mm-s':'mm-m'}">${R[k]}</g>`).join('');
+  return `<svg viewBox="${crop||'0 0 100 200'}" preserveAspectRatio="xMidYMid meet" class="mm${cls?' '+cls:''}" aria-hidden="true"><g class="mm-b">${MM_BODY}</g>${parts}</svg>`;
+}
+// Thumbnail: the view and crop that best show the primary muscle.
+function mmThumb(names){
+  const hi=mmHighlight(names);
+  const first=[...hi.p][0];
+  if(!first)return null;
+  const view=MM_BACK_REGIONS.has(first)?'back':'front';
+  const crop=['quads','glutes','hams'].includes(first)?'14 96 72 72':first==='calves'?'14 134 72 66':(first==='abs'||first==='obliques')?'14 36 72 72':'10 26 80 80';
+  return mmSvg(view,hi,crop);
+}
+// Hero: front and back side by side.
+function mmHero(names,extraP){
+  const hi=mmHighlight(names);
+  (extraP||[]).forEach(m=>mmRegionsOf(m).forEach(r=>hi.p.add(r)));
+  return `<div class="mm-hero">${mmSvg('front',hi)}${mmSvg('back',hi)}</div>`;
+}
+const WO_EQUIP_LABEL={bb:'Barbell',db:'Dumbbells',cable:'Cable',mach:'Machine',bw:'Bodyweight',smith:'Smith machine'};
+function woEquipOf(name){const m=WoEngine.musclesOf(name);return m?(WO_EQUIP_LABEL[m.equip]||''):'';}
 
-// Main icon getter used by all render sites. Returns an HTML string.
-// If an explicit slug is passed (e.g. from AI response `iconSlug`), it's used directly
-// when available. Otherwise falls through to keyword → slug match, then emoji.
-function getExIcon(name, explicitSlug){
-  // 1. Explicit slug from AI response
-  if(explicitSlug && AVAILABLE_SLUGS.has(explicitSlug)){
-    return `<img class="wo-ex-img" src="icons/${explicitSlug}.png" alt="" loading="lazy">`;
-  }
-  // 2. Keyword match → slug
-  const slug = getExIconSlug(name);
-  if(slug){
-    return `<img class="wo-ex-img" src="icons/${slug}.png" alt="" loading="lazy">`;
-  }
-  // 3. Emoji fallback
-  const n = String(name||'').toLowerCase();
-  for(const [k, v] of Object.entries(EX_ICONS)){if(n.includes(k)) return v;}
-  return '💪';
+// Kept for older call sites/data: slugs no longer drive anything.
+function getExIconSlug(){ return null; }
+// Icon for any exercise or cardio machine (HTML string).
+function getExIcon(name){
+  const svg=mmThumb([name]);
+  if(svg)return `<span class="wo-mm-thumb">${svg}</span>`;
+  const n=String(name||'').toLowerCase();
+  const cardio=/tread|bike|cycle|row(er|ing machine)|erg|stair|elliptical|walk|run|sprint|jump rope|ski/.test(n);
+  return `<span class="wo-ex-glyph">${woIco(cardio?'heart':'dumbbell')}</span>`;
 }
 
 // ── Yesterday's nutrition helper ──
@@ -4171,6 +3970,509 @@ function getExerciseGhostSets(exerciseName) {
 }
 
 // ── Render workout page (readiness) ──
+// ── v12 icon set (Lucide-style strokes) — replaces emoji across the workout UI ──
+const WO_ICONS={
+  shuffle:'<path d="m18 14 4 4-4 4"/><path d="m18 2 4 4-4 4"/><path d="M2 18h1.973a4 4 0 0 0 3.3-1.7l5.454-8.6a4 4 0 0 1 3.3-1.7H22"/><path d="M2 6h1.972a4 4 0 0 1 3.6 2.2"/><path d="M22 18h-6.041a4 4 0 0 1-3.3-1.8l-.359-.45"/>',
+  play:'<circle cx="12" cy="12" r="10"/><path d="m10 8 6 4-6 4z" fill="currentColor"/>',
+  check:'<path d="M20 6 9 17l-5-5"/>',
+  sparkles:'<path d="M12 3 13.9 8.1 19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 3v4M17 5h4M5 17v4M3 19h4"/>',
+  target:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/>',
+  bulb:'<path d="M9 18h6M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.1V17h6v-.2c0-.8.4-1.6 1-2.1A7 7 0 0 0 12 2z"/>',
+  flame:'<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>',
+  zap:'<path d="M13 2 3 14h9l-1 8 10-12h-9z"/>',
+  note:'<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>',
+  trophy:'<path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M4 22h16M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2z"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  layers:'<path d="m12 2 10 5-10 5L2 7z"/><path d="m2 17 10 5 10-5M2 12l10 5 10-5"/>',
+  chevron:'<path d="m6 9 6 6 6-6"/>',
+  heart:'<path d="M3 12h4l3-8 4 16 3-8h4"/>',
+  more:'<circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none"/>',
+  chart:'<path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 6-6"/>',
+  plates:'<rect x="2" y="9" width="3" height="6" rx="1"/><rect x="5" y="6" width="3" height="12" rx="1"/><path d="M8 12h8"/><rect x="16" y="6" width="3" height="12" rx="1"/><rect x="19" y="9" width="3" height="6" rx="1"/>',
+  grip:'<path d="M5 9h14M5 15h14"/>',
+  trash:'<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>',
+  reorder:'<path d="M7 4v16M3 8l4-4 4 4M17 20V4M13 16l4 4 4-4"/>',
+  bell:'<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
+  minus:'<path d="M5 12h14"/>',
+  gear:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>',
+  bookmark:'<path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>',
+  dumbbell:'<path d="M14.4 14.4 9.6 9.6"/><path d="M18.657 21.485a2 2 0 1 1-2.829-2.828l-1.767 1.768a2 2 0 1 1-2.829-2.829l6.364-6.364a2 2 0 1 1 2.829 2.829l-1.768 1.767a2 2 0 1 1 2.828 2.829z"/><path d="m21.5 21.5-1.4-1.4"/><path d="M3.9 3.9 2.5 2.5"/><path d="M6.404 12.768a2 2 0 1 1-2.829-2.829l1.768-1.767a2 2 0 1 1-2.828-2.829l2.828-2.828a2 2 0 1 1 2.829 2.828l1.767-1.768a2 2 0 1 1 2.829 2.829z"/>',
+};
+function woIco(name,cls){
+  return `<svg class="ico${cls?' '+cls:''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${WO_ICONS[name]||''}</svg>`;
+}
+// Light haptic tick on supporting devices (Android/Chrome). No-op elsewhere.
+function woHaptic(p){
+  try{ if(navigator.vibrate && !matchMedia('(prefers-reduced-motion: reduce)').matches) navigator.vibrate(p||10); }catch(e){}
+}
+function woFormUrl(name){ return 'https://www.youtube.com/results?search_query='+encodeURIComponent(name+' proper form'); }
+
+// ══════════════════════════════════════════════════════════════════════════
+// v13 bottom sheet — replaces window.confirm / prompt / alert in the workout flow
+// ══════════════════════════════════════════════════════════════════════════
+function woSheet(o){
+  o=o||{};
+  const ov=document.createElement('div');
+  ov.className='wo-sheet-ov';
+  const acts=o.actions||[];
+  ov.innerHTML=`<div class="wo-sheet ${o.className||''}" role="dialog" aria-modal="true"${o.title?` aria-label="${escapeAttr(o.title)}"`:''}>
+    <div class="wo-sheet-grab" aria-hidden="true"></div>
+    ${o.title?`<div class="wo-sheet-title">${escapeHtml(o.title)}</div>`:''}
+    ${o.message?`<div class="wo-sheet-msg">${o.message}</div>`:''}
+    <div class="wo-sheet-body">${o.body||''}</div>
+    ${acts.length?`<div class="wo-sheet-actions">${acts.map((a,i)=>`<button class="wo-sheet-btn ${a.style||''}" data-i="${i}">${a.icon?woIco(a.icon):''}<span>${escapeHtml(a.label)}</span></button>`).join('')}</div>`:''}
+  </div>`;
+  document.body.appendChild(ov);
+  let done=false;
+  const close=v=>{
+    if(done)return;done=true;
+    ov.classList.remove('open');ov.classList.add('closing');
+    document.removeEventListener('keydown',onKey);
+    setTimeout(()=>ov.remove(),240);
+    if(o.onClose)o.onClose(v);
+  };
+  const onKey=e=>{if(e.key==='Escape')close(null);};
+  document.addEventListener('keydown',onKey);
+  ov.addEventListener('click',e=>{if(e.target===ov)close(null);});
+  ov.querySelectorAll('.wo-sheet-btn[data-i]').forEach(b=>b.addEventListener('click',()=>{
+    const a=acts[+b.dataset.i];
+    const v=a.value!==undefined?a.value:a.label;
+    close(v);
+    if(a.onClick)a.onClick(v);
+  }));
+  requestAnimationFrame(()=>ov.classList.add('open'));
+  const sheet=ov.querySelector('.wo-sheet');
+  return {el:sheet,body:ov.querySelector('.wo-sheet-body'),close};
+}
+function woConfirm(title,message,okLabel,destructive){
+  return new Promise(res=>woSheet({title,message:escapeHtml(message||''),
+    actions:[{label:okLabel||'OK',style:destructive?'destructive':'primary',value:true},{label:'Cancel',style:'cancel',value:false}],
+    onClose:v=>res(v===true)}));
+}
+function woPrompt(title,value,okLabel,placeholder){
+  return new Promise(res=>{
+    const sh=woSheet({title,
+      body:`<input class="wo-sheet-input" type="text" value="${escapeAttr(value||'')}" placeholder="${escapeAttr(placeholder||'')}" maxlength="60" autocomplete="off">`,
+      actions:[{label:okLabel||'Save',style:'primary',value:'__ok'},{label:'Cancel',style:'cancel',value:null}],
+      onClose:v=>res(v==='__ok'?(inp.value.trim()||null):null)});
+    const inp=sh.body.querySelector('input');
+    inp.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();sh.el.querySelector('.wo-sheet-btn.primary').click();}});
+    setTimeout(()=>{inp.focus();inp.select();},250);
+  });
+}
+
+// ── Workout UI preferences (device-local; kept apart from engine prefs) ──
+const WO_UI_KEY=KEY+'_wo_ui';
+const WO_UI_DEFAULTS={autoRest:true,sound:true,alerts:false,awake:true,bar:20};
+function woUi(){try{return Object.assign({},WO_UI_DEFAULTS,JSON.parse(localStorage.getItem(WO_UI_KEY)||'{}'));}catch(e){return Object.assign({},WO_UI_DEFAULTS);}}
+function woSetUi(k,v){const u=woUi();u[k]=v;localStorage.setItem(WO_UI_KEY,JSON.stringify(u));}
+
+// ── Rest-over alerts while the app is in the background ──
+// A tiny service worker (sw.js, no caching) lets us post a system notification.
+async function woEnableAlerts(on){
+  if(!on){woSetUi('alerts',false);return true;}
+  if(!('Notification' in window)||!('serviceWorker' in navigator)){woToast('This browser can’t show alerts');return false;}
+  let perm=Notification.permission;
+  if(perm==='default'){try{perm=await Notification.requestPermission();}catch(e){}}
+  if(perm!=='granted'){woToast('Notifications are blocked for this app');return false;}
+  try{await navigator.serviceWorker.register('sw.js');}catch(e){woToast('Couldn’t set up alerts');return false;}
+  woSetUi('alerts',true);
+  return true;
+}
+async function woNotify(title,body){
+  try{
+    if(!woUi().alerts||!('serviceWorker' in navigator)||Notification.permission!=='granted')return;
+    const reg=await navigator.serviceWorker.getRegistration();
+    if(reg)reg.showNotification(title,{body,tag:'rb-rest',renotify:true,vibrate:[200,100,200],icon:'reborn-logo-rb.png',badge:'reborn-logo-rb.png'});
+  }catch(e){}
+}
+
+// ── Settings sheet ──
+function openWoSettings(){
+  const u=woUi();
+  const sw=(k,label,sub)=>`<label class="wo-row wo-row-switch">
+      <span class="wo-row-main"><span class="wo-row-label">${label}</span>${sub?`<span class="wo-row-sub">${sub}</span>`:''}</span>
+      <input type="checkbox" class="wo-switch" ${u[k]?'checked':''} onchange="woSettingChange('${k}',this)">
+    </label>`;
+  woSheet({title:'Workout settings',className:'wo-sheet-tall',body:`
+    <div class="wo-list">
+      ${sw('autoRest','Start rest timer automatically','After each logged set')}
+      ${sw('sound','Rest timer sound')}
+      ${sw('alerts','Alert when rest ends','Notification if the app is in the background')}
+      ${sw('awake','Keep screen on during workouts')}
+    </div>
+    <div class="wo-list">
+      <div class="wo-row"><span class="wo-row-main"><span class="wo-row-label">Barbell weight</span></span>
+        <div class="wo-seg wo-seg-sm" role="group" aria-label="Barbell weight">
+          ${[20,15,10].map(b=>`<button class="wo-seg-btn${u.bar===b?' sel':''}" onclick="woSetBar(${b},this)">${b} kg</button>`).join('')}
+        </div>
+      </div>
+    </div>
+    <p class="wo-footnote">On iPhone, web apps pause in the background, so a rest alert may only arrive when you switch back. Keeping the screen on avoids this.</p>`,
+    actions:[{label:'Done',style:'cancel'}]});
+}
+async function woSettingChange(k,inp){
+  if(k==='alerts'){const ok=await woEnableAlerts(inp.checked);if(!ok)inp.checked=false;return;}
+  woSetUi(k,inp.checked);
+  if(k==='awake'){if(inp.checked)woWakeOn();else woWakeOff();}
+}
+function woSetBar(b,btn){
+  woSetUi('bar',b);
+  btn.parentElement.querySelectorAll('.wo-seg-btn').forEach(x=>x.classList.toggle('sel',x===btn));
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// Plate calculator
+// ══════════════════════════════════════════════════════════════════════════
+const WO_PLATES=[25,20,15,10,5,2.5,1.25];
+// Calibrated-plate colours (IWF), height % of the visual, thickness px.
+const WO_PLATE_STYLE={25:['#D93A2B',96,22],20:['#2F67D8',96,20],15:['#E8B923',84,18],10:['#2E9D57',72,16],5:['#E9E9EC',54,12],2.5:['#8E8E93',42,10],1.25:['#C7C7CC',34,8]};
+function woIsBarbell(name){
+  const lib=WoEngine.byName(name);
+  if(lib)return lib.equip==='bb'||lib.equip==='smith';
+  return /barbell|smith|ez[- ]?bar|trap bar|landmine|t-bar/i.test(name||'');
+}
+function woPlatesFor(total,bar){
+  let per=Math.round(((total-bar)/2)*1000)/1000;
+  const plates=[];
+  if(per<0)return {plates,left:per};
+  for(const p of WO_PLATES){while(per>=p-1e-9){plates.push(p);per=Math.round((per-p)*1000)/1000;}}
+  return {plates,left:per};
+}
+let _pc=null;
+function openPlateCalc(ei){
+  const ex=_woSession&&_woSession.exercises[ei];if(!ex)return;
+  let si=ex.sets.findIndex(s=>!s.done);if(si<0)si=ex.sets.length-1;
+  const h=woSetHint(ex,si);
+  const bar=woUi().bar;
+  const w=parseFloat(ex.sets[si].weight)||parseFloat(h.w)||bar+40;
+  _pc={ei,si,w,bar};
+  const sh=woSheet({title:'Plate calculator',className:'wo-sheet-tall',body:'<div id="wo-pc"></div>',
+    actions:[{label:`Use for set ${si+1}`,style:'primary',value:'apply',onClick:woApplyPlates},{label:'Close',style:'cancel'}]});
+  _pc.sheet=sh;
+  woRenderPlates();
+}
+function woRenderPlates(){
+  const el=gv('wo-pc');if(!el||!_pc)return;
+  const {plates,left}=woPlatesFor(_pc.w,_pc.bar);
+  const exact=left===0;
+  const loaded=_pc.bar+2*plates.reduce((a,b)=>a+b,0);
+  const stack=plates.map(p=>{const [c,h,w]=WO_PLATE_STYLE[p];return `<span class="pc-plate" style="--c:${c};--h:${h}%;--w:${w}px" title="${p} kg"></span>`;}).join('');
+  const counts={};plates.forEach(p=>counts[p]=(counts[p]||0)+1);
+  const legend=Object.keys(counts).map(Number).sort((a,b)=>b-a).map(p=>`<span class="pc-chip"><i style="background:${WO_PLATE_STYLE[p][0]}"></i>${counts[p]} × ${p}</span>`).join('');
+  el.innerHTML=`
+    <div class="pc-weight">
+      <button class="wo-round-btn" onclick="woPlateStep(-2.5)" aria-label="Decrease">${woIco('minus')}</button>
+      <div class="pc-total"><span class="tnum">${_pc.w}</span><small>kg</small></div>
+      <button class="wo-round-btn" onclick="woPlateStep(2.5)" aria-label="Increase">${woIco('plus')}</button>
+    </div>
+    <div class="pc-visual" aria-hidden="true">
+      <span class="pc-shaft"></span><span class="pc-collar"></span>${stack}<span class="pc-sleeve"></span>
+    </div>
+    <div class="pc-legend">${plates.length?`<span class="pc-legend-lbl">Each side</span>${legend}`:`<span class="pc-legend-lbl">${_pc.w<=_pc.bar?'Empty bar':'No plates'}</span>`}</div>
+    ${!exact&&_pc.w>_pc.bar?`<div class="pc-warn">Closest you can load is <b class="tnum">${loaded} kg</b></div>`:''}
+    <div class="wo-row"><span class="wo-row-main"><span class="wo-row-label">Bar</span></span>
+      <div class="wo-seg wo-seg-sm">${[20,15,10].map(b=>`<button class="wo-seg-btn${_pc.bar===b?' sel':''}" onclick="woPlateBar(${b})">${b} kg</button>`).join('')}</div>
+    </div>`;
+}
+function woPlateStep(d){if(!_pc)return;_pc.w=Math.max(0,Math.round((_pc.w+d)*100)/100);woHaptic(6);woRenderPlates();}
+function woPlateBar(b){if(!_pc)return;_pc.bar=b;woSetUi('bar',b);woRenderPlates();}
+function woApplyPlates(){
+  if(!_pc||!_woSession)return;
+  const ex=_woSession.exercises[_pc.ei];if(!ex||!ex.sets[_pc.si])return;
+  ex.sets[_pc.si].weight=String(_pc.w);
+  woSave(WO_KEY,_woSession);
+  renderExerciseCardAt(_pc.ei);
+  _pc=null;
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// Per-exercise menu, swap, reorder, remove, swipe-to-delete
+// ══════════════════════════════════════════════════════════════════════════
+function openExMenu(ei){
+  const ex=_woSession&&_woSession.exercises[ei];if(!ex)return;
+  const name=ex.swappedTo||ex.name;
+  const hasNote=!!getExerciseNote(name);
+  const acts=[{label:'History & progress',icon:'chart',onClick:()=>openExerciseDetail(name)}];
+  if((ex.alternatives||[]).length)acts.push({label:'Swap exercise',icon:'shuffle',onClick:()=>openSwapSheet(ei)});
+  if(woIsBarbell(name))acts.push({label:'Plate calculator',icon:'plates',onClick:()=>openPlateCalc(ei)});
+  acts.push({label:hasNote?'Edit note':'Add note',icon:'note',onClick:()=>openNoteModal(ei)});
+  acts.push({label:'Watch form video',icon:'play',onClick:()=>window.open(woFormUrl(name),'_blank','noopener')});
+  if(_woSession.exercises.length>1)acts.push({label:'Reorder exercises',icon:'reorder',onClick:openReorder});
+  acts.push({label:'Remove exercise',icon:'trash',style:'destructive',onClick:()=>woRemoveExercise(ei)});
+  acts.push({label:'Cancel',style:'cancel'});
+  woSheet({title:name,actions:acts,className:'wo-sheet-menu'});
+}
+function openSwapSheet(ei){
+  const ex=_woSession&&_woSession.exercises[ei];if(!ex)return;
+  const acts=(ex.alternatives||[]).map((a,ai)=>({label:a,icon:(a===ex.name&&ex.swappedTo)?'reorder':null,onClick:()=>{swapExercise(ei,ai);woHaptic(8);}}));
+  acts.push({label:'Cancel',style:'cancel'});
+  woSheet({title:'Swap for…',message:'Same movement pattern, different equipment or angle.',actions:acts,className:'wo-sheet-menu'});
+}
+// ══════════════════════════════════════════════════════════════════════════
+// Live recalibration — re-plan the lifts you haven't started whenever the
+// session deviates from the plan (swap, remove, add, or a big rep shortfall).
+// The engine decides; this applies it, explains it, and offers Undo.
+// ══════════════════════════════════════════════════════════════════════════
+function woDoneCount(){return _woSession?_woSession.exercises.reduce((a,e)=>a+(e.sets||[]).filter(s=>s.done).length,0):0;}
+function woRecalibrate(){
+  if(!_woSession||!_woSession.basePlan||typeof WoEngine.recalibrate!=='function')return;
+  let res;
+  try{res=WoEngine.recalibrate(_woSession,woEngineInput({recovery:_woSession.recovery??null}));}
+  catch(e){console.error('[reBorn] recalibrate',e);return;}
+  const changes=(res&&res.changes)||[];
+  if(!changes.length)return;
+  const snap={ex:JSON.stringify(_woSession.exercises),restEi:_restTimerState.ei,done:woDoneCount()};
+  changes.forEach(c=>{
+    if(c.type==='replace'){
+      const nx=woSessionExercise(c.exercise);
+      nx.recal={reason:c.reason,from:c.from};
+      _woSession.exercises[c.index]=nx;
+    }else if(c.type==='sets'){
+      const ex=_woSession.exercises[c.index];if(!ex)return;
+      while(ex.sets.length>c.to){const last=ex.sets[ex.sets.length-1];if(last.done||last.weight!==''||last.reps!=='')break;ex.sets.pop();}
+      while(ex.sets.length<c.to){const last=ex.sets[ex.sets.length-1]||{};const ns={weight:'',reps:'',rpe:'',done:false};if(last.tw!=null){ns.tw=last.tw;ns.tr=last.tr;}ex.sets.push(ns);}
+      ex.recal={reason:c.reason};
+    }
+  });
+  changes.filter(c=>c.type==='insert').sort((a,b)=>b.index-a.index).forEach(c=>{
+    const nx=woSessionExercise(c.exercise);nx.recal={reason:c.reason};
+    _woSession.exercises.splice(c.index,0,nx);
+    if(_restTimerState.ei!=null&&_restTimerState.ei>=c.index)_restTimerState.ei++;
+    if(_currentSuggestion&&_currentSuggestion.ei>=c.index)_currentSuggestion.ei++;
+  });
+  woSave(WO_KEY,_woSession);
+  renderExercises();
+  woHaptic([8,40,8]);
+  woRecalBanner(changes,snap);
+}
+function woRecalLine(c){
+  if(c.type==='replace')return `<b>${escapeHtml(c.from)}</b> → <b>${escapeHtml(c.to)}</b>`;
+  if(c.type==='sets')return `<b>${escapeHtml(c.name)}</b>: ${c.from} → ${c.to} sets`;
+  return `Added <b>${escapeHtml(c.to)}</b>`;
+}
+let _woRecalTimer=null;
+function woRecalBanner(changes,snap){
+  document.querySelectorAll('.wo-recal-banner').forEach(b=>b.remove());
+  const el=document.createElement('div');
+  el.className='wo-recal-banner';el.setAttribute('role','status');
+  const more=changes.length>1?`<div class="wo-recal-more">and ${changes.length-1} more change${changes.length>2?'s':''}</div>`:'';
+  el.innerHTML=`<div class="wo-recal-ico">${woIco('sparkles')}</div>
+    <div class="wo-recal-txt" role="button" tabindex="0"><div class="wo-recal-title">Plan adjusted</div><div class="wo-recal-line">${woRecalLine(changes[0])}</div>${more}</div>
+    <button class="wo-recal-undo">Undo</button>`;
+  document.body.appendChild(el);
+  requestAnimationFrame(()=>el.classList.add('show'));
+  const hide=()=>{clearTimeout(_woRecalTimer);el.classList.remove('show');setTimeout(()=>el.remove(),300);};
+  el.querySelector('.wo-recal-undo').onclick=()=>{woRecalUndo(changes,snap);hide();};
+  el.querySelector('.wo-recal-txt').onclick=()=>{
+    const first=changes.reduce((m,c)=>Math.min(m,c.index),Infinity);
+    woGoTo(first);
+    hide();
+  };
+  clearTimeout(_woRecalTimer);_woRecalTimer=setTimeout(hide,8000);
+}
+function woRecalUndo(changes,snap){
+  if(!_woSession)return;
+  if(woDoneCount()!==snap.done){woToast('Can’t undo — you’ve logged sets since');return;}
+  let exs;try{exs=JSON.parse(snap.ex);}catch(e){return;}
+  // Pin what the lifter chose to keep, so the next recalibration leaves it alone.
+  changes.forEach(c=>{if(c.type!=='insert'&&exs[c.index])exs[c.index].keep=true;});
+  _woSession.exercises=exs;
+  _restTimerState.ei=snap.restEi;
+  _currentSuggestion=null;
+  woSave(WO_KEY,_woSession);
+  renderExercises();
+  woToast('Kept your original plan');
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// Session carousel — one page per exercise, swipe between them.
+// ══════════════════════════════════════════════════════════════════════════
+let _woPageIdx=0,_woCarRO=null,_woCarBound=false,_woCarT=null;
+function woPages(){return [...document.querySelectorAll('#wo-carousel .wo-page')].filter(p=>p.style.display!=='none');}
+function woGoTo(i,instant){
+  const car=gv('wo-carousel');const pages=woPages();if(!car||!pages.length)return;
+  i=Math.max(0,Math.min(i,pages.length-1));
+  const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  car.scrollTo({left:pages[i].offsetLeft,behavior:(instant||reduce)?'auto':'smooth'});
+  if(instant){_woPageIdx=i;woOnPage();}
+}
+function woOnPage(){
+  const pages=woPages();const car=gv('wo-carousel');if(!car||!pages.length)return;
+  const p=pages[Math.min(_woPageIdx,pages.length-1)];
+  car.style.height=p.offsetHeight+'px';
+  document.querySelectorAll('#wo-pager .wo-pg').forEach((b,k)=>{b.classList.toggle('on',k===_woPageIdx);b.setAttribute('aria-selected',k===_woPageIdx);});
+  // keep the new page's top in view
+  const hdr=document.querySelector('.wo-active-header');
+  const top=car.getBoundingClientRect().top-(hdr?hdr.offsetHeight:0);
+  if(top<0)window.scrollBy({top:top-4,behavior:'auto'});
+}
+function woBindCarousel(){
+  const car=gv('wo-carousel');if(!car||_woCarBound)return;_woCarBound=true;
+  car.addEventListener('scroll',()=>{
+    const w=car.clientWidth||1;
+    const i=Math.round(car.scrollLeft/w);
+    if(i!==_woPageIdx){_woPageIdx=i;woHaptic(4);document.querySelectorAll('#wo-pager .wo-pg').forEach((b,k)=>b.classList.toggle('on',k===i));}
+    clearTimeout(_woCarT);_woCarT=setTimeout(woOnPage,90);
+  },{passive:true});
+  document.addEventListener('keydown',e=>{
+    if(gv('wo-active-view')?.style.display==='none'||_currentPage!=='workout')return;
+    if(e.target.closest&&e.target.closest('input,textarea,[contenteditable]'))return;
+    if(document.querySelector('.wo-sheet-ov'))return;
+    if(e.key==='ArrowRight')woGoTo(_woPageIdx+1);
+    if(e.key==='ArrowLeft')woGoTo(_woPageIdx-1);
+  });
+  window.addEventListener('resize',()=>woGoTo(_woPageIdx,true));
+}
+function woWatchPageSizes(){
+  if(!('ResizeObserver' in window))return;
+  if(_woCarRO)_woCarRO.disconnect();
+  _woCarRO=new ResizeObserver(()=>{const car=gv('wo-carousel');const p=woPages()[_woPageIdx];if(car&&p)car.style.height=p.offsetHeight+'px';});
+  woPages().forEach(p=>_woCarRO.observe(p));
+}
+function woRenderPager(){
+  const el=gv('wo-pager');if(!el||!_woSession)return;
+  const segs=_woSession.exercises.map((ex,i)=>{
+    const n=ex.sets.length||1,d=ex.sets.filter(s=>s.done).length;
+    return `<button class="wo-pg${d===n?' full':''}" style="--f:${d/n}" onclick="woGoTo(${i})" role="tab" aria-label="${escapeAttr((ex.swappedTo||ex.name)+': '+d+' of '+n+' sets')}"></button>`;
+  });
+  if(_woSession.cardio)segs.push(`<button class="wo-pg${_woSession.cardio.done?' full':''}" style="--f:${_woSession.cardio.done?1:0}" onclick="woGoTo(${_woSession.exercises.length})" role="tab" aria-label="Cardio finisher"></button>`);
+  segs.push(`<button class="wo-pg wo-pg-end" onclick="woGoTo(${segs.length})" role="tab" aria-label="Finish">${woIco('check')}</button>`);
+  el.innerHTML=segs.join('');
+  el.querySelectorAll('.wo-pg').forEach((b,k)=>b.classList.toggle('on',k===_woPageIdx));
+}
+function woRenderOverview(){
+  if(!_woSession)return;
+  const el=gv('wo-overview');
+  if(el)el.innerHTML=_woSession.exercises.map((ex,i)=>{
+    const n=ex.sets.length,d=ex.sets.filter(s=>s.done).length;
+    const recap=ex.sets.filter(s=>s.done).map(s=>ex.unit==='sec'?`${s.reps}s`:(parseFloat(s.weight)>0?`${s.weight}×${s.reps}`:`BW×${s.reps}`)).join('  ');
+    return `<button class="wo-row wo-ov-row" onclick="woGoTo(${i})">
+      ${getExIcon(ex.swappedTo||ex.name)}
+      <span class="wo-row-main"><span class="wo-row-label">${escapeHtml(ex.swappedTo||ex.name)}</span><span class="wo-row-sub tnum">${recap||'Not started'}</span></span>
+      <span class="wo-ov-state${d===n?' done':''}">${d===n?woIco('check'):`${d}/${n}`}</span>
+    </button>`;
+  }).join('');
+  const st=gv('wo-finish-stats');
+  if(st){
+    let done=0,total=0,vol=0;
+    _woSession.exercises.forEach(ex=>ex.sets.forEach(s=>{total++;if(s.done){done++;vol+=(parseFloat(s.weight)||0)*(parseInt(s.reps)||0);}}));
+    const mins=Math.max(0,Math.round((Date.now()-_woSession.startTime)/60000));
+    st.innerHTML=`<div class="wo-ss"><div class="wo-ss-v tnum">${done}/${total}</div><div class="wo-ss-l">Sets logged</div></div>
+      <div class="wo-ss"><div class="wo-ss-v tnum">${Math.round(vol).toLocaleString()}</div><div class="wo-ss-l">kg volume</div></div>
+      <div class="wo-ss"><div class="wo-ss-v tnum">${mins}</div><div class="wo-ss-l">Minutes</div></div>`;
+  }
+}
+function woShowTech(ei){
+  const ex=_woSession&&_woSession.exercises[ei];if(!ex)return;
+  woSheet({title:ex.intensityTechnique,message:escapeHtml(ex.techNote||''),actions:[{label:'Got it',style:'cancel'}]});
+}
+function woSetMenu(ei,si){
+  const ex=_woSession&&_woSession.exercises[ei];if(!ex)return;
+  const s=ex.sets[si];
+  const acts=[];
+  if(s&&(s.weight!==''||s.reps!==''||s.done))acts.push({label:'Clear this set',icon:'minus',onClick:()=>{s.weight='';s.reps='';s.done=false;woSave(WO_KEY,_woSession);renderExerciseCardAt(ei);}});
+  if(ex.sets.length>1)acts.push({label:'Delete set',icon:'trash',style:'destructive',onClick:()=>woDeleteSet(ei,si)});
+  acts.push({label:'Cancel',style:'cancel'});
+  woSheet({title:`${ex.swappedTo||ex.name} · Set ${si+1}`,actions:acts,className:'wo-sheet-menu'});
+}
+
+// Keep anything that refers to exercises by index consistent after a structural change.
+function woReindex(map){
+  if(_restTimerState&&_restTimerState.ei!=null){const n=map(_restTimerState.ei);_restTimerState.ei=n<0?null:n;}
+  _currentSuggestion=null;
+}
+async function woRemoveExercise(ei){
+  const ex=_woSession&&_woSession.exercises[ei];if(!ex)return;
+  const logged=ex.sets.filter(s=>s.done).length;
+  const ok=await woConfirm('Remove '+(ex.swappedTo||ex.name)+'?',logged?`${logged} logged set${logged>1?'s':''} will be removed too.`:'',"Remove",true);
+  if(!ok)return;
+  _woSession.exercises.splice(ei,1);
+  woReindex(i=>i===ei?-1:(i>ei?i-1:i));
+  woSave(WO_KEY,_woSession);
+  renderExercises();
+  woRecalibrate();
+}
+function woDeleteSet(ei,si){
+  const ex=_woSession&&_woSession.exercises[ei];if(!ex)return;
+  if(ex.sets.length<=1){woToast('An exercise needs at least one set');renderExerciseCardAt(ei);return;}
+  ex.sets.splice(si,1);
+  if(_currentSuggestion&&_currentSuggestion.ei===ei)_currentSuggestion=null;
+  woHaptic(10);
+  woSave(WO_KEY,_woSession);
+  renderExerciseCardAt(ei);
+}
+function openReorder(){
+  if(!_woSession)return;
+  const items=_woSession.exercises.map((e,i)=>`<div class="wo-ro-item" data-i="${i}">
+      <span class="wo-ro-thumb">${getExIcon(e.swappedTo||e.name,e.swappedTo?null:e.iconSlug)}</span>
+      <span class="wo-ro-name">${escapeHtml(e.swappedTo||e.name)}</span>
+      <span class="wo-ro-handle" aria-label="Drag to reorder">${woIco('grip')}</span>
+    </div>`).join('');
+  const sh=woSheet({title:'Reorder exercises',className:'wo-sheet-tall',body:`<div class="wo-reorder">${items}</div>`,
+    actions:[{label:'Done',style:'primary',value:'done',onClick:()=>woApplyReorder(list)},{label:'Cancel',style:'cancel'}]});
+  const list=sh.body.querySelector('.wo-reorder');
+  woInitReorderDrag(list);
+}
+function woInitReorderDrag(list){
+  list.addEventListener('pointerdown',e=>{
+    const handle=e.target.closest('.wo-ro-handle');if(!handle)return;
+    const item=handle.closest('.wo-ro-item');
+    const items=[...list.children];
+    const from=items.indexOf(item);
+    const h=item.getBoundingClientRect().height+6;
+    const y0=e.clientY;let to=from;
+    item.classList.add('dragging');handle.setPointerCapture(e.pointerId);
+    const move=ev=>{
+      const dy=ev.clientY-y0;
+      item.style.transform=`translateY(${dy}px)`;
+      to=Math.max(0,Math.min(items.length-1,from+Math.round(dy/h)));
+      items.forEach((it,i)=>{
+        if(it===item)return;
+        let shift=0;
+        if(from<to&&i>from&&i<=to)shift=-h;
+        if(to<from&&i>=to&&i<from)shift=h;
+        it.style.transform=shift?`translateY(${shift}px)`:'';
+      });
+    };
+    const up=()=>{
+      handle.removeEventListener('pointermove',move);handle.removeEventListener('pointerup',up);handle.removeEventListener('pointercancel',up);
+      items.forEach(it=>{it.style.transform='';});
+      item.classList.remove('dragging');
+      if(to!==from){
+        const ref=to>from?items[to].nextSibling:items[to];
+        list.insertBefore(item,ref);
+        woHaptic(8);
+      }
+    };
+    handle.addEventListener('pointermove',move);handle.addEventListener('pointerup',up);handle.addEventListener('pointercancel',up);
+    e.preventDefault();
+  });
+}
+function woApplyReorder(list){
+  if(!_woSession||!list)return;
+  const order=[...list.children].map(el=>+el.dataset.i);
+  if(order.every((v,i)=>v===i))return;
+  const old=_woSession.exercises;
+  _woSession.exercises=order.map(i=>old[i]);
+  woReindex(i=>order.indexOf(i));
+  woSave(WO_KEY,_woSession);
+  renderExercises();
+}
+// ── Exercise detail (history + chart), openable straight from a live session ──
+let _woHistDirect=false;
+function openExerciseDetail(name){
+  if(typeof name==='number'){const ex=_woSession&&_woSession.exercises[name];if(!ex)return;name=ex.swappedTo||ex.name;}
+  if(!gv('wo-hist-modal'))showWorkoutHistory();
+  _woHistDirect=true;
+  renderExerciseProgression(name);
+}
+async function woAskDiscard(){
+  if(!_woSession)return;
+  if(await woConfirm('Discard workout?','Nothing from this session will be saved.','Discard',true))discardWorkout();
+}
+
 function renderWorkoutPage(){
   if(!_WO_ENGINE_OK){
     const el=gv('wo-split-picker');
@@ -4204,6 +4506,7 @@ function renderWorkoutPage(){
 }
 
 function setRecovery(val){
+  woHaptic(8);
   _woRecovery=val;
   const inp=gv('wo-rec-val');
   if(inp)inp.value=val;
@@ -4242,51 +4545,84 @@ function updateReadiness(){
   if(protEl)protEl.textContent=yest.p?Math.round(yest.p)+'g':'—';
   if(lastEl)lastEl.textContent=lastLabel;
 
+  // Level drives the card tint and the selected preset
+  const lvl=rec==null?'':rec>=67?'high':rec>=34?'mid':'low';
+  const card=gv('wo-ready');if(card)card.dataset.level=lvl;
+  document.querySelectorAll('.wo-rec-preset').forEach(b=>b.classList.toggle('sel',b.dataset.lvl===lvl));
+
   // Verdict
   if(verdictEl){
     if(rec==null){verdictEl.textContent='Enter your WHOOP recovery to begin';return;}
-    if(rec>=67)verdictEl.textContent='💪 Great recovery — go heavy today';
-    else if(rec>=50)verdictEl.textContent='👍 Decent recovery — moderate volume';
-    else if(rec>=34)verdictEl.textContent='⚠️ Low recovery — keep intensity down';
-    else verdictEl.textContent='😴 Poor recovery — consider light work only';
+    if(rec>=67)verdictEl.textContent='Great recovery — go heavy today';
+    else if(rec>=50)verdictEl.textContent='Decent recovery — moderate volume';
+    else if(rec>=34)verdictEl.textContent='Low recovery — keep intensity down';
+    else verdictEl.textContent='Poor recovery — consider light work only';
   }
 }
 
 // ── Split picker: shows the auto-rotation next-up split and lets the user
 // override it for the next generation (one-shot). ──
+function woVarietyHint(v){
+  return v==='max'
+    ?'Every lift rotates every session.'
+    :'Main lifts stay for the block; the rest rotates.';
+}
 function renderSplitPicker(){
   const el=gv('wo-split-picker');if(!el)return;
   const autoSplit=getNextSplit();
   const selected=_woSplitOverride||autoSplit;
   const B=WoEngine.blockInfo(woHistory().length);
   const variety=woPrefs().variety==='max'?'max':'balanced';
-  const chips=WO_SPLIT_CYCLE.map(name=>{
-    const isSel=name===selected;
-    const isAuto=name===autoSplit;
-    return `<button class="wo-split-chip${isSel?' sel':''}" onclick="pickSplit('${name.replace(/'/g,"\\'")}')">${name}${isAuto?' <span class="wo-split-next">next</span>':''}</button>`;
-  }).join('');
-  const blockTag=B.deload
-    ?`<span class="wo-block-tag deload" title="${escapeAttr(B.blurb)}">Deload week</span>`
-    :`<span class="wo-block-tag" title="${escapeAttr(B.blurb)}">${B.phaseName} block · wk ${B.week+1}/4</span>`;
-  el.innerHTML=`<div class="wo-split-picker-card">
-    <div class="wo-split-picker-label"><span>Today's Split ${_woSplitOverride?'<span class="wo-split-override">override</span>':''}</span>${blockTag}</div>
-    <div class="wo-split-chips">${chips}</div>
-    <div class="wo-variety-row">
-      <span class="wo-variety-lbl">Variety</span>
-      <button class="wo-variety-chip${variety==='balanced'?' sel':''}" onclick="setVariety('balanced')">Balanced</button>
-      <button class="wo-variety-chip${variety==='max'?' sel':''}" onclick="setVariety('max')">Max</button>
-    </div>
-    <div class="wo-variety-hint">${variety==='max'
-      ?'Every lift rotates every session. Progress is still tracked per exercise whenever it comes back.'
-      :'Your main lifts stay for the 4-week block so you can add load; everything else rotates every session.'}</div>
-    <button class="wo-gen-btn" onclick="generateWorkout()">⚡ Generate workout</button>
-  </div>`;
+  const blockLabel=B.deload?'Deload week':`${B.phaseName} block · Week ${B.week+1} of 4`;
+  const sub=gv('wo-hdr-sub');if(sub){sub.textContent=blockLabel;sub.title=B.blurb||'';}
+  const muscles=(WoEngine.SPLIT_MUSCLES[selected]||[]);
+  const short={'Arms & Shoulders':'Arms'};
+  el.innerHTML=`
+    <section class="wo-today">
+      <div class="wo-today-txt">
+        <div class="wo-page-kicker">${selected===autoSplit?'Up next':'Picked for today'}</div>
+        <div class="wo-today-title">${escapeHtml(selected)}</div>
+        <div class="wo-today-muscles">${muscles.map(escapeHtml).join(' · ')}</div>
+        ${selected!==autoSplit?`<button class="wo-link" onclick="pickSplit('${autoSplit.replace(/'/g,"\\'")}')">Back to ${escapeHtml(autoSplit)}</button>`:''}
+      </div>
+      ${mmHero([],muscles)}
+    </section>
+    <div class="wo-seg wo-split-seg" role="group" aria-label="Split">
+      ${WO_SPLIT_CYCLE.map(name=>`<button class="wo-seg-btn wo-split-chip${name===selected?' sel':''}" onclick="pickSplit('${name.replace(/'/g,"\\'")}')" aria-pressed="${name===selected}">${escapeHtml(short[name]||name)}</button>`).join('')}
+    </div>`;
+  const act=gv('wo-gen-actions');
+  if(act){
+    const vi=variety==='max'?1:0;
+    act.innerHTML=`
+      <div class="wo-group wo-list">
+        <div class="wo-row">
+          <span class="wo-row-main"><span class="wo-row-label">Variety</span><span class="wo-row-sub wo-variety-hint">${woVarietyHint(variety)}</span></span>
+          <div class="wo-seg wo-seg-sm wo-seg-slide" data-sel="${vi}" role="group" aria-label="Variety">
+            <span class="wo-seg-thumb" aria-hidden="true"></span>
+            <button class="wo-seg-btn wo-variety-chip${vi===0?' sel':''}" onclick="setVariety('balanced')">Balanced</button>
+            <button class="wo-seg-btn wo-variety-chip${vi===1?' sel':''}" onclick="setVariety('max')">Max</button>
+          </div>
+        </div>
+      </div>
+      <div class="wo-cta"><button class="wo-btn wo-btn-primary wo-btn-lg wo-gen-btn" onclick="generateWorkout()">Generate ${escapeHtml(selected)} workout</button></div>`;
+  }
 }
 
-function setVariety(v){woSetPref('variety',v==='max'?'max':'balanced');renderSplitPicker();}
+// Updated in place so the segmented thumb can glide instead of re-rendering.
+function setVariety(v){
+  v=v==='max'?'max':'balanced';
+  woSetPref('variety',v);woHaptic(8);
+  const seg=document.querySelector('#wo-gen-actions .wo-seg-slide');
+  if(!seg){renderSplitPicker();return;}
+  const vi=v==='max'?1:0;
+  seg.dataset.sel=vi;
+  seg.querySelectorAll('.wo-seg-btn').forEach((b,i)=>b.classList.toggle('sel',i===vi));
+  const h=document.querySelector('#wo-gen-actions .wo-variety-hint');if(h)h.textContent=woVarietyHint(v);
+}
 
 // Set a manual override (or clear it back to auto when tapping the auto split).
 function pickSplit(name){
+  woHaptic(8);
   _woSplitOverride = (name===getNextSplit()) ? null : name;
   renderSplitPicker();
 }
@@ -4298,12 +4634,15 @@ function renderLastSession(){
   const s=hist[0];
   const date=new Date(s.date).toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});
   el.style.display='block';
-  el.innerHTML=`<div class="wo-last-card">
-    <div class="wo-last-label">Last Session</div>
-    <div class="wo-last-name">${s.splitName}</div>
-    <div class="wo-last-meta">${date} &nbsp;·&nbsp; ${s.duration||'—'} min &nbsp;·&nbsp; ${s.totalVolume||'—'} kg volume</div>
-    <div class="wo-last-muscles">${(s.muscleGroups||[]).map(m=>`<span class="wo-muscle-chip">${m}</span>`).join('')}</div>
-  </div>`;
+  const idx=woHistory().length-1;
+  el.innerHTML=`<h2 class="wo-section-title">Last session</h2>
+  <button class="wo-group wo-row wo-last-card" onclick="showWorkoutHistory();openHistSession(${idx})">
+    <span class="wo-row-main">
+      <span class="wo-row-label">${escapeHtml(s.splitName||'Workout')}</span>
+      <span class="wo-row-sub">${date} · <span class="tnum">${s.duration>0?s.duration:'<1'}</span> min · <span class="tnum">${(s.totalVolume||0).toLocaleString()}</span> kg</span>
+    </span>
+    <span class="wo-chev" aria-hidden="true">${woIco('chevron')}</span>
+  </button>`;
 }
 
 // ── Workout generation (local engine — instant, offline, enforced variety) ──
@@ -4327,6 +4666,7 @@ function generateWorkout(){
   if(_woSession&&_woSession.inProgress){woToast('Finish your current workout first');return;}
   const loader=gv('wo-generating');if(loader)loader.style.display='none';
   const split=_woSplitOverride||getNextSplit();
+  woHaptic(12);
   try{
     _woPlan=WoEngine.generate(woEngineInput({split}));
     // Override was a one-shot; clear it so the next auto rotation resumes.
@@ -4338,7 +4678,7 @@ function generateWorkout(){
     const el=gv('wo-plan-preview');
     if(el){
       el.style.display='block';
-      el.innerHTML=`<div style="margin:16px;padding:14px 16px;background:rgba(196,91,82,0.06);border:1px solid rgba(196,91,82,0.16);border-radius:16px;font-size:13px;color:var(--red);line-height:1.6"><strong>Couldn't build a workout</strong><br>${escapeHtml(e&&e.message||'Unknown error')}<br><button onclick="generateWorkout()" style="margin-top:10px;padding:8px 16px;background:var(--blue2);color:#fff;border:none;border-radius:8px;font-size:13px;cursor:pointer">Try Again</button></div>`;
+      el.innerHTML=`<div class="wo-card wo-error"><strong>Couldn't build a workout</strong><span>${escapeHtml(e&&e.message||'Unknown error')}</span><button onclick="generateWorkout()">Try again</button></div>`;
     }
   }
 }
@@ -4346,6 +4686,7 @@ function generateWorkout(){
 // Same split, brand-new selection.
 function rerollWorkout(){
   if(!_woPlan)return;
+  woHaptic(10);
   try{
     _woPlan=WoEngine.generate(woEngineInput({split:_woPlan.splitCategory}));
     renderWorkoutPreview(true);
@@ -4357,7 +4698,10 @@ function swapPreviewExercise(i){
   if(!_woPlan)return;
   const n=WoEngine.swapOne(_woPlan,i,woEngineInput());
   if(!n){woToast('No other options for this slot');return;}
+  woHaptic(8);
   renderWorkoutPreview();
+  const row=document.querySelector(`#wpp-exercises .wo-ex-preview[data-i="${i}"]`);
+  if(row){row.classList.remove('wo-swapped');void row.offsetWidth;row.classList.add('wo-swapped');}
 }
 
 // Cardio spec chips — new plans carry `specs`; older sessions/routines fall back to the legacy fields.
@@ -4366,76 +4710,133 @@ function woCardioSpecs(c){
   return [{v:c.duration,l:'min'},{v:c.speed,l:c.unit},{v:(c.incline??0)+'%',l:'incline'}];
 }
 
-function woTargetLine(ex){
+function woTargetLine(ex,compact){
   const unit=ex.unit==='sec'?'s':'';
   if(ex.targets&&ex.targets[0]){
     const t=ex.targets[0];
-    const tgt=(t.w>0?t.w+'kg × ':'')+t.r+unit;
-    return `<div class="wo-ex-target"><span class="wo-tgt-lbl">🎯 Target</span> ${tgt}${ex.lastText?` <span class="wo-tgt-last">· ${escapeHtml(ex.lastText)}</span>`:''}</div>`;
+    const tgt=(t.w>0?t.w+' kg × ':'')+t.r+unit;
+    return `<div class="wo-ex-target"><span class="wo-tgt-lbl">Target</span> <span class="wo-tgt-val tnum">${tgt}</span>${ex.lastText&&!compact?`<span class="wo-tgt-last"> · ${escapeHtml(ex.lastText)}</span>`:''}</div>`;
   }
-  if(ex.isNew){
-    const msg=ex.unit==='sec'?'First time — hold a time that leaves a few seconds spare'
-      :ex.bw?'First time — pick a rep count that leaves ~2 in reserve (add load once it feels easy)'
-      :'First time — pick a weight that leaves ~2 reps in reserve';
+  if(ex.isNew&&!compact){
+    const msg=ex.unit==='sec'?'First time — hold for a time that leaves a few seconds spare.'
+      :ex.bw?'First time — stop about 2 reps short of failure.'
+      :'First time — pick a weight you could lift for about 2 more reps.';
     return `<div class="wo-ex-target new">${msg}</div>`;
   }
   return '';
 }
+// Status tags shown as quiet coloured text, not pills.
 function woBadges(ex){
   const b=[];
-  if(ex.isNew)b.push('<span class="wo-badge new">NEW</span>');
+  if(ex.held)b.push('<span class="wo-tag brand">Main lift</span>');
   switch(ex.progression){
-    case 'up':b.push('<span class="wo-badge up">↑ add load</span>');break;
-    case 'shift-up':b.push('<span class="wo-badge up">↑ heavier zone</span>');break;
-    case 'shift-down':b.push('<span class="wo-badge">lighter, more reps</span>');break;
-    case 'deload':b.push('<span class="wo-badge deload">deload</span>');break;
-    case 'return':b.push('<span class="wo-badge">easing back in</span>');break;
-    case 'reset':b.push('<span class="wo-badge deload">reset</span>');break;
+    case 'up':b.push('<span class="wo-tag ok">Add load</span>');break;
+    case 'shift-up':b.push('<span class="wo-tag ok">Heavier</span>');break;
+    case 'shift-down':b.push('<span class="wo-tag">Lighter, more reps</span>');break;
+    case 'deload':b.push('<span class="wo-tag warn">Deload</span>');break;
+    case 'return':b.push('<span class="wo-tag">Easing back in</span>');break;
+    case 'reset':b.push('<span class="wo-tag warn">Reset</span>');break;
   }
-  if(ex.held)b.push('<span class="wo-badge anchor">main lift</span>');
-  if(ex.len&&ex.role==='isolation')b.push('<span class="wo-badge len">stretch</span>');
-  return b.length?`<div class="wo-badges">${b.join('')}</div>`:'';
+  if(ex.isNew)b.push('<span class="wo-tag info">New</span>');
+  if(ex.len&&ex.role==='isolation')b.push('<span class="wo-tag">Stretch focus</span>');
+  return b.length?`<div class="wo-badges">${b.join('<span class="wo-tag-sep">·</span>')}</div>`:'';
+}
+
+function woShowCoachNote(){
+  const note=(_woSession&&_woSession.coachNote)||(_woPlan&&_woPlan.coachNote)||'';
+  if(!note)return;
+  woSheet({title:'About this session',message:escapeHtml(note),actions:[{label:'Done',style:'cancel'}]});
+}
+// "8-10 reps", "30-45s", "10 each side" — never "eachs" or "each side reps".
+function woRepsLabel(ex,short){
+  const r=String(ex.reps||'').trim();
+  if(!r)return '';
+  if(/[a-z]/i.test(r))return r;                       // already carries its unit
+  return ex.unit==='sec'?r+'s':(short?r:r+' reps');
+}
+function woRestLabel(sec){
+  sec=parseInt(sec)||0;
+  if(sec<60)return sec+'s';
+  const m=Math.floor(sec/60),r=sec%60;
+  return r?`${m}:${String(r).padStart(2,'0')}`:`${m} min`;
+}
+function woIntensityLine(ex){
+  if(!ex.intensityTechnique||ex.intensityTechnique==='straight sets')return '';
+  return `<div class="wo-ex-intensity"><b>${escapeHtml(ex.intensityTechnique)}</b>${ex.techNote?` — ${escapeHtml(ex.techNote)}`:''}</div>`;
+}
+// Sticky Start bar: shown only while the header's Start button is scrolled out of view.
+let _woStartObs=null;
+function woWatchStartDock(){
+  const dock=gv('wo-start-dock');const anchor=document.querySelector('#wo-plan-preview .wo-plan-actions');
+  if(!dock||!anchor||!('IntersectionObserver' in window))return;
+  if(_woStartObs)_woStartObs.disconnect();
+  _woStartObs=new IntersectionObserver(([e])=>{
+    // Only once the button has gone off the TOP edge (user scrolled down into the list).
+    const show=!e.isIntersecting&&e.boundingClientRect.top<0;
+    dock.classList.toggle('show',show);
+    dock.setAttribute('aria-hidden',show?'false':'true');
+    const b=dock.querySelector('button');if(b)b.tabIndex=show?0:-1;
+  });
+  _woStartObs.observe(anchor);
 }
 
 function renderWorkoutPreview(animate){
   if(!_woPlan)return;
   const nameEl=gv('wpp-name');const noteEl=gv('wpp-note');
   const exEl=gv('wpp-exercises');const cardioEl=gv('wpp-cardio');
+  const statsEl=gv('wpp-stats');
   const preview=gv('wo-plan-preview');
+  const exs=_woPlan.exercises||[];
   if(nameEl)nameEl.textContent=_woPlan.splitName||'';
   if(noteEl)noteEl.textContent=_woPlan.coachNote||'';
+  const nb=gv('wpp-note-btn');
+  if(nb){const B=_woPlan.block||{};const T=_woPlan.tier||{};
+    nb.innerHTML=`${woIco('sparkles')}<span>${B.deload?'Deload week':(B.phaseName||'')+' · Week '+(B.week||1)+' of 4'}${T.rec!=null?' · Recovery '+T.rec+'%':''}</span>${woIco('chevron','wo-chip-chev')}`;}
+  if(statsEl){
+    const sets=exs.reduce((a,e)=>a+(parseInt(e.sets)||0),0);
+    const cardioMin=_woPlan.cardio?(parseInt(_woPlan.cardio.duration)||0):0;
+    const mins=Math.round(exs.reduce((a,e)=>a+(parseInt(e.sets)||0)*((parseInt(e.rest)||90)+40),0)/60)+cardioMin;
+    statsEl.innerHTML=`<span><b class="tnum">${exs.length}</b> exercises</span><span><b class="tnum">${sets}</b> sets</span><span><b class="tnum">~${mins}</b> min</span>`;
+  }
   if(exEl){
-    exEl.innerHTML=(_woPlan.exercises||[]).map((ex,i)=>`
-      <div class="wo-ex-preview">
-        <div class="wo-ex-icon">${getExIcon(ex.name, ex.iconSlug) || ex.icon || '💪'}</div>
+    exEl.innerHTML=exs.map((ex,i)=>`
+      <div class="wo-ex-preview" data-i="${i}" style="--i:${i}" onclick="this.classList.toggle('open')">
+        <div class="wo-ex-icon">${getExIcon(ex.name, ex.iconSlug) || ex.icon || ''}</div>
         <div class="wo-ex-info">
-          <div class="wo-ex-name"><a href="https://www.youtube.com/results?search_query=${encodeURIComponent(ex.name+' proper form')}" target="_blank" rel="noopener" class="wo-ex-link" onclick="event.stopPropagation()">${escapeHtml(ex.name)}</a></div>
-          <div class="wo-ex-meta">${ex.sets} sets · ${escapeHtml(ex.reps)}${ex.unit==='sec'?'':' reps'} · ${ex.rest}s rest</div>
+          <div class="wo-ex-name">${escapeHtml(ex.name)}</div>
+          <div class="wo-ex-meta">${ex.focus?`<span class="wo-focus">${escapeHtml(ex.focus)}</span> · `:''}${woEquipOf(ex.name)?escapeHtml(woEquipOf(ex.name))+' · ':''}<span class="tnum">${ex.sets} × ${escapeHtml(woRepsLabel(ex,true))}</span></div>
           ${woBadges(ex)}
-          ${woTargetLine(ex)}
-          <div class="wo-ex-cue">${escapeHtml(ex.cue||'')}</div>
-          ${ex.intensityTechnique&&ex.intensityTechnique!=='straight sets'?`<div class="wo-ex-intensity">⚡ ${escapeHtml(ex.intensityTechnique)}${ex.techNote?` <span class="wo-tech-note">— ${escapeHtml(ex.techNote)}</span>`:''}</div>`:''}
+          ${woTargetLine(ex,true)}
+          <div class="wo-ex-more-info">
+            <div class="wo-ex-cue">${escapeHtml(ex.cue||'')}</div>
+            <div class="wo-ex-meta">${woRestLabel(ex.rest)} rest between sets</div>
+            ${woIntensityLine(ex)}
+            <a class="wo-link" href="${woFormUrl(ex.name)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${woIco('play')}Watch form video</a>
+          </div>
         </div>
-        ${ex.slot?`<button class="wo-ex-swap" onclick="swapPreviewExercise(${i})" title="Swap for something different" aria-label="Swap exercise">🔀</button>`:''}
+        ${ex.slot?`<button class="wo-icon-btn wo-ex-swap" onclick="event.stopPropagation();swapPreviewExercise(${i})" title="Swap for something different" aria-label="Swap exercise">${woIco('shuffle')}</button>`:''}
       </div>`).join('');
   }
-  if(cardioEl&&_woPlan.cardio){
-    const c=_woPlan.cardio;
-    const specs=woCardioSpecs(c);
-    cardioEl.innerHTML=`<div class="wo-cardio-preview">
-      <div class="wo-cardio-icon">${getExIcon(c.machine, c.iconSlug) || c.icon || '🏃'}</div>
-      <div class="wo-cardio-info">
-        <div class="wo-cardio-title">${escapeHtml(c.machine)} · ${c.duration} min</div>
-        <div class="wo-cardio-meta">${specs.slice(1).map(sp=>escapeHtml(sp.v)+' '+escapeHtml(sp.l)).join(' · ')}</div>
-        <div class="wo-cardio-rat">${escapeHtml(c.rationale||'')}</div>
-      </div>
-    </div>`;
+  if(cardioEl){
+    if(_woPlan.cardio){
+      const c=_woPlan.cardio;
+      const specs=woCardioSpecs(c);
+      cardioEl.innerHTML=`<h2 class="wo-section-title">Finisher</h2><div class="wo-group wo-cardio-preview">
+        <div class="wo-cardio-icon">${getExIcon(c.machine, c.iconSlug) || c.icon || ''}</div>
+        <div class="wo-cardio-info">
+          <div class="wo-cardio-title">${escapeHtml(c.machine)} · <span class="tnum">${c.duration}</span> min</div>
+          <div class="wo-cardio-meta">${specs.slice(1).map(sp=>escapeHtml(sp.v)+' '+escapeHtml(sp.l)).join(' · ')}</div>
+          <div class="wo-cardio-rat">${escapeHtml(c.rationale||'')}</div>
+        </div>
+      </div>`;
+    }else cardioEl.innerHTML='';
   }
+  woWatchStartDock();
   if(preview){
     preview.style.display='block';
     if(animate){
       preview.classList.remove('wo-preview-pop');void preview.offsetWidth;preview.classList.add('wo-preview-pop');
-      preview.scrollIntoView({behavior:'smooth',block:'start'});
+      preview.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'start'});
     }
   }
 }
@@ -4458,6 +4859,7 @@ function woSessionExercise(ex){
 
 function startWorkout(){
   if(!_woPlan)return;
+  woHaptic([10,40,18]);
   _woSession={
     id: Date.now(),
     date: new Date().toISOString(),
@@ -4470,13 +4872,33 @@ function startWorkout(){
     inProgress: true,
     startTime: Date.now(),
     exercises: (_woPlan.exercises||[]).map(woSessionExercise),
+    // The plan as generated — live recalibration measures every deviation against this.
+    basePlan: (_woPlan.exercises||[]).map(e=>({slot:e.slot||null,name:e.name,sets:Array.isArray(e.sets)?e.sets.length:(parseInt(e.sets)||3)})),
     cardio: _woPlan.cardio?{..._woPlan.cardio,done:false,actualDuration:null}:null,
   };
   woSave(WO_KEY,_woSession);
   showActiveWorkout();
 }
 
+function woSessionChrome(on){
+  const nav=gv('wo-nav');if(nav)nav.style.display=on?'none':'';
+}
+function openSessionMenu(){
+  const acts=[];
+  if(_woSession&&_woSession.exercises.length>1)acts.push({label:'Reorder exercises',icon:'reorder',onClick:openReorder});
+  acts.push({label:'About this session',icon:'sparkles',onClick:woShowCoachNote});
+  acts.push({label:'Workout settings',icon:'gear',onClick:openWoSettings});
+  acts.push({label:'History',icon:'clock',onClick:showWorkoutHistory});
+  acts.push({label:'Discard workout',icon:'trash',style:'destructive',onClick:woAskDiscard});
+  acts.push({label:'Cancel',style:'cancel'});
+  woSheet({title:_woSession?.splitName||'Workout',actions:acts,className:'wo-sheet-menu'});
+}
+
 function showActiveWorkout(){
+  woSessionChrome(true);
+  if(_woSession&&!_woSession.basePlan){
+    _woSession.basePlan=_woSession.exercises.map(e=>({slot:e.slot||null,name:e.name,sets:(e.sets||[]).length}));
+  }
   gv('wo-generate-view').style.display='none';
   gv('wo-active-view').style.display='block';
   const nameEl=gv('wo-split-name');const noteEl=gv('wo-split-note');
@@ -4485,6 +4907,9 @@ function showActiveWorkout(){
   renderExercises();
   renderCardioSection();
   startElapsedTimer();
+  woBindCarousel();
+  woWakeOn();
+  requestAnimationFrame(()=>{const c=woCurrentEx();woGoTo(c<0?woPages().length-1:c,true);});
   // Show add exercises section
   const addExSection = gv('wo-add-exercises-section');
   if(addExSection) addExSection.style.display = 'block';
@@ -4500,9 +4925,51 @@ function startElapsedTimer(){
   },1000);
 }
 
+// The exercise you're on: first one with an unlogged set (-1 when everything is done).
+function woCurrentEx(){
+  if(!_woSession)return -1;
+  return _woSession.exercises.findIndex(e=>(e.sets||[]).some(s=>!s.done));
+}
+// What a blank set row should suggest: the prescribed target, else the previous set's
+// numbers (so repeating a set is one tap on ✓).
+function woSetHint(ex,si){
+  const s=ex.sets[si]||{};
+  const prev=si>0?ex.sets[si-1]:null;
+  const pw=prev&&prev.weight!==''&&prev.weight!=null?prev.weight:null;
+  const pr=prev&&prev.reps!==''&&prev.reps!=null?prev.reps:null;
+  return {
+    w: s.tw!=null&&s.tw>0 ? s.tw : (s.tw==null ? pw : null),
+    r: s.tr!=null ? s.tr : pr,
+  };
+}
+
+// Keep the screen awake while a session is running (Screen Wake Lock API).
+let _woWake=null;
+async function woWakeOn(){
+  try{
+    if(!('wakeLock' in navigator)||_woWake||!_woSession?.inProgress||document.visibilityState!=='visible'||!woUi().awake)return;
+    _woWake=await navigator.wakeLock.request('screen');
+    _woWake.addEventListener('release',()=>{_woWake=null;});
+  }catch(e){_woWake=null;}
+}
+function woWakeOff(){try{if(_woWake)_woWake.release();}catch(e){}_woWake=null;}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')woWakeOn();});
+
+// Sticky session bar: sets done / total + progress fill.
+function woUpdateSessionProgress(){
+  if(!_woSession)return;
+  let done=0,total=0;
+  _woSession.exercises.forEach(e=>(e.sets||[]).forEach(s=>{total++;if(s.done)done++;}));
+  const fill=gv('wo-session-fill');if(fill)fill.style.transform=`scaleX(${total?done/total:0})`;
+  const cnt=gv('wo-sets-count');if(cnt)cnt.textContent=`${done} / ${total} sets`;
+}
+
 function renderExercises(){
   const el=gv('wo-exercises');if(!el||!_woSession)return;
   el.innerHTML=_woSession.exercises.map((ex,ei)=>renderExerciseCard(ex,ei)).join('');
+  woUpdateSessionProgress();
+  woRenderPager();woRenderOverview();woWatchPageSizes();
+  requestAnimationFrame(woOnPage);
   _restRedraw();
   // If a next-set suggestion is pending, re-display the effort rating (it was wiped by innerHTML).
   if (_currentSuggestion && typeof _currentSuggestion.ei === 'number') {
@@ -4518,6 +4985,9 @@ function renderExerciseCardAt(ei){
   const old=gv('wo-ex-'+ei);
   if(!ex||!old){renderExercises();return;}
   old.outerHTML=renderExerciseCard(ex,ei);
+  woUpdateSessionProgress();
+  woRenderPager();woRenderOverview();woWatchPageSizes();
+  requestAnimationFrame(woOnPage);
   _restRedraw();
   if (_currentSuggestion && _currentSuggestion.ei === ei) showEffortRating(ei);
 }
@@ -4533,115 +5003,100 @@ function renderExerciseCard(ex,ei){
   const exName = ex.swappedTo || ex.name;
   const timed = ex.unit === 'sec';
   const pb=pbs[exName];
-  const pbLine=(pb&&!timed)?`<div class="wo-pb-badge">PB: ${pb.weight}kg × ${pb.reps} → 1RM ${pb.oneRM}kg</div>`:'';
-
-  // Ghost sets from the last time this exercise was done
   const ghostData = getExerciseGhostSets(exName);
   const ghostSets = ghostData?.sets || [];
+  const doneCount = ex.sets.filter(s=>s.done).length;
+  const total = ex.sets.length;
+  const allDone = total>0 && doneCount===total;
+  const isCurrent = ei === woCurrentEx();
+  const nextIdx = isCurrent ? ex.sets.findIndex(s=>!s.done) : -1;
+  const nEx = _woSession.exercises.length;
 
   const setsHtml=ex.sets.map((s,si)=>{
-    const oneRM=woOneRM(ex,s);
     const ghost = ghostSets[si];
-    let ghostText = '—';
-    let trendIndicator = '';
-
+    let ghostText = '—', trend = '';
     if (ghost) {
-      ghostText = timed ? `${ghost.reps}s` : (ghost.weight>0 ? `${ghost.weight}×${ghost.reps}` : `BW×${ghost.reps}`);
+      ghostText = timed ? `${ghost.reps}s` : (ghost.weight>0 ? `${ghost.weight} × ${ghost.reps}` : `BW × ${ghost.reps}`);
       if (s.done && s.reps) {
-        // volume if loaded, otherwise reps decide (bodyweight / timed work)
         const cur = (parseFloat(s.weight)||1) * parseInt(s.reps);
         const prev = (ghost.weight||1) * ghost.reps;
-        trendIndicator = cur > prev ? '<span class="wo-trend-up">↑</span>'
-                       : cur < prev ? '<span class="wo-trend-down">↓</span>'
-                       : '<span class="wo-trend-same">=</span>';
+        trend = cur > prev ? ' wo-up' : cur < prev ? ' wo-down' : '';
       }
     }
-
-    const hasTarget = s.tw != null || s.tr != null;
-    const wPh = (s.tw != null && s.tw > 0) ? s.tw : 'kg';
-    const rPh = s.tr != null ? s.tr : (timed ? 'sec' : 'reps');
-    return `<div class="wo-set-row ${s.done?'done':''}" id="wo-set-${ei}-${si}">
-      <div class="wo-set-num">${si+1}</div>
-      <div class="wo-set-ghost">${ghostText}${trendIndicator}</div>
+    const hint = woSetHint(ex, si);
+    const hasTarget = hint.w != null || hint.r != null;
+    const wPh = hint.w != null ? hint.w : (ex.bw||timed ? '0' : '');
+    const rPh = hint.r != null ? hint.r : '';
+    return `<div class="wo-set-row ${s.done?'done':''}${si===nextIdx?' next':''}" id="wo-set-${ei}-${si}">
+      <button class="wo-set-num" onclick="woSetMenu(${ei},${si})" aria-label="Set ${si+1} options">${si+1}</button>
+      <div class="wo-set-ghost${trend}">${ghostText}</div>
       <input class="wo-set-inp${hasTarget?' has-target':''}" type="number" inputmode="decimal" placeholder="${wPh}" value="${s.weight}"
-        oninput="setExerciseSet(${ei},${si},'weight',this.value)" min="0" step="0.5">
-      <span class="wo-set-x">×</span>
+        oninput="setExerciseSet(${ei},${si},'weight',this.value)" min="0" step="0.5" aria-label="Set ${si+1} weight in kg">
       <input class="wo-set-inp wo-set-reps${hasTarget?' has-target':''}" type="number" inputmode="numeric" placeholder="${rPh}" value="${s.reps}"
-        oninput="setExerciseSet(${ei},${si},'reps',this.value)" min="0">
-      <div class="wo-set-1rm" style="${oneRM?'color:var(--blue2)':'color:var(--muted)'}">
-        ${oneRM?oneRM+'kg':'—'}
-      </div>
-      <button class="wo-set-done-btn ${s.done?'active':''}" onclick="toggleSetDone(${ei},${si})" aria-label="Mark set ${si+1} done">✓</button>
+        oninput="setExerciseSet(${ei},${si},'reps',this.value)" min="0" aria-label="Set ${si+1} ${timed?'seconds':'reps'}">
+      <button class="wo-set-done-btn ${s.done?'active':''}" onclick="toggleSetDone(${ei},${si})" aria-label="Mark set ${si+1} done" aria-pressed="${!!s.done}">${woIco('check')}</button>
     </div>`;
   }).join('');
 
-  // Ghost data date indicator
-  const ghostDateHint = ghostData ? `<div class="wo-ghost-date">Last: ${new Date(ghostData.date).toLocaleDateString('en-GB',{day:'numeric',month:'short'})}</div>` : '';
-
-  // Get saved note for this exercise
+  // The one number that matters: what to lift on the next set.
+  const t = ex.targets && ex.targets[0];
+  let target;
+  if (t) {
+    target = `<div class="wo-tgt-big tnum">${t.w>0?`${t.w}<small>kg</small><i>×</i>`:''}${t.r}<small>${timed?'s':' reps'}</small></div>
+      <div class="wo-tgt-sub">${ex.lastText?escapeHtml(ex.lastText):'Target for every set'}${pb&&!timed?`<br>Best e1RM ${pb.oneRM} kg`:''}</div>`;
+  } else {
+    target = `<div class="wo-tgt-big wo-tgt-new">${ex.isNew?'New exercise':'Your call'}</div>
+      <div class="wo-tgt-sub">${timed?'Hold for a time that leaves a few seconds spare':ex.bw?'Stop about 2 reps short of failure':'Pick a weight you could lift for ~2 more reps'}</div>`;
+  }
   const savedNote = getExerciseNote(exName);
-  const noteHtml = savedNote
-    ? `<div class="wo-ex-note" onclick="openNoteModal(${ei})"><span class="wo-ex-note-icon">📝</span><span class="wo-ex-note-text">${escapeHtml(savedNote)}</span></div>`
-    : '';
-
-  // Alternatives are addressed by index — no name ever has to survive an HTML attribute.
-  const altHtml=(ex.alternatives||[]).map((a,ai)=>{
-    const isBackToOriginal = (a === ex.name) && !!ex.swappedTo && a !== ex.swappedTo;
-    const icon = isBackToOriginal ? '↺' : '↻';
-    const cls = isBackToOriginal ? 'wo-alt-btn wo-alt-btn-back' : 'wo-alt-btn';
-    return `<button class="${cls}" onclick="swapExercise(${ei},${ai})">${icon} ${escapeHtml(a)}</button>`;
-  }).join('');
-
-  const repsLbl = timed ? 'Secs' : 'Reps';
-  return `<div class="wo-ex-card ${ex.collapsed?'collapsed':''}" id="wo-ex-${ei}">
-    <div class="wo-ex-card-hdr" onclick="toggleExCollapse(${ei})">
-      <div class="wo-ex-card-icon">${getExIcon(exName, ex.swappedTo?null:ex.iconSlug) || ex.icon || '💪'}</div>
-      <div class="wo-ex-card-title">
-        <div class="wo-ex-card-name"><a href="https://www.youtube.com/results?search_query=${encodeURIComponent(exName+' proper form')}" target="_blank" rel="noopener" class="wo-ex-link" onclick="event.stopPropagation()">${escapeHtml(exName)}</a>${savedNote ? '<span class="wo-note-indicator">📝</span>' : ''}</div>
-        <div class="wo-ex-card-meta">${ex.sets.length} sets · ${escapeHtml(ex.reps||ex.sets[0]?.reps||'—')}${timed?'':' reps'} · ${ex.rest}s rest</div>
+  const tech = ex.intensityTechnique&&ex.intensityTechnique!=='straight sets'
+    ? `<button class="wo-tech-chip" onclick="woShowTech(${ei})">${woIco('zap')}<span>${escapeHtml(ex.intensityTechnique)} on the last set</span></button>` : '';
+  const how = [
+    ex.cue?`<p>${escapeHtml(ex.cue)}</p>`:'',
+    ex.warmup?`<p class="wo-howto-dim">${escapeHtml(ex.warmup)}</p>`:'',
+    `<a class="wo-link" href="${woFormUrl(exName)}" target="_blank" rel="noopener">${woIco('play')}Watch form video</a>`,
+  ].join('');
+  const equip = woEquipOf(exName);
+  return `<section class="wo-page wo-ex-card${allDone?' complete':''}${isCurrent?' current':''}" id="wo-ex-${ei}" data-ei="${ei}" aria-label="${escapeAttr(exName)}">
+    <div class="wo-page-top">
+      <div class="wo-page-head">
+        <div class="wo-page-kicker">${allDone?`<span class="wo-kicker-done">${woIco('check')}Done</span> · `:''}${ex.isAutoCore?'Core first · ':''}Exercise ${ei+1} of ${nEx}</div>
+        <button class="wo-page-title" onclick="openExerciseDetail(${ei})">${escapeHtml(exName)}</button>
+        <div class="wo-page-meta">${ex.focus?escapeHtml(ex.focus)+' · ':''}${equip?escapeHtml(equip)+' · ':''}${escapeHtml(woRepsLabel(ex))} · ${woRestLabel(ex.rest)} rest</div>
       </div>
-      <div class="wo-ex-card-check" id="wo-ex-check-${ei}">${ex.sets.every(s=>s.done)?'✅':'○'}</div>
+      <button class="wo-icon-btn wo-ex-more" onclick="openExMenu(${ei})" aria-label="Exercise options">${woIco('more')}</button>
     </div>
-    <div class="wo-ex-card-body">
-      <div class="wo-ex-cue-line">💡 ${escapeHtml(ex.cue||'')}</div>
-      ${woTargetLine(ex)}
-      ${ex.warmup?`<div class="wo-ex-warmup">🔥 ${escapeHtml(ex.warmup)}</div>`:''}
-      ${noteHtml}
-      ${ex.intensityTechnique&&ex.intensityTechnique!=='straight sets'?`<div class="wo-ex-intensity">⚡ ${escapeHtml(ex.intensityTechnique)}${ex.techNote?` <span class="wo-tech-note">— ${escapeHtml(ex.techNote)}</span>`:''}</div>`:''}
-      ${pbLine}
-      <div class="wo-sets-header">
-        <span>Set</span><span>Last</span><span>Weight</span><span></span><span>${repsLbl}</span><span>1RM</span><span></span>
-      </div>
-      ${ghostDateHint}
+    <div class="wo-page-hero">${mmHero([exName])}<div class="wo-page-target">${target}${tech}</div></div>
+    ${ex.recal&&!doneCount?`<div class="wo-recal-note">${woIco('sparkles')}<span>${escapeHtml(ex.recal.reason)}</span></div>`:''}
+    ${savedNote?`<div class="wo-ex-note" onclick="openNoteModal(${ei})">${woIco('note')}<span class="wo-ex-note-text">${escapeHtml(savedNote)}</span></div>`:''}
+    <div class="wo-sets">
+      <div class="wo-sets-header"><span>Set</span><span>Previous</span><span>kg</span><span>${timed?'Secs':'Reps'}</span><span></span></div>
       ${setsHtml}
-      <div class="wo-ex-btns-row">
-        <button class="wo-add-set-btn" onclick="addSet(${ei})">+ Add Set</button>
-        <button class="wo-add-note-btn" onclick="openNoteModal(${ei})">${savedNote ? '✏️ Edit Note' : '📝 Note'}</button>
-      </div>
-      ${altHtml?`<div class="wo-alts-row">${altHtml}</div>`:''}
-      <div id="wo-rest-timer-${ei}" class="wo-rest-timer" style="display:none"></div>
-      <div id="wo-effort-slot-${ei}" class="wo-effort-slot" style="display:none"></div>
     </div>
-  </div>`;
+    <button class="wo-add-set-btn" onclick="addSet(${ei})">${woIco('plus')}Add set</button>
+    <div id="wo-effort-slot-${ei}" class="wo-effort-slot" style="display:none"></div>
+    <details class="wo-howto"><summary>How to do it${woIco('chevron','wo-howto-chev')}</summary><div class="wo-howto-body">${how}</div></details>
+  </section>`;
 }
 
 function renderCardioSection(){
-  const el=gv('wo-cardio-section');if(!el||!_woSession?.cardio)return;
+  const page=gv('wo-cardio-page');
+  const el=gv('wo-cardio-section');if(!el)return;
+  if(!_woSession?.cardio){if(page)page.style.display='none';el.innerHTML='';return;}
+  if(page)page.style.display='';
   const c=_woSession.cardio;
   el.innerHTML=`<div class="wo-cardio-card ${c.done?'done':''}">
-    <div class="wo-cardio-hdr">
-      <div class="wo-cardio-icon-big">${getExIcon(c.machine, c.iconSlug) || c.icon || '🏃'}</div>
-      <div>
-        <div class="wo-cardio-card-title">Cardio Finisher</div>
-        <div class="wo-cardio-card-sub">${escapeHtml(c.machine)}</div>
-      </div>
-      <button class="wo-cardio-done-btn ${c.done?'active':''}" onclick="toggleCardioDone()">✓</button>
+    <div class="wo-page-head">
+      <div class="wo-page-kicker">${c.done?`<span class="wo-kicker-done">${woIco('check')}Done</span> · `:''}Finisher</div>
+      <div class="wo-page-title-static">${escapeHtml(c.machine)}</div>
     </div>
     <div class="wo-cardio-specs">
       ${woCardioSpecs(c).map(sp=>`<div class="wo-cs"><div class="wo-cs-v">${escapeHtml(sp.v)}</div><div class="wo-cs-l">${escapeHtml(sp.l)}</div></div>`).join('')}
     </div>
-    <div class="wo-cardio-rat">${escapeHtml(c.rationale||'')}</div>
+    <p class="wo-cardio-rat">${escapeHtml(c.rationale||'')}</p>
+    <button class="wo-btn ${c.done?'wo-btn-gray':'wo-btn-primary'} wo-btn-lg" onclick="toggleCardioDone()">${c.done?'Mark as not done':'Mark cardio done'}</button>
   </div>`;
+  woRenderOverview();
 }
 
 // ── Set logging ──
@@ -4652,7 +5107,7 @@ function woRefreshOneRM(ei,si){
   const row=gv(`wo-set-${ei}-${si}`);if(!row)return;
   const oneRM=woOneRM(ex,ex.sets[si]);
   const rm=row.querySelector('.wo-set-1rm');
-  if(rm){rm.textContent=oneRM?oneRM+'kg':'—';rm.style.color=oneRM?'var(--blue2)':'var(--muted)';}
+  if(rm){rm.textContent=oneRM?oneRM:'—';rm.classList.toggle('has',!!oneRM);}
 }
 
 function setExerciseSet(ei,si,field,val){
@@ -4665,18 +5120,25 @@ function setExerciseSet(ei,si,field,val){
 function toggleSetDone(ei,si){
   if(!_woSession)return;
   const ex=_woSession.exercises[ei];
-  const set=ex.sets[si];
+  const set=ex&&ex.sets[si];
+  if(!set)return;
   const name=ex.swappedTo||ex.name;
   const timed=ex.unit==='sec';
+  const curBefore=woCurrentEx();
   set.done=!set.done;
+  // A pending "how was that set?" for this very set is moot once it's logged.
+  if(_currentSuggestion&&_currentSuggestion.ei===ei&&_currentSuggestion.nextSetIndex===si)_currentSuggestion=null;
 
   if(set.done){
-    // One-tap logging: anything left blank adopts the prescribed target.
+    woHaptic(14);
+    // One-tap logging: anything left blank adopts the target, else repeats the previous set.
+    const hint=woSetHint(ex,si);
     if((set.weight===''||set.weight==null)){
       if(set.tw!=null)set.weight=String(set.tw);
+      else if(hint.w!=null)set.weight=String(hint.w);
       else if(ex.bw||timed)set.weight='0';            // bodyweight / holds: no added load
     }
-    if((set.reps===''||set.reps==null)&&set.tr!=null)set.reps=String(set.tr);
+    if((set.reps===''||set.reps==null)&&hint.r!=null)set.reps=String(hint.r);
 
     const w=parseFloat(set.weight),r=parseInt(set.reps);
     if(!timed&&w>0&&r>0){
@@ -4692,7 +5154,8 @@ function toggleSetDone(ei,si){
           const i=hits.findIndex(h=>h.name===name);
           const rec={name,weight:w,reps:r,oneRM,prevOneRM:prev.oneRM};
           if(i>=0)hits[i]=rec;else hits.push(rec);
-          woToast(`🏆 New PB — ${name}: ${w}kg × ${r} (1RM ${oneRM}kg)`);
+          woToast(`New PB — ${name}: ${w}kg × ${r} (1RM ${oneRM}kg)`);
+          woHaptic([20,60,20,60,40]);
         }
       }
     }
@@ -4702,11 +5165,31 @@ function toggleSetDone(ei,si){
       _currentSuggestion={ei,nextSetIndex,baseWeight:w,baseReps:r};
     }
   }
+  // Focus flow: a finished exercise folds into a one-line recap; un-ticking reopens it.
+  const exDone=ex.sets.every(s=>s.done);
+  if(set.done&&exDone){
+    ex.collapsed=true;
+    if(_currentSuggestion&&_currentSuggestion.ei===ei)_currentSuggestion=null;
+  }
+  if(!set.done)ex.collapsed=false;
+  const curAfter=woCurrentEx();
+  if(curAfter>=0)_woSession.exercises[curAfter].collapsed=false;
   woSave(WO_KEY,_woSession);
   renderExerciseCardAt(ei);
+  // The "current" highlight may have moved to another card — repaint those too.
+  new Set([curBefore,curAfter]).forEach(i=>{if(i>=0&&i!==ei)renderExerciseCardAt(i);});
+  if(set.done)woRecalibrate();
   if(set.done){
-    startRestTimer(ei,ex.rest||90);
+    const row=gv(`wo-set-${ei}-${si}`);if(row)row.classList.add('just-done');
+    if(woUi().autoRest)startRestTimer(ei,ex.rest||90);
     if(_currentSuggestion&&_currentSuggestion.ei===ei)showEffortRating(ei);
+    if(exDone){
+      const c=gv('wo-ex-'+ei);if(c)c.classList.add('just-complete');
+      woHaptic([12,50,24]);
+      // Move on to the next exercise (or the finish page) once this one is complete.
+      const nextPage=curAfter>=0?curAfter:woPages().length-1;
+      if(nextPage!==ei)setTimeout(()=>woGoTo(nextPage),650);
+    }
   }
 }
 
@@ -4720,11 +5203,11 @@ function showEffortRating(ei) {
 
   slot.innerHTML = `
     <div class="wo-effort-rating">
-      <div class="wo-effort-label">How was that set? Next set will be pre-filled.</div>
+      <div class="wo-effort-label">How did that set feel?</div>
       <div class="wo-effort-btns">
-        <button class="wo-effort-btn easy" onclick="applyEffortSuggestion('easy')">😊 Easy +kg</button>
-        <button class="wo-effort-btn good" onclick="applyEffortSuggestion('good')">💪 Good</button>
-        <button class="wo-effort-btn hard" onclick="applyEffortSuggestion('hard')">🔥 Hard −1</button>
+        <button class="wo-effort-btn easy" onclick="applyEffortSuggestion('easy')"><b>Easy</b><span>Add weight</span></button>
+        <button class="wo-effort-btn good" onclick="applyEffortSuggestion('good')"><b>Good</b><span>Keep it</span></button>
+        <button class="wo-effort-btn hard" onclick="applyEffortSuggestion('hard')"><b>Hard</b><span>One less rep</span></button>
       </div>
     </div>
   `;
@@ -4775,8 +5258,7 @@ function applyEffortSuggestion(effort) {
 }
 
 function showSuggestionToast(weight, reps, effort) {
-  const emoji = effort === 'easy' ? '📈' : effort === 'hard' ? '📉' : '➡️';
-  woToast(`${emoji} Next set: ${weight}kg × ${reps}`);
+  woToast(`Next set: ${weight}kg × ${reps}`);
 }
 
 function toggleExCollapse(ei){
@@ -4832,9 +5314,10 @@ function addSuggestedExercise(index) {
   if (!_woSession || !window._suggestedExercises?.[index]) return;
 
   const s = window._suggestedExercises[index];
-  _woSession.exercises.push(woSessionExercise({ ...s, icon: getExIcon(s.name), iconSlug: getExIconSlug(s.name) }));
+  _woSession.exercises.push(Object.assign(woSessionExercise({ ...s, icon: getExIcon(s.name), iconSlug: getExIconSlug(s.name) }), { addedByUser: true }));
   woSave(WO_KEY, _woSession);
   renderExercises();
+  woRecalibrate();
 
   const cards = document.querySelectorAll('.wo-suggest-card');
   if (cards[index]) {
@@ -4843,8 +5326,7 @@ function addSuggestedExercise(index) {
     if (btn) { btn.textContent = '✓ Added'; btn.disabled = true; }
   }
   setTimeout(() => {
-    const newExEl = gv(`wo-ex-${_woSession.exercises.length - 1}`);
-    if (newExEl) newExEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    woGoTo(_woSession.exercises.length - 1);
   }, 100);
 }
 
@@ -4967,11 +5449,14 @@ function swapExercise(ei,ai){
   });
   woSave(WO_KEY, _woSession);
   renderExerciseCardAt(ei);
+  woRecalibrate();
 }
 
 function toggleCardioDone(){
   if(!_woSession?.cardio)return;
   _woSession.cardio.done=!_woSession.cardio.done;
+  if(_woSession.cardio.done)woHaptic(15);
+  setTimeout(woRenderPager,0);
   woSave(WO_KEY,_woSession);
   renderCardioSection();
 }
@@ -4983,10 +5468,31 @@ let _restTimerState = { ei: null, endAt: 0, total: 0, active: false, shown: -1 }
 
 function _restRemaining() { return Math.max(0, Math.ceil((_restTimerState.endAt - Date.now()) / 1000)); }
 
+// One dock for the whole app (lives outside the cards, so it survives a card collapsing
+// and stays visible on other tabs). Tapping its readout jumps back to the session.
+function woRestEl(){ return gv('wo-rest-dock'); }
+function woRestHide(){ const el=woRestEl(); if(el){ el.style.display='none'; el.innerHTML=''; } }
+function woUpNext(){
+  const c=woCurrentEx();
+  if(c<0)return _woSession?.cardio&&!_woSession.cardio.done?'Cardio finisher':'Finish workout';
+  const ex=_woSession.exercises[c];
+  const si=ex.sets.findIndex(s=>!s.done);
+  const h=woSetHint(ex,si);
+  const s=ex.sets[si];
+  const w=s.weight!==''?s.weight:h.w, r=s.reps!==''?s.reps:h.r;
+  const load=(w!=null&&parseFloat(w)>0?w+' × ':'')+(r!=null?r+(ex.unit==='sec'?'s':''):'');
+  if(c===_restTimerState.ei)return `Set ${si+1} of ${ex.sets.length}${load?' · '+load:''}`;
+  return escapeHtml(ex.swappedTo||ex.name);
+}
+function woRestGoto(){
+  if(_currentPage!=='workout')showPage('workout',gv('nb-workout'));
+  const c=woCurrentEx();setTimeout(()=>woGoTo(c<0?woPages().length-1:c),60);
+}
+
 function _restDraw(force) {
   const st = _restTimerState;
   if (!st.active) return;
-  const el = gv(`wo-rest-timer-${st.ei}`);
+  const el = woRestEl();
   if (!el) return;
   const remaining = _restRemaining();
   if (!force && remaining === st.shown && el.style.display === 'flex') return;
@@ -4994,16 +5500,18 @@ function _restDraw(force) {
   el.style.display = 'flex';
   const mins = Math.floor(remaining / 60);
   const secsLeft = remaining % 60;
-  const timeStr = mins > 0 ? `${mins}:${secsLeft.toString().padStart(2, '0')}` : `${secsLeft}s`;
+  const timeStr = `${mins}:${secsLeft.toString().padStart(2, '0')}`;
   const progress = st.total > 0 ? (st.total - remaining) / st.total : 0;
   const isUrgent = remaining <= 10;
   const isPulsing = remaining <= 5 && remaining > 0;
   el.innerHTML = `
     <div class="rest-timer-content ${isUrgent ? 'urgent' : ''} ${isPulsing ? 'pulsing' : ''}">
-      <div class="rest-timer-bar" style="width: ${progress * 100}%"></div>
-      <div class="rest-timer-time">${timeStr}</div>
+      <div class="rest-timer-bar" style="transform: scaleX(${progress})"></div>
+      <div class="rest-timer-info" onclick="woRestGoto()"><div class="rest-timer-lbl">Rest</div><div class="rest-timer-time">${timeStr}</div></div>
+      <div class="rest-timer-next" onclick="woRestGoto()"><div class="rest-timer-lbl">Up next</div><div class="rest-timer-next-v">${woUpNext()}</div></div>
       <div class="rest-timer-btns">
-        <button class="rest-timer-btn" onclick="addRestTime(30)">+30s</button>
+        <button class="rest-timer-btn" onclick="addRestTime(-15)" aria-label="15 seconds less">−15</button>
+        <button class="rest-timer-btn" onclick="addRestTime(15)" aria-label="15 seconds more">+15</button>
         <button class="rest-timer-btn skip" onclick="skipRestTimer()">Skip</button>
       </div>
     </div>
@@ -5013,12 +5521,6 @@ function _restDraw(force) {
 function _restRedraw() { _restDraw(true); }
 
 function startRestTimer(ei, secs) {
-  // only one timer at a time: clear the previous exercise's display
-  const prev = _restTimerState;
-  if (prev.ei !== null && prev.ei !== ei) {
-    const pe = gv(`wo-rest-timer-${prev.ei}`);
-    if (pe) { pe.style.display = 'none'; pe.innerHTML = ''; }
-  }
   if (_woRestInt) clearInterval(_woRestInt);
   _restTimerState = { ei, endAt: Date.now() + secs * 1000, total: secs, active: true, shown: -1 };
   _restDraw(true);
@@ -5031,15 +5533,12 @@ function _restTick() {
   if (_restRemaining() <= 0) {
     st.active = false;
     clearInterval(_woRestInt);
-    const ei = st.ei;
-    const el = gv(`wo-rest-timer-${ei}`);
-    if (el) { el.style.display = 'flex'; el.innerHTML = `<div class="rest-timer-done">Go! 💪</div>`; }
-    playRestChime();
+    const el = woRestEl();
+    if (el) { el.style.display = 'flex'; el.innerHTML = `<div class="rest-timer-done" onclick="woRestGoto()">${woIco('zap')}<span>Go — ${woUpNext()}</span></div>`; }
+    if (woUi().sound) playRestChime();
     if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-    setTimeout(() => {
-      const e2 = gv(`wo-rest-timer-${ei}`);
-      if (e2 && !(_restTimerState.active && _restTimerState.ei === ei)) e2.style.display = 'none';
-    }, 2000);
+    if (document.visibilityState === 'hidden') woNotify('Rest over', 'Up next: ' + woUpNext().replace(/&[a-z#0-9]+;/g, ''));
+    setTimeout(() => { if (!_restTimerState.active) woRestHide(); }, 2600);
     return;
   }
   _restDraw(false);
@@ -5049,6 +5548,7 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 
 function addRestTime(secs) {
   if (!_restTimerState.active) return;
+  woHaptic(6);
   _restTimerState.endAt += secs * 1000;
   _restTimerState.total += secs;
   _restDraw(true);
@@ -5057,8 +5557,7 @@ function addRestTime(secs) {
 function skipRestTimer() {
   if (_woRestInt) clearInterval(_woRestInt);
   _restTimerState.active = false;
-  const el = gv(`wo-rest-timer-${_restTimerState.ei}`);
-  if (el) { el.style.display = 'none'; el.innerHTML = ''; }
+  woRestHide();
 }
 
 function playRestChime() {
@@ -5232,11 +5731,13 @@ function discardWorkout(){
   if(_woTimerInt)clearInterval(_woTimerInt);
   if(_woRestInt)clearInterval(_woRestInt);
   _restTimerState.active=false;
+  woRestHide();woWakeOff();
   _currentSuggestion=null;
   _woSession=null;_woPlan=null;
   _woClearLiveSession();
   gv('wo-active-view').style.display='none';
   gv('wo-generate-view').style.display='block';
+  woSessionChrome(false);
   const prev=gv('wo-plan-preview');if(prev)prev.style.display='none';
   renderWorkoutPage();
 }
@@ -5245,12 +5746,15 @@ async function finishWorkout(){
   if(!_woSession)return;
   // Saving an empty session would advance the split rotation for nothing — offer to discard instead.
   if(!_woSession.exercises.some(ex=>ex.sets.some(s=>s.done))){
-    if(window.confirm('No sets logged yet. Discard this workout instead of saving it?'))discardWorkout();
+    if(await woConfirm('Nothing logged yet','Discard this workout instead of saving it?','Discard workout',true))discardWorkout();
     return;
   }
+  const unlogged=_woSession.exercises.reduce((a,ex)=>a+ex.sets.filter(s=>!s.done).length,0);
+  if(unlogged&&!(await woConfirm('Finish workout?',`${unlogged} set${unlogged>1?'s are':' is'} not logged and won’t be saved.`,'Finish')))return;
   if(_woTimerInt)clearInterval(_woTimerInt);
   if(_woRestInt)clearInterval(_woRestInt);
   _restTimerState.active=false;
+  woRestHide();woWakeOff();
   _woSession.inProgress=false;
   _woSession.endTime=Date.now();
   const durMins=Math.round((_woSession.endTime-_woSession.startTime)/60000);
@@ -5355,26 +5859,29 @@ function showWorkoutSummary(session){
   // PB highlights: only records actually broken in THIS session (previously every
   // exercise that had any PB at all was listed, whenever it was set).
   const pbHtml=(session.pbHits||[]).map(h=>
-    `<div class="wo-sum-pb"><span>🏆</span><span class="wo-sum-pb-txt">${escapeHtml(h.name)}: ${h.weight}kg × ${h.reps} → 1RM <strong>${h.oneRM}kg</strong></span><span class="wo-sum-pb-up">+${Math.round((h.oneRM-h.prevOneRM)*10)/10}kg</span></div>`
+    `<div class="wo-sum-pb"><span class="wo-sum-pb-ico">${woIco('trophy')}</span><span class="wo-sum-pb-txt"><b>${escapeHtml(h.name)}</b><span class="mono">${h.weight}kg × ${h.reps} · 1RM ${h.oneRM}kg</span></span><span class="wo-sum-pb-up mono">+${Math.round((h.oneRM-h.prevOneRM)*10)/10}</span></div>`
   ).join('');
   const setsDone=(session.exercises||[]).reduce((a,ex)=>a+ex.sets.filter(s=>s.done).length,0);
 
-  const strainColor = session.strain >= 18 ? '#ef4444' : session.strain >= 14 ? '#f97316' : session.strain >= 10 ? '#eab308' : '#22c55e';
+  const strainColor = session.strain >= 18 ? 'var(--bad)' : session.strain >= 14 ? 'var(--brand-text)' : session.strain >= 10 ? 'var(--warn)' : 'var(--ok)';
+  const dur = session.duration>0 ? session.duration : '<1';
+  const dateStr = new Date(session.date||Date.now()).toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});
 
   const html=`<div class="wo-summary-modal" id="wo-sum-modal">
     <div class="wo-sum-inner">
-      <div class="wo-sum-title">Workout Complete 💪</div>
-      <div class="wo-sum-split">${escapeHtml(session.splitName||'')}</div>
+      <div class="wo-sum-badge">${woIco('check')}</div>
+      <div class="wo-sum-title">Workout complete</div>
+      <div class="wo-sum-split">${escapeHtml(session.splitName||'')}<span class="wo-dot-sep"> · </span>${dateStr}</div>
       <div class="wo-sum-stats">
-        <div class="wo-ss"><div class="wo-ss-v">${session.duration}</div><div class="wo-ss-l">minutes</div></div>
-        <div class="wo-ss"><div class="wo-ss-v">${setsDone}</div><div class="wo-ss-l">sets</div></div>
-        <div class="wo-ss"><div class="wo-ss-v">${session.totalVolume?.toLocaleString()}</div><div class="wo-ss-l">kg volume</div></div>
-        <div class="wo-ss"><div class="wo-ss-v" style="color:${strainColor}">${session.strain || '—'}</div><div class="wo-ss-l">strain</div></div>
+        <div class="wo-ss" style="--i:0"><div class="wo-ss-v">${dur}</div><div class="wo-ss-l">Minutes</div></div>
+        <div class="wo-ss" style="--i:1"><div class="wo-ss-v">${setsDone}</div><div class="wo-ss-l">Sets</div></div>
+        <div class="wo-ss" style="--i:2"><div class="wo-ss-v">${(session.totalVolume||0).toLocaleString()}</div><div class="wo-ss-l">kg volume</div></div>
+        <div class="wo-ss" style="--i:3"><div class="wo-ss-v" style="color:${strainColor}">${session.strain || '—'}</div><div class="wo-ss-l">Strain</div></div>
       </div>
-      <div class="wo-sum-muscles">${(session.muscleGroups||[]).map(m=>`<span class="wo-muscle-chip">${m}</span>`).join('')}</div>
-      ${pbHtml?`<div class="wo-sum-pbs">${pbHtml}</div>`:''}
+      <div class="wo-sum-muscles">${(session.muscleGroups||[]).map(m=>`<span class="wo-muscle-chip">${escapeHtml(m)}</span>`).join('')}</div>
+      ${pbHtml?`<div class="wo-sum-pbs"><div class="wo-eyebrow">New personal bests</div>${pbHtml}</div>`:''}
       <button class="wo-sum-close" onclick="closeWorkoutSummary()">Done</button>
-      <button class="wo-sum-save-routine" onclick="saveAsRoutine()">💾 Save as Routine</button>
+      <button class="wo-sum-save-routine" onclick="saveAsRoutine()">${woIco('bookmark')}<span>Save as routine</span></button>
     </div>
   </div>`;
 
@@ -5388,6 +5895,8 @@ function closeWorkoutSummary(){
   if(el)el.remove();
   gv('wo-active-view').style.display='none';
   gv('wo-generate-view').style.display='block';
+  woSessionChrome(false);
+  window.scrollTo(0,0);
   renderLastSession();
   renderWorkoutPage();
 }
@@ -5395,8 +5904,11 @@ function closeWorkoutSummary(){
 const WO_ROUTINES_KEY=`${KEY}_routines`;
 function saveAsRoutine(){
   const session=woHistory().slice(-1)[0];
-  if(!session){alert('No session found.');return;}
-  const name=window.prompt('Name this routine:',session.splitName||'My Routine');
+  if(!session){woToast('No session found');return;}
+  woPromptRoutineName(session);
+}
+async function woPromptRoutineName(session){
+  const name=await woPrompt('Name this routine',session.splitName||'My routine','Save');
   if(!name||!name.trim())return;
   const routines=load(WO_ROUTINES_KEY,[]);
   const c=session.cardio;
@@ -5418,27 +5930,30 @@ function saveAsRoutine(){
   });
   save(WO_ROUTINES_KEY,routines);
   const btn=document.querySelector('.wo-sum-save-routine');
-  if(btn){btn.textContent='✓ Saved';btn.disabled=true;}
+  if(btn){btn.innerHTML=`${woIco('check')}<span>Saved to routines</span>`;btn.disabled=true;btn.classList.add('saved');}woHaptic(10);
 }
 
 function showRoutinesModal(){
   const routines=load(WO_ROUTINES_KEY,[]);
   const rows=routines.length
     ?[...routines].reverse().map(r=>`
-        <div class="wo-routine-row" onclick="loadRoutine('${r.id}')">
-          <div class="wo-routine-name">${r.name}</div>
-          <div class="wo-routine-split">${r.splitName}</div>
-          <div class="wo-routine-chips">${(r.muscleGroups||[]).map(m=>`<span class="wo-muscle-chip">${m}</span>`).join('')}</div>
+        <div class="wo-routine-row" onclick="loadRoutine('${escapeAttr(r.id)}')">
+          <div class="wo-routine-main">
+            <div class="wo-routine-name">${escapeHtml(r.name)}</div>
+            <div class="wo-routine-split">${escapeHtml(r.splitName||'')}<span class="wo-dot-sep"> · </span><span class="mono">${(r.exercises||[]).length}</span> exercises</div>
+            <div class="wo-routine-chips">${(r.muscleGroups||[]).map(m=>`<span class="wo-muscle-chip">${escapeHtml(m)}</span>`).join('')}</div>
+          </div>
+          <span class="wo-routine-go">${woIco('play')}</span>
         </div>`).join('')
-    :`<div class="wo-hist-empty">No saved routines yet.<br>Finish a workout and tap "Save as Routine".</div>`;
+    :`<div class="wo-hist-empty"><span class="wo-hist-empty-ico">${woIco('bookmark')}</span><b>No saved routines</b><span>Finish a workout and tap “Save as routine” to reuse it here.</span></div>`;
   const modal=document.createElement('div');
   modal.id='wo-routines-modal';
   modal.className='wo-hist-modal';
   modal.innerHTML=`
     <div class="wo-hist-inner">
       <div class="wo-hist-topbar">
-        <div class="wo-hist-title">My Routines</div>
-        <button class="wo-hist-close" onclick="document.getElementById('wo-routines-modal').remove()">✕</button>
+        <div class="wo-hist-title">Routines</div>
+        <button class="wo-hist-close" onclick="document.getElementById('wo-routines-modal').remove()" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
       </div>
       <div class="wo-hist-content-scroll">${rows}</div>
     </div>`;
@@ -5487,9 +6002,9 @@ function showWorkoutHistory(){
   modal.innerHTML=`
     <div class="wo-hist-inner">
       <div class="wo-hist-topbar">
-        <button class="wo-hist-back" id="wo-hist-back-btn" onclick="woHistBack()" style="display:none">‹</button>
+        <button class="wo-hist-back" id="wo-hist-back-btn" onclick="woHistBack()" style="display:none" aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></button>
         <div class="wo-hist-title" id="wo-hist-title">History</div>
-        <button class="wo-hist-close" onclick="closeWorkoutHistory()">✕</button>
+        <button class="wo-hist-close" onclick="closeWorkoutHistory()" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
       </div>
       <div id="wo-hist-content"></div>
     </div>`;
@@ -5499,11 +6014,13 @@ function showWorkoutHistory(){
 
 function closeWorkoutHistory(){
   const el=gv('wo-hist-modal');if(el)el.remove();
+  _woHistDirect=false;_woHistDetail=null;
   _woHistMode=false;
   _woHistLimit=30;
 }
 
 function woHistBack(){
+  if(_woHistPage==='exercise'&&(_woHistDirect||!_woHistDetail)){closeWorkoutHistory();return;}
   if(_woHistPage==='detail'){_woHistPage='list';renderHistoryList();}
   else if(_woHistPage==='exercise'){_woHistPage='detail';renderHistoryDetail(_woHistDetail);}
   gv('wo-hist-back-btn').style.display=_woHistPage==='list'?'none':'block';
@@ -5517,7 +6034,7 @@ function renderHistoryList(){
   const backBtn=gv('wo-hist-back-btn');if(backBtn)backBtn.style.display='none';
 
   if(!all.length){
-    el.innerHTML=`<div class="wo-hist-empty">No workouts yet.<br>Complete your first session!</div>`;
+    el.innerHTML=`<div class="wo-hist-empty"><span class="wo-hist-empty-ico">${woIco('dumbbell')}</span><b>No workouts yet</b><span>Generate a session on the Train tab — it'll show up here when you finish.</span></div>`;
     return;
   }
 
@@ -5535,9 +6052,8 @@ function renderHistoryList(){
         <div class="wo-hr-muscles">${(s.muscleGroups||[]).map(m=>`<span class="wo-muscle-chip">${escapeHtml(m)}</span>`).join('')}</div>
       </div>
       <div class="wo-hr-right">
-        <div class="wo-hr-vol">${s.totalVolume?.toLocaleString()||'—'}<span class="wo-hr-unit">kg</span></div>
-        <div class="wo-hr-dur">${s.duration||'—'} min</div>
-        <div class="wo-hr-arrow">›</div>
+        <div class="wo-hr-vol mono">${s.totalVolume?.toLocaleString()||'—'}<span class="wo-hr-unit">kg</span></div>
+        <div class="wo-hr-dur mono">${s.duration>0?s.duration:'<1'} min</div>
       </div>
     </div>`;
   }
@@ -5562,7 +6078,7 @@ function renderHistoryDetail(session){
     const bestSet=doneSets.reduce((b,s)=>epley(parseFloat(s.weight),parseInt(s.reps))>epley(parseFloat(b.weight||0),parseInt(b.reps||1))?s:b,doneSets[0]);
     return `<div class="wo-det-ex" onclick="renderExerciseProgression('${name.replace(/'/g,"\\'")}')">
       <div class="wo-det-ex-top">
-        <div class="wo-det-ex-name">${getExIcon(name, ex.iconSlug) || ex.icon || '💪'} ${escapeHtml(name)}</div>
+        <div class="wo-det-ex-name">${getExIcon(name, ex.iconSlug)} ${escapeHtml(name)}</div>
         <div class="wo-det-ex-arrow">›</div>
       </div>
       <div class="wo-det-sets">
@@ -5575,15 +6091,63 @@ function renderHistoryDetail(session){
   el.innerHTML=`<div class="wo-det-header">
     <div class="wo-det-date">${date}</div>
     <div class="wo-det-stats">
-      <span>${session.duration||'—'} min</span>
-      <span>${session.totalVolume?.toLocaleString()||'—'} kg</span>
+      <span><b class="mono">${session.duration>0?session.duration:(session.duration===0?'<1':'—')}</b> min</span>
+      <span><b class="mono">${session.totalVolume?.toLocaleString()||'—'}</b> kg</span>
     </div>
     <div class="wo-det-muscles">${(session.muscleGroups||[]).map(m=>`<span class="wo-muscle-chip">${m}</span>`).join('')}</div>
   </div>
   <div class="wo-det-ex-list">
-    <div class="wo-det-section-lbl">Exercises — tap for progression</div>
+    <div class="wo-det-section-lbl">Exercises · tap for progress</div>
     ${exHtml}
   </div>`;
+}
+
+let _woProgMetric='e1rm';
+function setProgMetric(m){_woProgMetric=m;if(_woHistExName)renderExerciseProgression(_woHistExName);}
+
+// One point per session: best estimated 1RM, heaviest weight, total volume.
+function woExerciseSeries(exName){
+  const out=[];
+  woHistory().forEach(session=>{
+    (session.exercises||[]).forEach(ex=>{
+      const name=ex.swappedTo||ex.name;
+      if(WoEngine.canon(name)!==WoEngine.canon(exName))return;
+      const sets=(ex.sets||[]).filter(s=>s.done&&s.reps!==''&&s.reps!=null);
+      if(!sets.length)return;
+      let best=null,heavy=0,vol=0,reps=0;
+      sets.forEach(s=>{
+        const w=parseFloat(s.weight)||0,r=parseInt(s.reps)||0;
+        reps+=r;vol+=w*r;heavy=Math.max(heavy,w);
+        const e=w>0&&r>0?epley(w,r):0;
+        if(!best||e>best.e)best={e,w,r};
+      });
+      out.push({date:session.date,e1rm:best.e,heavy,vol:Math.round(vol),reps,bestW:best.w,bestR:best.r,sets});
+    });
+  });
+  return out;
+}
+
+function woChartSvg(points,key,unit){
+  const W=340,H=170,L=8,R=44,T=14,B=26;
+  const vals=points.map(p=>p[key]);
+  let lo=Math.min(...vals),hi=Math.max(...vals);
+  if(lo===hi){lo=lo*0.9;hi=hi*1.1||1;}
+  const padv=(hi-lo)*0.12;lo=Math.max(0,lo-padv);hi=hi+padv;
+  const n=points.length;
+  const x=i=>n===1?(L+(W-L-R)/2):L+(i/(n-1))*(W-L-R);
+  const y=v=>T+(1-(v-lo)/(hi-lo))*(H-T-B);
+  const fmt=v=>v>=1000?(Math.round(v/100)/10)+'k':String(Math.round(v*10)/10);
+  const grid=[0,0.5,1].map(f=>{const v=lo+(hi-lo)*(1-f);const yy=T+f*(H-T-B);
+    return `<line x1="${L}" x2="${W-R}" y1="${yy}" y2="${yy}" class="ch-grid"/><text x="${W-R+6}" y="${yy+4}" class="ch-ylab">${fmt(v)}</text>`;}).join('');
+  const pts=points.map((p,i)=>`${x(i).toFixed(1)},${y(p[key]).toFixed(1)}`);
+  const area=n>1?`<path class="ch-area" d="M${x(0)},${H-B} L${pts.join(' L')} L${x(n-1)},${H-B} Z"/>`:'';
+  const line=n>1?`<polyline class="ch-line" points="${pts.join(' ')}"/>`:'';
+  const dots=points.map((p,i)=>`<circle class="ch-dot${i===n-1?' last':''}" cx="${x(i)}" cy="${y(p[key])}" r="${i===n-1?4.5:3}"><title>${fmt(p[key])} ${unit}</title></circle>`).join('');
+  const d0=new Date(points[0].date).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  const d1=new Date(points[n-1].date).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  const xl=n>1?`<text x="${L}" y="${H-6}" class="ch-xlab">${d0}</text><text x="${W-R}" y="${H-6}" class="ch-xlab" text-anchor="end">${d1}</text>`
+             :`<text x="${x(0)}" y="${H-6}" class="ch-xlab" text-anchor="middle">${d1}</text>`;
+  return `<svg viewBox="0 0 ${W} ${H}" class="wo-prog-chart" role="img" aria-label="${unit} over time">${grid}${area}${line}${dots}${xl}</svg>`;
 }
 
 function renderExerciseProgression(exName){
@@ -5593,71 +6157,53 @@ function renderExerciseProgression(exName){
   const backBtn=gv('wo-hist-back-btn');if(backBtn)backBtn.style.display='block';
   const titleEl=gv('wo-hist-title');if(titleEl)titleEl.textContent=exName;
 
-  // Gather all historical data for this exercise
-  const hist=woHistory();
-  const dataPoints=[];
-  hist.forEach(session=>{
-    (session.exercises||[]).forEach(ex=>{
-      const name=ex.swappedTo||ex.name;
-      if(WoEngine.canon(name)===WoEngine.canon(exName)){      // "Incline DB Press" and "Incline Dumbbell Press" are one lift
-        const doneSets=ex.sets.filter(s=>s.done&&s.weight&&s.reps);
-        if(doneSets.length){
-          const best=doneSets.reduce((b,s)=>epley(parseFloat(s.weight),parseInt(s.reps))>epley(parseFloat(b.weight||0),parseInt(b.reps||1))?s:b,doneSets[0]);
-          dataPoints.push({
-            date:session.date,
-            oneRM:epley(parseFloat(best.weight),parseInt(best.reps)),
-            weight:parseFloat(best.weight),
-            reps:parseInt(best.reps),
-            sets:doneSets,
-          });
-        }
-      }
-    });
-  });
+  const pts=woExerciseSeries(exName);
+  const lib=WoEngine.byName(exName);
+  const timed=lib&&lib.unit==='sec';
+  const loaded=pts.some(p=>p.heavy>0);
+  const metrics=loaded&&!timed
+    ?[['e1rm','Est. 1RM','kg'],['heavy','Heaviest','kg'],['vol','Volume','kg']]
+    :[['reps','Total '+(timed?'seconds':'reps'),timed?'s':'reps']];
+  if(!metrics.some(m=>m[0]===_woProgMetric))_woProgMetric=metrics[0][0];
+  const [mk,mlabel,munit]=metrics.find(m=>m[0]===_woProgMetric);
 
-  const pb=woPBs()[exName];
-
-  // Draw mini chart as inline SVG
-  let chartSvg='<div class="wo-prog-empty">Not enough data yet</div>';
-  if(dataPoints.length>=2){
-    const W=320,H=100,pad=20;
-    const vals=dataPoints.map(d=>d.oneRM);
-    const min=Math.min(...vals)-5,max=Math.max(...vals)+5;
-    const pts=dataPoints.map((d,i)=>{
-      const x=pad+(i/(dataPoints.length-1))*(W-pad*2);
-      const y=H-pad-((d.oneRM-min)/(max-min||1))*(H-pad*2);
-      return `${x},${y}`;
-    }).join(' ');
-    const dotHtml=dataPoints.map((d,i)=>{
-      const x=pad+(i/(dataPoints.length-1))*(W-pad*2);
-      const y=H-pad-((d.oneRM-min)/(max-min||1))*(H-pad*2);
-      return `<circle cx="${x}" cy="${y}" r="4" fill="var(--blue2)"/><title>${d.oneRM}kg</title>`;
-    }).join('');
-    chartSvg=`<svg viewBox="0 0 ${W} ${H}" class="wo-prog-chart">
-      <polyline points="${pts}" fill="none" stroke="var(--blue2)" stroke-width="2" stroke-linejoin="round"/>
-      ${dotHtml}
-    </svg>`;
+  if(!pts.length){
+    el.innerHTML=`<div class="wo-hist-empty"><span class="wo-hist-empty-ico">${woIco('chart')}</span><b>No history yet</b><span>Log this exercise in a workout and your progress will chart here.</span></div>`;
+    return;
   }
+  const last=pts[pts.length-1],first=pts[0];
+  const delta=pts.length>1?Math.round((last[mk]-first[mk])*10)/10:null;
+  const bestE=pts.reduce((b,p)=>p.e1rm>b.e1rm?p:b,pts[0]);
+  const heaviest=pts.reduce((b,p)=>p.heavy>b.heavy?p:b,pts[0]);
+  const bestVol=pts.reduce((b,p)=>p.vol>b.vol?p:b,pts[0]);
+  const totalVol=pts.reduce((a,p)=>a+p.vol,0);
+  const dfmt=d=>new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  const rec=(label,val,sub)=>`<div class="wo-rec"><div class="wo-rec-l">${label}</div><div class="wo-rec-v tnum">${val}</div>${sub?`<div class="wo-rec-s">${sub}</div>`:''}</div>`;
 
-  const histRows=dataPoints.slice().reverse().map(d=>{
-    const date=new Date(d.date).toLocaleDateString('en-US',{month:'short',day:'numeric'});
-    return `<div class="wo-prog-row">
-      <span class="wo-prog-date">${date}</span>
-      <span class="wo-prog-sets">${d.sets.map(s=>`${s.weight}×${s.reps}`).join('  ')}</span>
-      <span class="wo-prog-1rm">${d.oneRM}kg</span>
-    </div>`;
-  }).join('');
+  const histRows=pts.slice().reverse().map(d=>`<div class="wo-prog-row">
+      <div class="wo-prog-date">${dfmt(d.date)}</div>
+      <div class="wo-prog-sets tnum">${d.sets.map(s=>timed?`${s.reps}s`:(parseFloat(s.weight)>0?`${s.weight}×${s.reps}`:`BW×${s.reps}`)).join('  ')}</div>
+      <div class="wo-prog-1rm tnum">${loaded&&!timed?d.e1rm+' kg':''}</div>
+    </div>`).join('');
 
   el.innerHTML=`
-    <div class="wo-prog-header">
-      ${pb?`<div class="wo-prog-pb">🏆 Personal Best: ${pb.weight}kg × ${pb.reps} reps → <strong>${pb.oneRM}kg</strong> 1RM</div>`:''}
-      <div class="wo-prog-sessions">${dataPoints.length} sessions logged</div>
+    <div class="wo-prog-top">
+      ${metrics.length>1?`<div class="wo-seg wo-seg-sm" role="group" aria-label="Chart metric">${metrics.map(m=>`<button class="wo-seg-btn${m[0]===mk?' sel':''}" onclick="setProgMetric('${m[0]}')">${m[1]}</button>`).join('')}</div>`:''}
+      <div class="wo-prog-head">
+        <div class="wo-prog-big tnum">${Math.round(last[mk]*10)/10}<small> ${munit}</small></div>
+        <div class="wo-prog-delta ${delta>0?'up':delta<0?'down':''}">${delta==null?'1 session logged — one more to see a trend':`${delta>0?'+':''}${delta} ${munit} since ${dfmt(first.date)}`}</div>
+      </div>
+      ${woChartSvg(pts,mk,munit)}
     </div>
-    ${chartSvg}
-    <div class="wo-prog-history">
-      <div class="wo-det-section-lbl">Session History</div>
-      ${histRows||'<div class="wo-hist-empty">No data yet</div>'}
-    </div>`;
+    <h2 class="wo-section-title">Records</h2>
+    <div class="wo-recs">
+      ${loaded&&!timed?rec('Best est. 1RM',bestE.e1rm+' kg',`${bestE.bestW} kg × ${bestE.bestR} · ${dfmt(bestE.date)}`):''}
+      ${loaded&&!timed?rec('Heaviest weight',heaviest.heavy+' kg',dfmt(heaviest.date)):''}
+      ${loaded&&!timed?rec('Best session volume',bestVol.vol.toLocaleString()+' kg',dfmt(bestVol.date)):''}
+      ${rec('Sessions',pts.length,loaded&&!timed?`${Math.round(totalVol).toLocaleString()} kg lifted in total`:'')}
+    </div>
+    <h2 class="wo-section-title">History</h2>
+    <div class="wo-group wo-prog-history">${histRows}</div>`;
 }
 
 // ── Weekly/Calendar merge: toggle inside weekly page ──
