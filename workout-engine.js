@@ -1109,6 +1109,14 @@
     return Array.isArray(ex.sets) && ex.sets.some(s => s && (s.done || (s.weight !== '' && s.weight != null) || (s.reps !== '' && s.reps != null)));
   }
 
+  // Primary muscle + the muscles a compound meaningfully works too (≥ half a set).
+  function musclesOf(name) {
+    const e = byName(name);
+    if (!e) return null;
+    const sec = e.role === 'c' && SECONDARY[e.pat] ? Object.keys(SECONDARY[e.pat]).filter(m => SECONDARY[e.pat][m] >= 0.5) : [];
+    return { primary: e.muscle, secondary: sec, pat: e.pat, equip: e.equip, role: e.role === 'c' ? 'compound' : 'isolation' };
+  }
+
   function recalibrate(session, input) {
     const split = session && session.splitCategory;
     const base = session && session.basePlan;
@@ -1321,7 +1329,7 @@
   const api = {
     LIB, SPLIT_CYCLE, SPLIT_MUSCLES, PHASES, TECH_NOTES, PAT_MUSCLE, SLOTS, EVIDENCE: { backed: BACKED, weaker: WEAKER },
     BLOCK_SESSIONS, SESSIONS_PER_WEEK,
-    generate, swapOne, exerciseFor, targetsFor, alternativesFor, suggestExtras, recalibrate,
+    generate, swapOne, exerciseFor, targetsFor, alternativesFor, suggestExtras, recalibrate, musclesOf,
     blockInfo, restoreBlock, tierOf, nextSplit, classifySplit, byName, canon, parseRange, roundW, progress, buildIndex,
   };
   root.WoEngine = api;

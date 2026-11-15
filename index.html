@@ -319,18 +319,19 @@
 
   <!-- GENERATE VIEW -->
   <div id="wo-generate-view">
-    <h2 class="wo-section-title">Readiness</h2>
+    <div id="wo-split-picker"></div>
     <section class="wo-group wo-ready" id="wo-ready">
       <div class="wo-ready-top">
         <div class="wo-ready-ring">
-          <svg viewBox="0 0 70 70" width="56" height="56" aria-hidden="true">
-            <circle cx="35" cy="35" r="29" fill="none" stroke="rgba(118,118,128,0.3)" stroke-width="7"/>
-            <circle id="wo-ready-arc" cx="35" cy="35" r="29" fill="none" stroke="#30D158" stroke-width="7"
+          <svg viewBox="0 0 70 70" width="44" height="44" aria-hidden="true">
+            <circle cx="35" cy="35" r="29" fill="none" stroke="rgba(118,118,128,0.3)" stroke-width="8"/>
+            <circle id="wo-ready-arc" cx="35" cy="35" r="29" fill="none" stroke="#30D158" stroke-width="8"
               stroke-dasharray="182.2" stroke-dashoffset="182.2" stroke-linecap="round"
               transform="rotate(-90 35 35)"/>
           </svg>
         </div>
         <div class="wo-ready-copy">
+          <div class="wo-ready-label">Recovery</div>
           <div class="wo-ready-verdict" id="wo-ready-verdict">Enter your WHOOP recovery to begin</div>
           <div class="wo-ready-sub" id="wo-rec-autofill" style="display:none">From WHOOP this morning</div>
         </div>
@@ -351,8 +352,7 @@
         <div class="wo-rs"><span class="wo-rs-l">Last session</span><span class="wo-rs-v" id="wr-last">—</span></div>
       </div>
     </section>
-
-    <div id="wo-split-picker"></div>
+    <div id="wo-gen-actions"></div>
     <div id="wo-last-session"></div>
     <div id="wo-generating" class="wo-generating" style="display:none">
       <div class="coach-spin"></div>
@@ -363,7 +363,8 @@
         <div class="wo-plan-kicker" id="wpp-eyebrow">Today's workout</div>
         <div class="wo-split-name" id="wpp-name"></div>
         <div class="wo-plan-stats" id="wpp-stats"></div>
-        <div class="wo-split-note" id="wpp-note"></div>
+        <button class="wo-note-chip" id="wpp-note-btn" onclick="woShowCoachNote()"></button>
+        <div class="wo-split-note" id="wpp-note" hidden></div>
         <div class="wo-plan-actions">
           <button class="wo-btn wo-btn-gray wo-reroll-btn" onclick="rerollWorkout()" aria-label="Shuffle exercises">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 14 4 4-4 4"/><path d="m18 2 4 4-4 4"/><path d="M2 18h1.973a4 4 0 0 0 3.3-1.7l5.454-8.6a4 4 0 0 1 3.3-1.7H22"/><path d="M2 6h1.972a4 4 0 0 1 3.6 2.2"/><path d="M22 18h-6.041a4 4 0 0 1-3.3-1.8l-.359-.45"/></svg>
@@ -381,7 +382,7 @@
     </div>
   </div>
 
-  <!-- ACTIVE WORKOUT VIEW -->
+  <!-- ACTIVE WORKOUT VIEW — one page per exercise, swipe between them -->
   <div id="wo-active-view" style="display:none">
     <div class="wo-active-header">
       <div class="wo-session-top">
@@ -394,21 +395,31 @@
           <button class="wo-btn wo-btn-primary wo-btn-sm" onclick="finishWorkout()">Finish</button>
         </div>
       </div>
-      <div class="wo-session-track"><div class="wo-session-fill" id="wo-session-fill"></div></div>
+      <div class="wo-pager" id="wo-pager" role="tablist" aria-label="Exercises"></div>
     </div>
-    <div class="wo-split-note wo-active-note" id="wo-split-note"></div>
-    <div id="wo-exercises"></div>
-    <div id="wo-add-exercises-section" style="display:none">
-      <button class="wo-btn wo-btn-gray wo-add-exercises-btn" onclick="suggestMoreExercises()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
-        Add exercises
-      </button>
-      <div id="wo-suggested-exercises"></div>
-    </div>
-    <div id="wo-cardio-section"></div>
-    <div class="wo-finish-wrap">
-      <button class="wo-btn wo-btn-primary wo-finish-btn" onclick="finishWorkout()">Finish workout</button>
-      <button class="wo-btn wo-btn-plain wo-discard-btn" onclick="woAskDiscard()">Discard workout</button>
+    <div class="wo-split-note" id="wo-split-note" hidden></div>
+    <div class="wo-carousel" id="wo-carousel">
+      <div id="wo-exercises" class="wo-car-group"></div>
+      <section class="wo-page wo-page-cardio" id="wo-cardio-page" style="display:none"><div id="wo-cardio-section"></div></section>
+      <section class="wo-page wo-page-finish" id="wo-finish-page">
+        <div class="wo-page-head">
+          <div class="wo-page-kicker">Wrap up</div>
+          <h2 class="wo-page-title-static">Finish workout</h2>
+        </div>
+        <div class="wo-finish-stats" id="wo-finish-stats"></div>
+        <div class="wo-group wo-list wo-overview" id="wo-overview"></div>
+        <div id="wo-add-exercises-section" style="display:none">
+          <button class="wo-btn wo-btn-gray wo-add-exercises-btn" onclick="suggestMoreExercises()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+            Add exercises
+          </button>
+          <div id="wo-suggested-exercises"></div>
+        </div>
+        <div class="wo-finish-wrap">
+          <button class="wo-btn wo-btn-primary wo-finish-btn" onclick="finishWorkout()">Finish workout</button>
+          <button class="wo-btn wo-btn-plain wo-discard-btn" onclick="woAskDiscard()">Discard workout</button>
+        </div>
+      </section>
     </div>
   </div>
 </div>

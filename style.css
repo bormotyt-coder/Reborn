@@ -1509,12 +1509,9 @@ button.wo-row:active { background: var(--card-2); }
 .wo-hdr-actions { display: flex; gap: 2px; padding-bottom: 4px; }
 
 /* ── Readiness ── */
-.wo-ready { padding: 14px 16px; display: grid; gap: 14px; }
 .wo-ready-top { display: flex; align-items: center; gap: 14px; }
-.wo-ready-ring { width: 56px; height: 56px; flex-shrink: 0; }
 .wo-ready-ring svg circle { transition: stroke-dashoffset .8s var(--ease-out), stroke .3s; }
 .wo-ready-copy { flex: 1; min-width: 0; }
-.wo-ready-verdict { font-family: var(--font); font-size: 17px; font-weight: 600; line-height: 1.25; color: var(--text); letter-spacing: -0.01em; }
 .wo-ready-sub { font-family: var(--font); font-size: 13px; color: var(--text-2); margin-top: 2px; }
 .wo-rec-field { display: flex; align-items: baseline; gap: 1px; width: 76px; padding: 8px 10px; border-radius: 10px; background: var(--card-2); }
 input.wo-rec-input, input.wo-rec-input:focus {
@@ -1545,7 +1542,6 @@ input.wo-rec-input::placeholder { color: var(--text-4); }
 .wo-plan-header { padding: 0 20px 4px; }
 .wo-plan-kicker { font-family: var(--font); font-size: 13px; font-weight: 600; color: var(--brand-text); text-transform: uppercase; letter-spacing: 0.02em; }
 .wo-split-name { font-family: var(--font-display); font-size: 28px; font-weight: 700; color: var(--text); letter-spacing: -0.025em; line-height: 1.15; margin-top: 2px; }
-.wo-plan-stats { margin: 4px 0 8px; font-family: var(--font); font-size: 15px; color: var(--text-2); }
 .wo-split-note { font-family: var(--font); font-size: 15px; color: var(--text-3); line-height: 1.4; }
 #wpp-note, #wo-split-note { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .wo-plan-actions { display: grid; grid-template-columns: auto 1fr; gap: 10px; margin-top: 16px; }
@@ -1611,7 +1607,6 @@ input.wo-rec-input::placeholder { color: var(--text-4); }
 .wo-start-dock .wo-btn { width: 100%; height: 52px; border-radius: 14px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
 
 /* ── Live session ── */
-#wo-active-view { padding-bottom: 80px; }
 .wo-active-header {
   position: sticky; top: 0; z-index: 25;
   padding: max(10px, calc(env(safe-area-inset-top) + 6px)) 16px 0 20px;
@@ -1625,36 +1620,10 @@ input.wo-rec-input::placeholder { color: var(--text-4); }
 .wo-session-name { display: flex; gap: 8px; align-items: baseline; font-family: var(--font); font-size: 14px; color: var(--text-2); white-space: nowrap; overflow: hidden; }
 .wo-session-name > span:first-child { overflow: hidden; text-overflow: ellipsis; }
 .wo-session-count { color: var(--text-3); font-variant-numeric: tabular-nums; flex-shrink: 0; }
-.wo-session-track { height: 2px; margin: 0 -16px 0 -20px; background: var(--hair); }
-.wo-session-fill { height: 100%; transform-origin: left; transform: scaleX(0); background: var(--brand); transition: transform .5s var(--ease-out); }
-.wo-active-note { margin: 12px 20px 4px; }
 
-.wo-ex-card { margin: 12px 16px 0; border-radius: 12px; background: var(--card); overflow: hidden; scroll-margin-top: 92px; }
-.wo-ex-card-hdr { display: flex; align-items: center; gap: 12px; padding: 12px 8px 10px 14px; cursor: pointer; }
-.wo-ex-card-icon { width: 44px; height: 44px; }
-.wo-ex-card-icon .wo-ex-img { width: 36px; height: 36px; }
-.wo-ex-card-title { flex: 1; min-width: 0; }
-.wo-ex-card-name {
-  display: block; max-width: 100%; padding: 0; border: none; background: none; cursor: pointer; text-align: left;
-  font-family: var(--font); font-size: 17px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.25; color: var(--brand-text);
-}
-.wo-ex-card.complete .wo-ex-card-name { color: var(--text); }
-.wo-recap { color: var(--ok) !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.wo-done-badge { width: 24px; height: 24px; border-radius: 12px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: var(--ok); color: #000; }
-.wo-done-badge .ico { width: 15px; height: 15px; stroke-width: 3; }
 .wo-ex-more { color: var(--text-2); }
-.wo-ex-card.collapsed .wo-ex-card-body { display: none; }
-.wo-ex-card-body { padding: 0 0 12px; }
-.wo-ex-card-body > .wo-ex-target, .wo-ex-cue-line, .wo-ex-warmup, .wo-ex-card-body > .wo-ex-intensity, .wo-ex-pb { margin: 0 14px 6px; }
-.wo-ex-cue-line {
-  font-family: var(--font); font-size: 14px; line-height: 1.4; color: var(--text-3); cursor: pointer;
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
-}
-.wo-ex-cue-line.open { -webkit-line-clamp: unset; display: block; }
 .wo-ex-warmup, .wo-ex-pb { font-family: var(--font); font-size: 14px; color: var(--text-3); }
 .wo-ex-pb .tnum { color: var(--text-2); }
-.wo-ex-note { display: flex; gap: 8px; align-items: flex-start; margin: 2px 14px 8px; padding: 10px 12px; border-radius: 10px; background: rgba(255,214,10,0.10); font-family: var(--font); font-size: 14px; line-height: 1.35; color: var(--text); cursor: pointer; }
-.wo-ex-note .ico { width: 15px; height: 15px; color: var(--warn); margin-top: 2px; }
 .wo-ex-note-text { flex: 1; }
 
 /* Sets table — Set | Previous | kg | Reps | ✓ */
@@ -1663,17 +1632,7 @@ input.wo-rec-input::placeholder { color: var(--text-4); }
 .wo-sets-header { padding-top: 4px; padding-bottom: 4px; font-family: var(--font); font-size: 12px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.02em; }
 .wo-sets-header > span { text-align: center; }
 .wo-sets-header > span:nth-child(2) { text-align: left; }
-.wo-set-wrap { position: relative; overflow: hidden; }
-.wo-set-del {
-  position: absolute; inset: 0; display: flex; align-items: center; justify-content: flex-end; gap: 6px; padding-right: 22px;
-  background: var(--bad); color: #fff; font-family: var(--font); font-size: 15px; font-weight: 600;
-  opacity: 0; transition: opacity var(--dur-1);
-}
-.wo-set-del .ico { width: 17px; height: 17px; }
-.wo-set-wrap:has(.swiping) .wo-set-del, .wo-set-wrap.removing .wo-set-del { opacity: 1; }
-.wo-set-wrap.removing { animation: woCollapse .22s var(--ease-out) forwards; }
-.wo-set-row { position: relative; min-height: 46px; background: var(--card); touch-action: pan-y; transition: background var(--dur-2), transform var(--dur-2) var(--ease-out); }
-.wo-set-row.swiping { transition: none; }
+.wo-set-row { position: relative; min-height: 46px; background: var(--card); transition: background var(--dur-2), transform var(--dur-2) var(--ease-out); }
 .wo-set-row.done { background: #18301F; }
 .wo-set-num { font-family: var(--font); font-size: 15px; font-weight: 600; color: var(--text-2); text-align: center; font-variant-numeric: tabular-nums; }
 .wo-set-row.next .wo-set-num { color: var(--brand-text); }
@@ -1701,16 +1660,8 @@ input.wo-set-inp.has-target::placeholder { color: var(--text-3); }
 .wo-set-done-btn .ico { width: 18px; height: 18px; stroke-width: 3; }
 .wo-set-done-btn.active { background: var(--ok); color: #fff; }
 .wo-set-row.just-done .wo-set-done-btn { animation: woCheckPop .3s var(--ease-out); }
-.wo-add-set-btn {
-  display: flex; align-items: center; justify-content: center; gap: 6px;
-  width: calc(100% - 28px); height: 34px; margin: 8px 14px 0; border: none; border-radius: 8px; cursor: pointer;
-  background: var(--card-2); color: var(--text); font-family: var(--font); font-size: 15px; font-weight: 600;
-}
-.wo-add-set-btn .ico { width: 16px; height: 16px; }
-.wo-add-set-btn:active { background: var(--card-3); }
 
 /* Effort prompt */
-.wo-effort-slot { margin: 12px 14px 0; }
 .wo-effort-label { margin-bottom: 8px; font-family: var(--font); font-size: 14px; color: var(--text-2); }
 .wo-effort-btns { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .wo-effort-btn {
@@ -1724,21 +1675,12 @@ input.wo-set-inp.has-target::placeholder { color: var(--text-3); }
 .wo-effort-btn.hard b { color: var(--brand-text); }
 
 /* Cardio (live) */
-.wo-cardio-card { margin: 12px 16px 0; padding: 12px 14px; border-radius: 12px; background: var(--card); }
-.wo-cardio-hdr { display: flex; align-items: center; gap: 12px; }
-.wo-cardio-icon-big { width: 44px; height: 44px; }
-.wo-cardio-hdr-txt { flex: 1; min-width: 0; }
 .wo-cardio-card-title { font-family: var(--font); font-size: 17px; font-weight: 600; color: var(--text); }
-.wo-cardio-specs { display: grid; grid-template-columns: repeat(auto-fit, minmax(70px, 1fr)); gap: 8px; margin-top: 12px; }
 .wo-cs { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px; border-radius: 10px; background: var(--card-2); }
 .wo-cs-v { font-family: var(--font); font-size: 17px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
 .wo-cs-l { font-family: var(--font); font-size: 12px; color: var(--text-3); }
-.wo-cardio-card .wo-cardio-rat { margin-top: 10px; }
-.wo-cardio-card.done .wo-cardio-card-title { color: var(--ok); }
 
-#wo-add-exercises-section { padding: 16px 16px 0; }
 .wo-add-exercises-btn { width: 100%; height: 44px; }
-.wo-finish-wrap { padding: 16px 16px 8px; display: grid; gap: 4px; }
 .wo-finish-btn { width: 100%; height: 52px; border-radius: 14px; }
 .wo-discard-btn { color: var(--bad); font-weight: 400; }
 
@@ -2038,12 +1980,147 @@ input.wo-set-inp.has-target::placeholder { color: var(--text-3); }
 .wo-coach-arrow { width: 16px; height: 16px; color: var(--text-4); }
 
 
-/* ── Live recalibration ── */
-.wo-recal-note {
-  display: flex; gap: 8px; align-items: flex-start; margin: 0 14px 8px; padding: 9px 12px; border-radius: 10px;
-  background: var(--brand-soft); color: var(--text); font-family: var(--font); font-size: 14px; line-height: 1.35;
+
+/* ══════════════════════════════════════
+   v14 — hero, carousel, exercise pages, muscle maps
+══════════════════════════════════════ */
+/* Muscle maps */
+.mm .mm-b { fill: #3A3A3C; }
+.mm .mm-m { fill: #4A4A4E; }
+.mm .mm-s { fill: var(--brand); opacity: .42; }
+.mm .mm-p { fill: var(--brand); }
+.mm-hero { display: flex; gap: 4px; height: 100%; }
+.mm-hero svg { height: 100%; width: auto; }
+.wo-mm-thumb { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; }
+.wo-mm-thumb svg { width: 90%; height: 90%; }
+.wo-ex-icon .mm .mm-b, .wo-ro-thumb .mm .mm-b, .wo-ov-row .mm .mm-b, .wo-suggest-card-icon .mm .mm-b { fill: #48484A; }
+.wo-ex-icon .mm .mm-m, .wo-ro-thumb .mm .mm-m, .wo-ov-row .mm .mm-m, .wo-suggest-card-icon .mm .mm-m { fill: #5A5A5E; }
+.wo-det-ex-name .wo-mm-thumb { display: inline-flex; width: 30px; height: 30px; margin-right: 8px; vertical-align: middle; border-radius: 8px; background: var(--card-2); }
+
+/* Generator hero */
+.wo-today { display: flex; align-items: center; gap: 4px; margin: 10px 16px 0; padding: 16px 10px 16px 20px; min-height: 172px; border-radius: 20px; background: var(--card); }
+.wo-today-txt { flex: 1; min-width: 0; }
+.wo-page-kicker { display: flex; align-items: center; gap: 4px; font-family: var(--font); font-size: 13px; font-weight: 600; color: var(--brand-text); }
+.wo-today-title { margin-top: 4px; font-family: var(--font-display); font-size: 34px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.05; color: var(--text); }
+.wo-today-muscles { margin-top: 6px; font-family: var(--font); font-size: 15px; line-height: 1.35; color: var(--text-2); }
+.wo-today .wo-link { margin-top: 10px; }
+.wo-today .mm-hero { height: 148px; flex-shrink: 0; }
+.wo-split-seg { margin: 12px 16px 0; }
+.wo-split-seg .wo-seg-btn { padding: 8px 4px; font-size: 14px; }
+.wo-ready { margin-top: 16px; padding: 12px 14px; display: grid; gap: 12px; }
+.wo-ready-ring { width: 44px; height: 44px; flex-shrink: 0; }
+.wo-ready-label { font-family: var(--font); font-size: 13px; color: var(--text-2); }
+.wo-ready-verdict { font-family: var(--font); font-size: 15px; font-weight: 600; line-height: 1.25; color: var(--text); }
+#wo-gen-actions { margin-top: 12px; }
+#wo-gen-actions .wo-row-sub { font-size: 13px; }
+
+/* Plan preview */
+.wo-plan-stats { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 8px 0 10px; font-family: var(--font); font-size: 15px; color: var(--text-2); }
+.wo-plan-stats b { color: var(--text); font-weight: 600; }
+.wo-note-chip { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 7px 10px; border: none; border-radius: 10px; cursor: pointer; background: var(--card); color: var(--text-2); font-family: var(--font); font-size: 14px; }
+.wo-note-chip > .ico { width: 15px; height: 15px; color: var(--brand-text); }
+.wo-note-chip span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wo-chip-chev { width: 14px !important; height: 14px !important; color: var(--text-4); transform: rotate(-90deg); }
+
+/* Session header + pager */
+#wo-active-view { padding-bottom: 96px; }
+.wo-active-header { padding-bottom: 0; }
+.wo-pager { display: flex; gap: 4px; padding: 0 0 6px; }
+.wo-pg { position: relative; flex: 1; height: 20px; padding: 0; border: none; background: none; cursor: pointer; }
+.wo-pg::before, .wo-pg::after { content: ''; position: absolute; left: 0; top: 8px; height: 4px; border-radius: 2px; transition: width .4s var(--ease-out), top .2s, height .2s; }
+.wo-pg::before { right: 0; background: var(--surface-3); }
+.wo-pg::after { width: calc(var(--f, 0) * 100%); background: var(--brand); }
+.wo-pg.full::after { background: var(--ok); }
+.wo-pg.on::before { background: rgba(235,235,245,0.5); }
+.wo-pg.on::before, .wo-pg.on::after { top: 7px; height: 6px; border-radius: 3px; }
+.wo-pg-end { flex: 0 0 20px; display: flex; align-items: center; justify-content: center; color: var(--text-3); }
+.wo-pg-end::before, .wo-pg-end::after { display: none; }
+.wo-pg-end .ico { width: 15px; height: 15px; stroke-width: 2.6; }
+.wo-pg-end.on { color: var(--brand-text); }
+
+/* Carousel */
+.wo-carousel {
+  position: relative; display: flex; align-items: flex-start;
+  overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; overscroll-behavior-x: contain;
+  scrollbar-width: none; -webkit-overflow-scrolling: touch; transition: height .25s var(--ease-out);
 }
+.wo-carousel::-webkit-scrollbar { display: none; }
+.wo-car-group { display: contents; }
+.wo-page { flex: 0 0 100%; width: 100%; box-sizing: border-box; padding: 12px 16px 24px; scroll-snap-align: start; scroll-snap-stop: always; }
+.wo-page-top { display: flex; align-items: flex-start; gap: 8px; }
+.wo-page-head { flex: 1; min-width: 0; }
+.wo-page-title, .wo-page-title-static {
+  display: block; margin-top: 4px; padding: 0; border: none; background: none; text-align: left; cursor: pointer;
+  font-family: var(--font-display); font-size: 28px; font-weight: 700; letter-spacing: -0.025em; line-height: 1.12; color: var(--text);
+}
+.wo-page-title-static { cursor: default; }
+.wo-page-meta { margin-top: 6px; font-family: var(--font); font-size: 15px; color: var(--text-2); }
+.wo-kicker-done { display: inline-flex; align-items: center; gap: 3px; color: var(--ok); }
+.wo-kicker-done .ico { width: 14px; height: 14px; stroke-width: 3; }
+.wo-ex-more { margin-top: 2px; }
+.wo-page-hero { display: flex; align-items: center; gap: 14px; margin: 14px 0 16px; }
+.wo-page-hero .mm-hero { height: 150px; flex-shrink: 0; }
+.wo-page-target { flex: 1; min-width: 0; }
+.wo-tgt-big { font-family: var(--font-display); font-size: 36px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.05; color: var(--text); }
+.wo-tgt-big small { margin-left: 3px; font-size: 20px; font-weight: 600; color: var(--text-2); letter-spacing: 0; }
+.wo-tgt-big i { margin: 0 6px; font-style: normal; font-size: 24px; font-weight: 500; color: var(--text-3); }
+.wo-tgt-new { font-size: 24px; line-height: 1.15; }
+.wo-tgt-sub { margin-top: 6px; font-family: var(--font); font-size: 14px; line-height: 1.35; color: var(--text-3); }
+.wo-tech-chip { display: inline-flex; align-items: center; gap: 6px; margin-top: 12px; padding: 7px 12px; border: none; border-radius: 16px; cursor: pointer; background: rgba(255,214,10,0.12); color: var(--warn); font-family: var(--font); font-size: 14px; font-weight: 600; }
+.wo-tech-chip .ico { width: 15px; height: 15px; }
+.wo-tech-chip span::first-letter { text-transform: uppercase; }
+.wo-recal-note { display: flex; gap: 8px; align-items: flex-start; margin: 0 0 14px; padding: 10px 12px; border-radius: 12px; background: var(--brand-soft); font-family: var(--font); font-size: 14px; line-height: 1.35; color: var(--text); }
 .wo-recal-note .ico { width: 16px; height: 16px; margin-top: 1px; color: var(--brand-text); }
+.wo-ex-note { display: flex; gap: 8px; align-items: flex-start; margin: 0 0 12px; padding: 10px 12px; border-radius: 12px; background: rgba(255,214,10,0.10); font-family: var(--font); font-size: 14px; line-height: 1.35; color: var(--text); cursor: pointer; }
+.wo-ex-note .ico { width: 15px; height: 15px; margin-top: 2px; color: var(--warn); }
+
+/* Set table on a page */
+.wo-sets { margin: 0; padding: 4px 0; border-radius: 14px; overflow: hidden; background: var(--card); }
+button.wo-set-num { width: 30px; height: 30px; padding: 0; border: none; border-radius: 15px; background: none; cursor: pointer; }
+button.wo-set-num:active { background: var(--surface-2); }
+.wo-add-set-btn {
+  display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; height: 42px; margin-top: 10px;
+  border: none; border-radius: 12px; cursor: pointer; background: var(--card); color: var(--text);
+  font-family: var(--font); font-size: 15px; font-weight: 600;
+}
+.wo-add-set-btn .ico { width: 16px; height: 16px; }
+.wo-add-set-btn:active { background: var(--card-2); }
+.wo-effort-slot { margin: 14px 0 0; }
+.wo-howto { margin-top: 16px; border-radius: 14px; background: var(--card); }
+.wo-howto > summary { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; list-style: none; cursor: pointer; font-family: var(--font); font-size: 16px; font-weight: 600; color: var(--text); }
+.wo-howto > summary::-webkit-details-marker { display: none; }
+.wo-howto-chev { width: 18px; height: 18px; color: var(--text-3); transition: transform var(--dur-2) var(--ease-out); }
+.wo-howto[open] .wo-howto-chev { transform: rotate(180deg); }
+.wo-howto-body { padding: 0 16px 14px; font-family: var(--font); font-size: 15px; line-height: 1.45; color: var(--text-2); }
+.wo-howto-body p + p { margin-top: 8px; }
+.wo-howto-dim { color: var(--text-3); }
+
+/* Cardio + finish pages */
+.wo-cardio-card { margin: 0; padding: 0; background: none; }
+.wo-cardio-specs { display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 8px; margin: 18px 0 12px; }
+.wo-cardio-specs .wo-cs { padding: 14px 6px; border-radius: 14px; background: var(--card); }
+.wo-cardio-specs .wo-cs-v { font-size: 22px; font-weight: 700; }
+.wo-cardio-card .wo-cardio-rat { margin: 0 0 18px; font-size: 15px; }
+.wo-page .wo-group { margin-left: 0; margin-right: 0; }
+.wo-finish-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 16px 0; }
+.wo-finish-stats .wo-ss { background: var(--card); }
+.wo-finish-stats .wo-ss-v { font-size: 22px; }
+.wo-ov-row .wo-mm-thumb, .wo-ov-row .wo-ex-glyph { flex-shrink: 0; width: 40px; height: 40px; border-radius: 10px; background: var(--card-2); }
+.wo-ov-state { flex-shrink: 0; font-family: var(--font); font-size: 14px; font-weight: 600; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.wo-ov-state.done { color: var(--ok); }
+.wo-ov-state .ico { width: 18px; height: 18px; stroke-width: 3; }
+.wo-overview .wo-row-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#wo-add-exercises-section { padding: 16px 0 0; }
+.wo-finish-wrap { display: grid; gap: 4px; padding: 16px 0 0; }
+
+/* The page container must not be a scroll container, or sticky headers never stick.
+   overflow-x: clip still clips the slide transition without creating one. */
+#pg-workout { overflow: visible; overflow-x: clip; }
+#wo-split-note[hidden], #wpp-note[hidden] { display: none !important; }
+
+.wo-det-ex-list .wo-det-section-lbl { margin: 0; padding: 14px 16px 4px; font-size: 13px; font-weight: 600; letter-spacing: 0; color: var(--text-2); }
+
+/* ── Live recalibration ── */
 .wo-recal-banner {
   position: fixed; z-index: 400; left: 50%; top: calc(10px + env(safe-area-inset-top, 0px));
   width: min(456px, calc(100% - 24px)); display: flex; align-items: center; gap: 12px;

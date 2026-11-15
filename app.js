@@ -3812,292 +3812,97 @@ function saveNoteFromModal(ei) {
   renderExercises();
 }
 
-// ── Exercise icon system ──
-// Two-tier lookup:
-//   1. Slug match → returns an <img> tag pointing at icons/<slug>.png (if available)
-//   2. Neutral SVG glyph fallback (dumbbell / cardio line)
-//
-// AVAILABLE_SLUGS is the gate. As PNGs are added to the icons/ folder,
-// also add their slug here and the system picks them up automatically.
-// Slugs listed in EX_SLUG_MAP but NOT in AVAILABLE_SLUGS fall through to emoji,
-// so it's safe to pre-populate the map with slugs whose art isn't ready yet.
-const AVAILABLE_SLUGS = new Set([
-  // Batch 1 — chest
-  'bench-barbell-flat','bench-barbell-incline','bench-db-flat','bench-db-incline','bench-smith-incline',
-  // Batch 2 — chest/back
-  'cable-fly','pec-deck','pullup','lat-pulldown','row-cable-seated',
-  // Batch 3 — back
-  'row-tbar','row-db-single-arm','row-barbell-bent','row-machine','pullover-cable',
-  // Batch 4 — shoulders
-  'ohp-barbell','press-db-seated','lateral-raise-db','lateral-raise-cable','rear-delt-fly',
-  // Batch 5 — biceps + 1 triceps
-  'curl-db-incline','curl-barbell','curl-preacher','curl-cable-bayesian','pushdown-cable-rope',
-  // Batch 6 — triceps + quads
-  'extension-overhead-cable','skullcrusher','dip','squat-barbell-back','squat-front',
-  // Batch 7 — quads + hams
-  'leg-press','hack-squat','leg-extension','rdl-barbell','leg-curl-seated',
-  // Batch 8 — hams/glutes/deadlifts
-  'leg-curl-lying','hip-thrust-barbell','back-extension-45','deadlift-conventional','deadlift-sumo',
-  // Batch 9 — lunge + core
-  'lunge-db','plank','cable-crunch','hanging-leg-raise','ab-wheel',
-]);
-
-// Ordered keyword → slug map. Longer/more specific keys FIRST because matching
-// is first-hit-wins (e.g. 'incline dumbbell press' must match before 'press').
-// Keys are lowercase substrings tested against exercise name.
-const EX_SLUG_MAP = [
-  // ── Specific-first guards ──
-  // Names a broader key further down would otherwise swallow (first hit wins). Slugs with no
-  // art yet fall through to the emoji, which is better than showing the wrong movement.
-  ['incline dumbbell curl',    'curl-db-incline'],
-  ['incline hammer curl',      'curl-db-incline'],
-  ['incline dumbbell fly',     'fly-db-incline'],
-  ['dumbbell fly',             'fly-db'],
-  ['reverse pec deck',         'rear-delt-fly'],
-  ['rear delt',                'rear-delt-fly'],      // raise / fly / row — beats the chest 'incline dumbbell' key
-  ['overhead cable',           'extension-overhead-cable'],
-  ['dumbbell pullover',        'pullover-db'],
-  ['calf',                     'calf-raise'],         // 'leg press calf raise' must not show the leg press
-  ['stiff-leg deadlift',       'rdl-barbell'],
-  ['reverse hyper',            'reverse-hyper'],
-  ['nordic',                   'nordic-curl'],
-  ['standing single-leg curl', 'leg-curl-standing'],
-  ['slider leg curl',          'leg-curl-slider'],
-  ['stability ball leg curl',  'leg-curl-ball'],
-  ['pendulum squat',           'squat-pendulum'],
-  ['belt squat',               'squat-belt'],
-  ['v-squat',                  'squat-v'],
-  ['split squat',              'squat-split'],
-  ['sissy squat',              'squat-sissy'],
-  ['smith machine squat',      'squat-smith'],
-  ['smith squat',              'squat-smith'],
-  ['bench dip',                'dip-bench'],
-  ['copenhagen',               'plank-copenhagen'],
-  // ── Chest ──
-  ['smith incline',            'bench-smith-incline'],
-  ['incline smith',            'bench-smith-incline'],
-  ['smith flat',               'press-smith-flat'],
-  ['incline dumbbell press',   'bench-db-incline'],
-  ['incline db press',         'bench-db-incline'],
-  ['incline dumbbell',         'bench-db-incline'],
-  ['incline bench',            'bench-barbell-incline'],
-  ['incline barbell',          'bench-barbell-incline'],
-  ['dumbbell bench',           'bench-db-flat'],
-  ['db bench',                 'bench-db-flat'],
-  ['flat dumbbell',            'bench-db-flat'],
-  ['bench press',              'bench-barbell-flat'],
-  ['flat bench',               'bench-barbell-flat'],
-  ['barbell bench',            'bench-barbell-flat'],
-  ['cable fly',                'cable-fly'],
-  ['low-to-high',              'cable-fly'],
-  ['low to high',              'cable-fly'],
-  ['chest fly',                'cable-fly'],
-  ['pec deck fly',             'pec-deck'],
-  ['pec deck',                 'pec-deck'],
-  ['machine chest press',      'press-machine-chest'],
-  ['chest press',              'press-machine-chest'],
-  // ── Back ──
-  ['pull-up',                  'pullup'],
-  ['pull up',                  'pullup'],
-  ['pullup',                   'pullup'],
-  ['chin-up',                  'pullup'],
-  ['chin up',                  'pullup'],
-  ['single-arm lat',           'pulldown-single-arm'],
-  ['single arm lat',           'pulldown-single-arm'],
-  ['one-arm lat',              'pulldown-single-arm'],
-  ['hammer strength pulldown', 'pulldown-hammer'],
-  ['hammer pulldown',          'pulldown-hammer'],
-  ['machine low row',          'pulldown-hammer'],
-  ['lat pulldown',             'lat-pulldown'],
-  ['pulldown',                 'lat-pulldown'],
-  ['straight-arm',             'pullover-cable'],
-  ['straight arm cable',       'pullover-cable'],
-  ['pullover',                 'pullover-cable'],
-  ['chest-supported',          'row-tbar'],
-  ['chest supported',          'row-tbar'],
-  ['t-bar row',                'row-tbar'],
-  ['t bar row',                'row-tbar'],
-  ['meadows row',              'row-meadows'],
-  ['single-arm row',           'row-db-single-arm'],
-  ['single arm row',           'row-db-single-arm'],
-  ['one-arm db row',           'row-db-single-arm'],
-  ['dumbbell row',             'row-db-single-arm'],
-  ['seated cable row',         'row-cable-seated'],
-  ['cable row',                'row-cable-seated'],
-  ['seated row',               'row-cable-seated'],
-  ['bent-over row',            'row-barbell-bent'],
-  ['bent over row',            'row-barbell-bent'],
-  ['barbell row',              'row-barbell-bent'],
-  ['plate-loaded row',         'row-machine'],
-  ['machine row',              'row-machine'],
-  ['face pull',                'face-pull'],
-  // ── Shoulders ──
-  ['overhead press',           'ohp-barbell'],
-  ['ohp',                      'ohp-barbell'],
-  ['military press',           'ohp-barbell'],
-  ['machine shoulder',         'press-machine-shoulder'],
-  ['seated dumbbell press',    'press-db-seated'],
-  ['seated db press',          'press-db-seated'],
-  ['shoulder press',           'press-db-seated'],
-  ['db shoulder',              'press-db-seated'],
-  ['machine lateral',          'lateral-raise-machine'],
-  ['cable lateral',            'lateral-raise-cable'],
-  ['prone incline lateral',    'lateral-raise-prone'],
-  ['prone lateral',            'lateral-raise-prone'],
-  ['lateral raise',            'lateral-raise-db'],
-  ['side raise',               'lateral-raise-db'],
-  ['lu raise',                 'raise-lu'],
-  ['reverse pec deck',         'rear-delt-fly'],
-  ['rear delt',                'rear-delt-fly'],
-  // ── Biceps ──
-  ['incline dumbbell curl',    'curl-db-incline'],
-  ['incline db curl',          'curl-db-incline'],
-  ['incline curl',             'curl-db-incline'],
-  ['preacher curl',            'curl-preacher'],
-  ['preacher',                 'curl-preacher'],
-  ['bayesian',                 'curl-cable-bayesian'],
-  ['cable hammer curl',        'curl-hammer-cable'],
-  ['hammer curl',              'curl-hammer-db'],
-  ['barbell curl',             'curl-barbell'],
-  ['ez-bar curl',              'curl-barbell'],
-  ['ez bar curl',              'curl-barbell'],
-  // ── Triceps ──
-  ['rope pushdown',            'pushdown-cable-rope'],
-  ['tricep pushdown',          'pushdown-cable-rope'],
-  ['cable pushdown',           'pushdown-cable-rope'],
-  ['pushdown',                 'pushdown-cable-rope'],
-  ['overhead tricep',          'extension-overhead-cable'],
-  ['overhead extension',       'extension-overhead-cable'],
-  ['tricep extension',         'extension-overhead-cable'],
-  ['skullcrusher',             'skullcrusher'],
-  ['skull crusher',            'skullcrusher'],
-  ['jm press',                 'press-jm'],
-  ['machine tricep dip',       'dip-machine'],
-  ['machine dip',              'dip-machine'],
-  ['assisted dip',             'dip-machine'],
-  ['dip',                      'dip'],
-  // ── Quads ──
-  ['front squat',              'squat-front'],
-  ['back squat',               'squat-barbell-back'],
-  ['barbell squat',            'squat-barbell-back'],
-  ['spanish squat',            'squat-spanish'],
-  ['heel-elevated goblet',     'squat-goblet'],
-  ['heel elevated goblet',     'squat-goblet'],
-  ['goblet squat',             'squat-goblet'],
-  ['goblet',                   'squat-goblet'],
-  ['hack squat',               'hack-squat'],
-  ['leg press',                'leg-press'],
-  ['leg extension',            'leg-extension'],
-  ['squat',                    'squat-barbell-back'],
-  // ── Hamstrings/glutes ──
-  ['single-leg rdl',           'rdl-single-leg'],
-  ['single leg rdl',           'rdl-single-leg'],
-  ['b-stance rdl',             'rdl-single-leg'],
-  ['romanian deadlift',        'rdl-barbell'],
-  ['rdl',                      'rdl-barbell'],
-  ['seated leg curl',          'leg-curl-seated'],
-  ['lying leg curl',           'leg-curl-lying'],
-  ['leg curl',                 'leg-curl-seated'],
-  ['hip thrust',               'hip-thrust-barbell'],
-  ['back extension',           'back-extension-45'],
-  ['hyperextension',           'back-extension-45'],
-  ['hip abduction',            'hip-abduction'],
-  ['sumo deadlift',            'deadlift-sumo'],
-  ['deadlift',                 'deadlift-conventional'],
-  ['step-up',                  'step-up-db'],
-  ['step up',                  'step-up-db'],
-  ['reverse lunge',            'lunge-reverse'],
-  ['lunge',                    'lunge-db'],
-  ['calf raise',               'calf-raise'],
-  ['calf',                     'calf-raise'],
-  // ── Core ──
-  ['side plank',               'plank-side'],
-  ['plank',                    'plank'],
-  ['cable crunch',             'cable-crunch'],
-  ['hanging leg raise',        'hanging-leg-raise'],
-  ['hanging knee raise',       'hanging-leg-raise'],
-  ['ab wheel',                 'ab-wheel'],
-  ['ab rollout',               'ab-wheel'],
-  ['dead bug',                 'dead-bug'],
-  ['deadbug',                  'dead-bug'],
-  // ── Cardio ──
-  ['treadmill',                'treadmill'],
-  ['stairmaster',              'stairmaster'],
-  ['stair climber',            'stairmaster'],
-  ['stair',                    'stairmaster'],
-  ['rower',                    'rower-machine'],
-  ['rowing machine',           'rower-machine'],
-  ['row machine',              'rower-machine'],
-  ['elliptical',               'elliptical'],
-  ['bike',                     'bike-upright'],
-  ['cycling',                  'bike-upright'],
-];
-
-// Some exercises are visually close enough that it's fine to render a more
-// general icon when the specific one isn't available. e.g. a "Single-Arm Lat
-// Pulldown" looks enough like a "Lat Pulldown" that using the latter's icon
-// is more helpful than falling back to a generic emoji.
-// Conversely, a "Spanish Squat" (quad-dominant, heels elevated) renders with
-// radically different equipment than a "Back Squat" (barbell) — those must
-// NOT silently downgrade. The default behavior is "no downgrade"; only the
-// mappings below are allowed to resolve to a different slug.
-const SAFE_DOWNGRADES = {
-  'pulldown-single-arm': 'lat-pulldown',
-  'pulldown-hammer':     'lat-pulldown',
-  'row-meadows':         'row-db-single-arm',
-  'curl-hammer-db':      'curl-barbell',
-  'curl-hammer-cable':   'curl-cable-bayesian',
-  'lunge-reverse':       'lunge-db',
-  'step-up-db':          'lunge-db',
-  'rdl-single-leg':      'rdl-barbell',
-  'squat-goblet':        'squat-front',     // both front-loaded, upright torso
-  'lateral-raise-machine': 'lateral-raise-db',
-  'lateral-raise-prone': 'rear-delt-fly',   // both rear-delt-focused
-  'press-machine-shoulder': 'press-db-seated',
-  'press-smith-flat':    'bench-barbell-flat',
-  'dip-machine':         'dip',
-  'plank-side':          'plank',
+// ── Exercise icon system: generated muscle maps ──
+// One uniform style for every exercise: a front/back figure with the primary
+// muscle in the brand colour and secondary muscles dimmed. Driven by the
+// engine's exercise metadata, so all 200+ movements are covered automatically.
+const MM_BODY='<ellipse cx="50" cy="15" rx="9" ry="11"/><path d="M45 24h10v9H45z"/>'+
+  '<path d="M31 37Q50 31 69 37Q72 52 68 70Q65 88 64 104H36Q35 88 32 70Q28 52 31 37Z"/>'+
+  '<ellipse cx="28" cy="43" rx="8" ry="8.5"/><ellipse cx="72" cy="43" rx="8" ry="8.5"/>'+
+  '<rect x="17" y="46" width="10" height="36" rx="5"/><rect x="73" y="46" width="10" height="36" rx="5"/>'+
+  '<rect x="15.5" y="81" width="9" height="32" rx="4.5"/><rect x="75.5" y="81" width="9" height="32" rx="4.5"/>'+
+  '<ellipse cx="20" cy="118" rx="4.5" ry="5.5"/><ellipse cx="80" cy="118" rx="4.5" ry="5.5"/>'+
+  '<path d="M36 101H64L66.5 121H33.5Z"/>'+
+  '<rect x="33.5" y="113" width="15.5" height="50" rx="7.5"/><rect x="51" y="113" width="15.5" height="50" rx="7.5"/>'+
+  '<rect x="35.5" y="161" width="11.5" height="33" rx="5.5"/><rect x="53" y="161" width="11.5" height="33" rx="5.5"/>'+
+  '<ellipse cx="41" cy="196" rx="6" ry="3"/><ellipse cx="59" cy="196" rx="6" ry="3"/>';
+const MM_FRONT={
+  chest:'<path d="M34 44Q42 40 49 43V58Q41 62 34 56Z"/><path d="M66 44Q58 40 51 43V58Q59 62 66 56Z"/>',
+  delts:'<ellipse cx="28" cy="43.5" rx="6.3" ry="7"/><ellipse cx="72" cy="43.5" rx="6.3" ry="7"/>',
+  biceps:'<ellipse cx="22" cy="63" rx="3.6" ry="11"/><ellipse cx="78" cy="63" rx="3.6" ry="11"/>',
+  abs:'<path d="M42.5 63h15v31q-7.5 6-15 0z"/>',
+  quads:'<ellipse cx="41.3" cy="136" rx="6" ry="19"/><ellipse cx="58.7" cy="136" rx="6" ry="19"/>',
+  shins:'<ellipse cx="41.2" cy="174" rx="3.6" ry="11"/><ellipse cx="58.8" cy="174" rx="3.6" ry="11"/>',
 };
-
-// Look up a slug for a given exercise name. Returns a string slug (guaranteed
-// to be in AVAILABLE_SLUGS) or null.
-// Logic:
-//   1. Find the first keyword match in EX_SLUG_MAP (most specific wins).
-//   2. If that slug is available → return it.
-//   3. If not, check SAFE_DOWNGRADES → return the fallback slug if available.
-//   4. Otherwise return null (caller renders emoji).
-// This prevents e.g. "Spanish Squat" from silently matching a generic 'squat'
-// keyword and rendering as a barbell back squat.
-function getExIconSlug(name){
-  if(!name) return null;
-  const n = String(name).toLowerCase();
-  for(const [kw, slug] of EX_SLUG_MAP){
-    if(n.includes(kw)){
-      if(AVAILABLE_SLUGS.has(slug)) return slug;
-      const downgrade = SAFE_DOWNGRADES[slug];
-      if(downgrade && AVAILABLE_SLUGS.has(downgrade)) return downgrade;
-      return null; // first match wins — don't silently fall through to wrong art
-    }
+const MM_BACK={
+  traps:'<path d="M41 36L50 30.5L59 36L55.5 53H44.5Z"/>',
+  reardelts:'<ellipse cx="28" cy="44" rx="6" ry="6.3"/><ellipse cx="72" cy="44" rx="6" ry="6.3"/>',
+  lats:'<path d="M34 50Q42 53 48.5 57V86Q40 80 35 69Z"/><path d="M66 50Q58 53 51.5 57V86Q60 80 65 69Z"/>',
+  triceps:'<ellipse cx="22" cy="62" rx="3.6" ry="11"/><ellipse cx="78" cy="62" rx="3.6" ry="11"/>',
+  lowback:'<path d="M45 88h10v12h-10z"/>',
+  glutes:'<ellipse cx="43" cy="112" rx="7.2" ry="7.6"/><ellipse cx="57" cy="112" rx="7.2" ry="7.6"/>',
+  hams:'<ellipse cx="41.3" cy="141" rx="5.6" ry="16"/><ellipse cx="58.7" cy="141" rx="5.6" ry="16"/>',
+  calves:'<ellipse cx="41.2" cy="172" rx="4.6" ry="10.5"/><ellipse cx="58.8" cy="172" rx="4.6" ry="10.5"/>',
+};
+const MM_BACK_REGIONS=new Set(Object.keys(MM_BACK));
+// Muscle (engine vocabulary) → drawn regions; Back depends on the movement.
+function mmRegionsOf(muscle,pat){
+  switch(muscle){
+    case 'Chest':return['chest'];
+    case 'Shoulders':return['delts'];
+    case 'Rear Delts':return['reardelts'];
+    case 'Back':return pat==='tr'?['traps']:pat==='hr'?['lats','traps']:['lats'];
+    case 'Biceps':return['biceps'];
+    case 'Triceps':return['triceps'];
+    case 'Quads':return['quads'];
+    case 'Hamstrings':return['hams'];
+    case 'Glutes':return['glutes'];
+    case 'Calves':return['calves'];
+    case 'Core':return['abs'];
   }
-  return null;
+  return[];
 }
+function mmHighlight(names){
+  const p=new Set(),sec=new Set();
+  (names||[]).forEach(n=>{
+    const m=WoEngine.musclesOf(n);if(!m)return;
+    mmRegionsOf(m.primary,m.pat).forEach(r=>p.add(r));
+    if(m.pat==='hg'){p.add('hams');p.add('glutes');sec.add('lowback');}
+    m.secondary.forEach(x=>mmRegionsOf(x,m.pat).forEach(r=>{if(!p.has(r))sec.add(r);}));
+  });
+  return {p,s:sec};
+}
+function mmSvg(view,hi,crop,cls){
+  const R=view==='front'?MM_FRONT:MM_BACK;
+  const parts=Object.keys(R).map(k=>`<g class="${hi.p.has(k)?'mm-p':hi.s.has(k)?'mm-s':'mm-m'}">${R[k]}</g>`).join('');
+  return `<svg viewBox="${crop||'0 0 100 200'}" preserveAspectRatio="xMidYMid meet" class="mm${cls?' '+cls:''}" aria-hidden="true"><g class="mm-b">${MM_BODY}</g>${parts}</svg>`;
+}
+// Thumbnail: the view and crop that best show the primary muscle.
+function mmThumb(names){
+  const hi=mmHighlight(names);
+  const first=[...hi.p][0];
+  if(!first)return null;
+  const view=MM_BACK_REGIONS.has(first)?'back':'front';
+  const crop=['quads','glutes','hams'].includes(first)?'14 96 72 72':first==='calves'?'14 134 72 66':first==='abs'?'14 36 72 72':'10 26 80 80';
+  return mmSvg(view,hi,crop);
+}
+// Hero: front and back side by side.
+function mmHero(names,extraP){
+  const hi=mmHighlight(names);
+  (extraP||[]).forEach(m=>mmRegionsOf(m).forEach(r=>hi.p.add(r)));
+  return `<div class="mm-hero">${mmSvg('front',hi)}${mmSvg('back',hi)}</div>`;
+}
+const WO_EQUIP_LABEL={bb:'Barbell',db:'Dumbbells',cable:'Cable',mach:'Machine',bw:'Bodyweight',smith:'Smith machine'};
+function woEquipOf(name){const m=WoEngine.musclesOf(name);return m?(WO_EQUIP_LABEL[m.equip]||''):'';}
 
-// Main icon getter used by all render sites. Returns an HTML string.
-// If an explicit slug is passed (e.g. from AI response `iconSlug`), it's used directly
-// when available. Otherwise falls through to keyword → slug match, then emoji.
-function getExIcon(name, explicitSlug){
-  // 1. Explicit slug from AI response
-  if(explicitSlug && AVAILABLE_SLUGS.has(explicitSlug)){
-    return `<img class="wo-ex-img" src="icons/${explicitSlug}.png" alt="" loading="lazy">`;
-  }
-  // 2. Keyword match → slug
-  const slug = getExIconSlug(name);
-  if(slug){
-    return `<img class="wo-ex-img" src="icons/${slug}.png" alt="" loading="lazy">`;
-  }
-  // 3. Glyph fallback — a neutral line icon instead of a platform emoji
-  const n = String(name||'').toLowerCase();
-  const cardio = /tread|bike|cycle|row(er|ing machine)|erg|stair|elliptical|walk|run|sprint|jump rope|ski/.test(n);
+// Kept for older call sites/data: slugs no longer drive anything.
+function getExIconSlug(){ return null; }
+// Icon for any exercise or cardio machine (HTML string).
+function getExIcon(name){
+  const svg=mmThumb([name]);
+  if(svg)return `<span class="wo-mm-thumb">${svg}</span>`;
+  const n=String(name||'').toLowerCase();
+  const cardio=/tread|bike|cycle|row(er|ing machine)|erg|stair|elliptical|walk|run|sprint|jump rope|ski/.test(n);
   return `<span class="wo-ex-glyph">${woIco(cardio?'heart':'dumbbell')}</span>`;
 }
 
@@ -4459,7 +4264,7 @@ function woRecalBanner(changes,snap){
   el.querySelector('.wo-recal-undo').onclick=()=>{woRecalUndo(changes,snap);hide();};
   el.querySelector('.wo-recal-txt').onclick=()=>{
     const first=changes.reduce((m,c)=>Math.min(m,c.index),Infinity);
-    const card=gv('wo-ex-'+first);if(card)card.scrollIntoView({behavior:'smooth',block:'start'});
+    woGoTo(first);
     hide();
   };
   clearTimeout(_woRecalTimer);_woRecalTimer=setTimeout(hide,8000);
@@ -4476,6 +4281,98 @@ function woRecalUndo(changes,snap){
   woSave(WO_KEY,_woSession);
   renderExercises();
   woToast('Kept your original plan');
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// Session carousel — one page per exercise, swipe between them.
+// ══════════════════════════════════════════════════════════════════════════
+let _woPageIdx=0,_woCarRO=null,_woCarBound=false,_woCarT=null;
+function woPages(){return [...document.querySelectorAll('#wo-carousel .wo-page')].filter(p=>p.style.display!=='none');}
+function woGoTo(i,instant){
+  const car=gv('wo-carousel');const pages=woPages();if(!car||!pages.length)return;
+  i=Math.max(0,Math.min(i,pages.length-1));
+  const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  car.scrollTo({left:pages[i].offsetLeft,behavior:(instant||reduce)?'auto':'smooth'});
+  if(instant){_woPageIdx=i;woOnPage();}
+}
+function woOnPage(){
+  const pages=woPages();const car=gv('wo-carousel');if(!car||!pages.length)return;
+  const p=pages[Math.min(_woPageIdx,pages.length-1)];
+  car.style.height=p.offsetHeight+'px';
+  document.querySelectorAll('#wo-pager .wo-pg').forEach((b,k)=>{b.classList.toggle('on',k===_woPageIdx);b.setAttribute('aria-selected',k===_woPageIdx);});
+  // keep the new page's top in view
+  const hdr=document.querySelector('.wo-active-header');
+  const top=car.getBoundingClientRect().top-(hdr?hdr.offsetHeight:0);
+  if(top<0)window.scrollBy({top:top-4,behavior:'auto'});
+}
+function woBindCarousel(){
+  const car=gv('wo-carousel');if(!car||_woCarBound)return;_woCarBound=true;
+  car.addEventListener('scroll',()=>{
+    const w=car.clientWidth||1;
+    const i=Math.round(car.scrollLeft/w);
+    if(i!==_woPageIdx){_woPageIdx=i;woHaptic(4);document.querySelectorAll('#wo-pager .wo-pg').forEach((b,k)=>b.classList.toggle('on',k===i));}
+    clearTimeout(_woCarT);_woCarT=setTimeout(woOnPage,90);
+  },{passive:true});
+  document.addEventListener('keydown',e=>{
+    if(gv('wo-active-view')?.style.display==='none'||_currentPage!=='workout')return;
+    if(e.target.closest&&e.target.closest('input,textarea,[contenteditable]'))return;
+    if(document.querySelector('.wo-sheet-ov'))return;
+    if(e.key==='ArrowRight')woGoTo(_woPageIdx+1);
+    if(e.key==='ArrowLeft')woGoTo(_woPageIdx-1);
+  });
+  window.addEventListener('resize',()=>woGoTo(_woPageIdx,true));
+}
+function woWatchPageSizes(){
+  if(!('ResizeObserver' in window))return;
+  if(_woCarRO)_woCarRO.disconnect();
+  _woCarRO=new ResizeObserver(()=>{const car=gv('wo-carousel');const p=woPages()[_woPageIdx];if(car&&p)car.style.height=p.offsetHeight+'px';});
+  woPages().forEach(p=>_woCarRO.observe(p));
+}
+function woRenderPager(){
+  const el=gv('wo-pager');if(!el||!_woSession)return;
+  const segs=_woSession.exercises.map((ex,i)=>{
+    const n=ex.sets.length||1,d=ex.sets.filter(s=>s.done).length;
+    return `<button class="wo-pg${d===n?' full':''}" style="--f:${d/n}" onclick="woGoTo(${i})" role="tab" aria-label="${escapeAttr((ex.swappedTo||ex.name)+': '+d+' of '+n+' sets')}"></button>`;
+  });
+  if(_woSession.cardio)segs.push(`<button class="wo-pg${_woSession.cardio.done?' full':''}" style="--f:${_woSession.cardio.done?1:0}" onclick="woGoTo(${_woSession.exercises.length})" role="tab" aria-label="Cardio finisher"></button>`);
+  segs.push(`<button class="wo-pg wo-pg-end" onclick="woGoTo(${segs.length})" role="tab" aria-label="Finish">${woIco('check')}</button>`);
+  el.innerHTML=segs.join('');
+  el.querySelectorAll('.wo-pg').forEach((b,k)=>b.classList.toggle('on',k===_woPageIdx));
+}
+function woRenderOverview(){
+  if(!_woSession)return;
+  const el=gv('wo-overview');
+  if(el)el.innerHTML=_woSession.exercises.map((ex,i)=>{
+    const n=ex.sets.length,d=ex.sets.filter(s=>s.done).length;
+    const recap=ex.sets.filter(s=>s.done).map(s=>ex.unit==='sec'?`${s.reps}s`:(parseFloat(s.weight)>0?`${s.weight}×${s.reps}`:`BW×${s.reps}`)).join('  ');
+    return `<button class="wo-row wo-ov-row" onclick="woGoTo(${i})">
+      ${getExIcon(ex.swappedTo||ex.name)}
+      <span class="wo-row-main"><span class="wo-row-label">${escapeHtml(ex.swappedTo||ex.name)}</span><span class="wo-row-sub tnum">${recap||'Not started'}</span></span>
+      <span class="wo-ov-state${d===n?' done':''}">${d===n?woIco('check'):`${d}/${n}`}</span>
+    </button>`;
+  }).join('');
+  const st=gv('wo-finish-stats');
+  if(st){
+    let done=0,total=0,vol=0;
+    _woSession.exercises.forEach(ex=>ex.sets.forEach(s=>{total++;if(s.done){done++;vol+=(parseFloat(s.weight)||0)*(parseInt(s.reps)||0);}}));
+    const mins=Math.max(0,Math.round((Date.now()-_woSession.startTime)/60000));
+    st.innerHTML=`<div class="wo-ss"><div class="wo-ss-v tnum">${done}/${total}</div><div class="wo-ss-l">Sets logged</div></div>
+      <div class="wo-ss"><div class="wo-ss-v tnum">${Math.round(vol).toLocaleString()}</div><div class="wo-ss-l">kg volume</div></div>
+      <div class="wo-ss"><div class="wo-ss-v tnum">${mins}</div><div class="wo-ss-l">Minutes</div></div>`;
+  }
+}
+function woShowTech(ei){
+  const ex=_woSession&&_woSession.exercises[ei];if(!ex)return;
+  woSheet({title:ex.intensityTechnique,message:escapeHtml(ex.techNote||''),actions:[{label:'Got it',style:'cancel'}]});
+}
+function woSetMenu(ei,si){
+  const ex=_woSession&&_woSession.exercises[ei];if(!ex)return;
+  const s=ex.sets[si];
+  const acts=[];
+  if(s&&(s.weight!==''||s.reps!==''||s.done))acts.push({label:'Clear this set',icon:'minus',onClick:()=>{s.weight='';s.reps='';s.done=false;woSave(WO_KEY,_woSession);renderExerciseCardAt(ei);}});
+  if(ex.sets.length>1)acts.push({label:'Delete set',icon:'trash',style:'destructive',onClick:()=>woDeleteSet(ei,si)});
+  acts.push({label:'Cancel',style:'cancel'});
+  woSheet({title:`${ex.swappedTo||ex.name} · Set ${si+1}`,actions:acts,className:'wo-sheet-menu'});
 }
 
 // Keep anything that refers to exercises by index consistent after a structural change.
@@ -4560,45 +4457,6 @@ function woApplyReorder(list){
   woSave(WO_KEY,_woSession);
   renderExercises();
 }
-// Swipe a set row left to delete it (touch + mouse, via pointer events).
-let _woSwipeBound=false;
-function woBindSetSwipe(){
-  const root=gv('wo-exercises');if(!root||_woSwipeBound)return;_woSwipeBound=true;
-  let st=null;
-  root.addEventListener('pointerdown',e=>{
-    const row=e.target.closest('.wo-set-row');if(!row||e.target.closest('button'))return;
-    if(e.pointerType==='mouse'&&e.button!==0)return;
-    st={row,x0:e.clientX,y0:e.clientY,dx:0,on:false,id:e.pointerId};
-  });
-  root.addEventListener('pointermove',e=>{
-    if(!st||e.pointerId!==st.id)return;
-    const dx=e.clientX-st.x0,dy=e.clientY-st.y0;
-    if(!st.on){
-      if(Math.abs(dx)>10&&Math.abs(dx)>Math.abs(dy)*1.4&&dx<0){
-        st.on=true;st.row.classList.add('swiping');
-        if(document.activeElement&&st.row.contains(document.activeElement))document.activeElement.blur();
-        try{st.row.setPointerCapture(e.pointerId);}catch(_){}
-      }else if(Math.abs(dy)>10){st=null;return;}
-      else return;
-    }
-    st.dx=Math.min(0,dx);
-    st.row.style.transform=`translateX(${st.dx}px)`;
-    st.row.parentElement.classList.toggle('armed',st.dx<-90);
-  });
-  const end=e=>{
-    if(!st||(e&&e.pointerId!==st.id))return;
-    const {row,dx,on}=st;st=null;
-    if(!on)return;
-    row.classList.remove('swiping');
-    const m=/^wo-set-(\d+)-(\d+)$/.exec(row.id);
-    if(dx<-90&&m){
-      row.style.transform='translateX(-110%)';row.parentElement.classList.add('removing');
-      setTimeout(()=>woDeleteSet(+m[1],+m[2]),180);
-    }else{row.style.transform='';row.parentElement.classList.remove('armed');}
-  };
-  root.addEventListener('pointerup',end);root.addEventListener('pointercancel',end);
-}
-
 // ── Exercise detail (history + chart), openable straight from a live session ──
 let _woHistDirect=false;
 function openExerciseDetail(name){
@@ -4703,8 +4561,8 @@ function updateReadiness(){
 // override it for the next generation (one-shot). ──
 function woVarietyHint(v){
   return v==='max'
-    ?'Every lift rotates every session. Progress is still tracked per exercise whenever it comes back.'
-    :'Main lifts stay for the 4-week block so you can add load; everything else rotates.';
+    ?'Every lift rotates every session.'
+    :'Main lifts stay for the block; the rest rotates.';
 }
 function renderSplitPicker(){
   const el=gv('wo-split-picker');if(!el)return;
@@ -4712,45 +4570,51 @@ function renderSplitPicker(){
   const selected=_woSplitOverride||autoSplit;
   const B=WoEngine.blockInfo(woHistory().length);
   const variety=woPrefs().variety==='max'?'max':'balanced';
-  const sub=gv('wo-hdr-sub');
-  if(sub)sub.textContent=B.deload?'Deload week':`${B.phaseName} block · Week ${B.week+1} of 4`;
-  if(sub)sub.title=B.blurb||'';
-  const rows=WO_SPLIT_CYCLE.map(name=>{
-    const isSel=name===selected;
-    const isAuto=name===autoSplit;
-    return `<button class="wo-row wo-split-chip${isSel?' sel':''}" onclick="pickSplit('${name.replace(/'/g,"\\'")}')" aria-pressed="${isSel}">
-      <span class="wo-row-main"><span class="wo-row-label">${name}</span>${isAuto?'<span class="wo-row-sub">Next in rotation</span>':''}</span>
-      <span class="wo-check" aria-hidden="true">${isSel?woIco('check'):''}</span>
-    </button>`;
-  }).join('');
-  const vi=variety==='max'?1:0;
+  const blockLabel=B.deload?'Deload week':`${B.phaseName} block · Week ${B.week+1} of 4`;
+  const sub=gv('wo-hdr-sub');if(sub){sub.textContent=blockLabel;sub.title=B.blurb||'';}
+  const muscles=(WoEngine.SPLIT_MUSCLES[selected]||[]);
+  const short={'Arms & Shoulders':'Arms'};
   el.innerHTML=`
-    <h2 class="wo-section-title">Today's split</h2>
-    <div class="wo-group wo-list wo-split-picker-card">${rows}</div>
-    <div class="wo-group wo-list">
-      <div class="wo-row">
-        <span class="wo-row-main"><span class="wo-row-label">Variety</span></span>
-        <div class="wo-seg wo-seg-sm wo-seg-slide" data-sel="${vi}" role="group" aria-label="Variety">
-          <span class="wo-seg-thumb" aria-hidden="true"></span>
-          <button class="wo-seg-btn wo-variety-chip${vi===0?' sel':''}" onclick="setVariety('balanced')">Balanced</button>
-          <button class="wo-seg-btn wo-variety-chip${vi===1?' sel':''}" onclick="setVariety('max')">Max</button>
+    <section class="wo-today">
+      <div class="wo-today-txt">
+        <div class="wo-page-kicker">${selected===autoSplit?'Up next':'Picked for today'}</div>
+        <div class="wo-today-title">${escapeHtml(selected)}</div>
+        <div class="wo-today-muscles">${muscles.map(escapeHtml).join(' · ')}</div>
+        ${selected!==autoSplit?`<button class="wo-link" onclick="pickSplit('${autoSplit.replace(/'/g,"\\'")}')">Back to ${escapeHtml(autoSplit)}</button>`:''}
+      </div>
+      ${mmHero([],muscles)}
+    </section>
+    <div class="wo-seg wo-split-seg" role="group" aria-label="Split">
+      ${WO_SPLIT_CYCLE.map(name=>`<button class="wo-seg-btn wo-split-chip${name===selected?' sel':''}" onclick="pickSplit('${name.replace(/'/g,"\\'")}')" aria-pressed="${name===selected}">${escapeHtml(short[name]||name)}</button>`).join('')}
+    </div>`;
+  const act=gv('wo-gen-actions');
+  if(act){
+    const vi=variety==='max'?1:0;
+    act.innerHTML=`
+      <div class="wo-group wo-list">
+        <div class="wo-row">
+          <span class="wo-row-main"><span class="wo-row-label">Variety</span><span class="wo-row-sub wo-variety-hint">${woVarietyHint(variety)}</span></span>
+          <div class="wo-seg wo-seg-sm wo-seg-slide" data-sel="${vi}" role="group" aria-label="Variety">
+            <span class="wo-seg-thumb" aria-hidden="true"></span>
+            <button class="wo-seg-btn wo-variety-chip${vi===0?' sel':''}" onclick="setVariety('balanced')">Balanced</button>
+            <button class="wo-seg-btn wo-variety-chip${vi===1?' sel':''}" onclick="setVariety('max')">Max</button>
+          </div>
         </div>
       </div>
-    </div>
-    <p class="wo-footnote wo-variety-hint">${woVarietyHint(variety)}</p>
-    <div class="wo-cta"><button class="wo-btn wo-btn-primary wo-btn-lg wo-gen-btn" onclick="generateWorkout()">Generate workout</button></div>`;
+      <div class="wo-cta"><button class="wo-btn wo-btn-primary wo-btn-lg wo-gen-btn" onclick="generateWorkout()">Generate ${escapeHtml(selected)} workout</button></div>`;
+  }
 }
 
 // Updated in place so the segmented thumb can glide instead of re-rendering.
 function setVariety(v){
   v=v==='max'?'max':'balanced';
   woSetPref('variety',v);woHaptic(8);
-  const seg=document.querySelector('#wo-split-picker .wo-seg-slide');
+  const seg=document.querySelector('#wo-gen-actions .wo-seg-slide');
   if(!seg){renderSplitPicker();return;}
   const vi=v==='max'?1:0;
   seg.dataset.sel=vi;
   seg.querySelectorAll('.wo-seg-btn').forEach((b,i)=>b.classList.toggle('sel',i===vi));
-  const h=document.querySelector('#wo-split-picker .wo-variety-hint');if(h)h.textContent=woVarietyHint(v);
+  const h=document.querySelector('#wo-gen-actions .wo-variety-hint');if(h)h.textContent=woVarietyHint(v);
 }
 
 // Set a manual override (or clear it back to auto when tapping the auto split).
@@ -4875,6 +4739,11 @@ function woBadges(ex){
   return b.length?`<div class="wo-badges">${b.join('<span class="wo-tag-sep">·</span>')}</div>`:'';
 }
 
+function woShowCoachNote(){
+  const note=(_woSession&&_woSession.coachNote)||(_woPlan&&_woPlan.coachNote)||'';
+  if(!note)return;
+  woSheet({title:'About this session',message:escapeHtml(note),actions:[{label:'Done',style:'cancel'}]});
+}
 function woRestLabel(sec){
   sec=parseInt(sec)||0;
   if(sec<60)return sec+'s';
@@ -4910,11 +4779,14 @@ function renderWorkoutPreview(animate){
   const exs=_woPlan.exercises||[];
   if(nameEl)nameEl.textContent=_woPlan.splitName||'';
   if(noteEl)noteEl.textContent=_woPlan.coachNote||'';
+  const nb=gv('wpp-note-btn');
+  if(nb){const B=_woPlan.block||{};const T=_woPlan.tier||{};
+    nb.innerHTML=`${woIco('sparkles')}<span>${B.deload?'Deload week':(B.phaseName||'')+' · Week '+(B.week||1)+' of 4'}${T.rec!=null?' · Recovery '+T.rec+'%':''}</span>${woIco('chevron','wo-chip-chev')}`;}
   if(statsEl){
     const sets=exs.reduce((a,e)=>a+(parseInt(e.sets)||0),0);
     const cardioMin=_woPlan.cardio?(parseInt(_woPlan.cardio.duration)||0):0;
     const mins=Math.round(exs.reduce((a,e)=>a+(parseInt(e.sets)||0)*((parseInt(e.rest)||90)+40),0)/60)+cardioMin;
-    statsEl.innerHTML=`<span class="tnum">${exs.length}</span> exercises · <span class="tnum">${sets}</span> sets · about <span class="tnum">${mins}</span> min`;
+    statsEl.innerHTML=`<span><b class="tnum">${exs.length}</b> exercises</span><span><b class="tnum">${sets}</b> sets</span><span><b class="tnum">~${mins}</b> min</span>`;
   }
   if(exEl){
     exEl.innerHTML=exs.map((ex,i)=>`
@@ -4922,11 +4794,12 @@ function renderWorkoutPreview(animate){
         <div class="wo-ex-icon">${getExIcon(ex.name, ex.iconSlug) || ex.icon || ''}</div>
         <div class="wo-ex-info">
           <div class="wo-ex-name">${escapeHtml(ex.name)}</div>
-          <div class="wo-ex-meta"><span class="tnum">${ex.sets} × ${escapeHtml(ex.reps)}${ex.unit==='sec'?'s':''}</span> · ${woRestLabel(ex.rest)} rest</div>
+          <div class="wo-ex-meta">${woEquipOf(ex.name)?escapeHtml(woEquipOf(ex.name))+' · ':''}<span class="tnum">${ex.sets} × ${escapeHtml(ex.reps)}${ex.unit==='sec'?'s':''}</span></div>
           ${woBadges(ex)}
           ${woTargetLine(ex,true)}
           <div class="wo-ex-more-info">
             <div class="wo-ex-cue">${escapeHtml(ex.cue||'')}</div>
+            <div class="wo-ex-meta">${woRestLabel(ex.rest)} rest between sets</div>
             ${woIntensityLine(ex)}
             <a class="wo-link" href="${woFormUrl(ex.name)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${woIco('play')}Watch form video</a>
           </div>
@@ -5003,6 +4876,7 @@ function woSessionChrome(on){
 function openSessionMenu(){
   const acts=[];
   if(_woSession&&_woSession.exercises.length>1)acts.push({label:'Reorder exercises',icon:'reorder',onClick:openReorder});
+  acts.push({label:'About this session',icon:'sparkles',onClick:woShowCoachNote});
   acts.push({label:'Workout settings',icon:'gear',onClick:openWoSettings});
   acts.push({label:'History',icon:'clock',onClick:showWorkoutHistory});
   acts.push({label:'Discard workout',icon:'trash',style:'destructive',onClick:woAskDiscard});
@@ -5023,8 +4897,9 @@ function showActiveWorkout(){
   renderExercises();
   renderCardioSection();
   startElapsedTimer();
-  woBindSetSwipe();
+  woBindCarousel();
   woWakeOn();
+  requestAnimationFrame(()=>{const c=woCurrentEx();woGoTo(c<0?woPages().length-1:c,true);});
   // Show add exercises section
   const addExSection = gv('wo-add-exercises-section');
   if(addExSection) addExSection.style.display = 'block';
@@ -5083,6 +4958,8 @@ function renderExercises(){
   const el=gv('wo-exercises');if(!el||!_woSession)return;
   el.innerHTML=_woSession.exercises.map((ex,ei)=>renderExerciseCard(ex,ei)).join('');
   woUpdateSessionProgress();
+  woRenderPager();woRenderOverview();woWatchPageSizes();
+  requestAnimationFrame(woOnPage);
   _restRedraw();
   // If a next-set suggestion is pending, re-display the effort rating (it was wiped by innerHTML).
   if (_currentSuggestion && typeof _currentSuggestion.ei === 'number') {
@@ -5099,6 +4976,8 @@ function renderExerciseCardAt(ei){
   if(!ex||!old){renderExercises();return;}
   old.outerHTML=renderExerciseCard(ex,ei);
   woUpdateSessionProgress();
+  woRenderPager();woRenderOverview();woWatchPageSizes();
+  requestAnimationFrame(woOnPage);
   _restRedraw();
   if (_currentSuggestion && _currentSuggestion.ei === ei) showEffortRating(ei);
 }
@@ -5114,7 +4993,6 @@ function renderExerciseCard(ex,ei){
   const exName = ex.swappedTo || ex.name;
   const timed = ex.unit === 'sec';
   const pb=pbs[exName];
-
   const ghostData = getExerciseGhostSets(exName);
   const ghostSets = ghostData?.sets || [];
   const doneCount = ex.sets.filter(s=>s.done).length;
@@ -5122,12 +5000,11 @@ function renderExerciseCard(ex,ei){
   const allDone = total>0 && doneCount===total;
   const isCurrent = ei === woCurrentEx();
   const nextIdx = isCurrent ? ex.sets.findIndex(s=>!s.done) : -1;
-  const recap = ex.sets.filter(s=>s.done).map(s=>timed?`${s.reps||'—'}s`:(parseFloat(s.weight)>0?`${s.weight}×${s.reps||'—'}`:`BW×${s.reps||'—'}`)).join(' · ');
+  const nEx = _woSession.exercises.length;
 
   const setsHtml=ex.sets.map((s,si)=>{
     const ghost = ghostSets[si];
-    let ghostText = '—';
-    let trend = '';
+    let ghostText = '—', trend = '';
     if (ghost) {
       ghostText = timed ? `${ghost.reps}s` : (ghost.weight>0 ? `${ghost.weight} × ${ghost.reps}` : `BW × ${ghost.reps}`);
       if (s.done && s.reps) {
@@ -5140,71 +5017,76 @@ function renderExerciseCard(ex,ei){
     const hasTarget = hint.w != null || hint.r != null;
     const wPh = hint.w != null ? hint.w : (ex.bw||timed ? '0' : '');
     const rPh = hint.r != null ? hint.r : '';
-    return `<div class="wo-set-wrap"><div class="wo-set-del" aria-hidden="true">${woIco('trash')}Delete</div>
-      <div class="wo-set-row ${s.done?'done':''}${si===nextIdx?' next':''}" id="wo-set-${ei}-${si}">
-      <div class="wo-set-num">${si+1}</div>
+    return `<div class="wo-set-row ${s.done?'done':''}${si===nextIdx?' next':''}" id="wo-set-${ei}-${si}">
+      <button class="wo-set-num" onclick="woSetMenu(${ei},${si})" aria-label="Set ${si+1} options">${si+1}</button>
       <div class="wo-set-ghost${trend}">${ghostText}</div>
       <input class="wo-set-inp${hasTarget?' has-target':''}" type="number" inputmode="decimal" placeholder="${wPh}" value="${s.weight}"
         oninput="setExerciseSet(${ei},${si},'weight',this.value)" min="0" step="0.5" aria-label="Set ${si+1} weight in kg">
       <input class="wo-set-inp wo-set-reps${hasTarget?' has-target':''}" type="number" inputmode="numeric" placeholder="${rPh}" value="${s.reps}"
         oninput="setExerciseSet(${ei},${si},'reps',this.value)" min="0" aria-label="Set ${si+1} ${timed?'seconds':'reps'}">
       <button class="wo-set-done-btn ${s.done?'active':''}" onclick="toggleSetDone(${ei},${si})" aria-label="Mark set ${si+1} done" aria-pressed="${!!s.done}">${woIco('check')}</button>
-    </div></div>`;
+    </div>`;
   }).join('');
 
+  // The one number that matters: what to lift on the next set.
+  const t = ex.targets && ex.targets[0];
+  let target;
+  if (t) {
+    target = `<div class="wo-tgt-big tnum">${t.w>0?`${t.w}<small>kg</small><i>×</i>`:''}${t.r}<small>${timed?'s':' reps'}</small></div>
+      <div class="wo-tgt-sub">${ex.lastText?escapeHtml(ex.lastText):'Target for every set'}${pb&&!timed?`<br>Best e1RM ${pb.oneRM} kg`:''}</div>`;
+  } else {
+    target = `<div class="wo-tgt-big wo-tgt-new">${ex.isNew?'New exercise':'Your call'}</div>
+      <div class="wo-tgt-sub">${timed?'Hold for a time that leaves a few seconds spare':ex.bw?'Stop about 2 reps short of failure':'Pick a weight you could lift for ~2 more reps'}</div>`;
+  }
   const savedNote = getExerciseNote(exName);
-  const noteHtml = savedNote
-    ? `<div class="wo-ex-note" onclick="openNoteModal(${ei})">${woIco('note')}<span class="wo-ex-note-text">${escapeHtml(savedNote)}</span></div>`
-    : '';
-  const pbLine=(pb&&!timed)?`<div class="wo-ex-pb">Best: <span class="tnum">${pb.weight} kg × ${pb.reps}</span> (est. 1RM <span class="tnum">${pb.oneRM} kg</span>)</div>`:'';
-  const repsLbl = timed ? 'Secs' : 'Reps';
-  return `<div class="wo-ex-card ${ex.collapsed?'collapsed':''}${allDone?' complete':''}${isCurrent?' current':''}" id="wo-ex-${ei}">
-    <div class="wo-ex-card-hdr" onclick="toggleExCollapse(${ei})">
-      <div class="wo-ex-card-icon">${getExIcon(exName, ex.swappedTo?null:ex.iconSlug) || ex.icon || ''}</div>
-      <div class="wo-ex-card-title">
-        <button class="wo-ex-card-name" onclick="event.stopPropagation();openExerciseDetail(${ei})">${escapeHtml(exName)}</button>
-        ${ex.collapsed&&recap
-          ?`<div class="wo-ex-card-meta wo-recap tnum">${escapeHtml(recap)}</div>`
-          :`<div class="wo-ex-card-meta"><span class="tnum">${doneCount}/${total}</span> sets · ${escapeHtml(ex.reps||'')}${timed?'s':' reps'} · ${woRestLabel(ex.rest)} rest</div>`}
+  const tech = ex.intensityTechnique&&ex.intensityTechnique!=='straight sets'
+    ? `<button class="wo-tech-chip" onclick="woShowTech(${ei})">${woIco('zap')}<span>${escapeHtml(ex.intensityTechnique)} on the last set</span></button>` : '';
+  const how = [
+    ex.cue?`<p>${escapeHtml(ex.cue)}</p>`:'',
+    ex.warmup?`<p class="wo-howto-dim">${escapeHtml(ex.warmup)}</p>`:'',
+    `<a class="wo-link" href="${woFormUrl(exName)}" target="_blank" rel="noopener">${woIco('play')}Watch form video</a>`,
+  ].join('');
+  const equip = woEquipOf(exName);
+  return `<section class="wo-page wo-ex-card${allDone?' complete':''}${isCurrent?' current':''}" id="wo-ex-${ei}" data-ei="${ei}" aria-label="${escapeAttr(exName)}">
+    <div class="wo-page-top">
+      <div class="wo-page-head">
+        <div class="wo-page-kicker">${allDone?`<span class="wo-kicker-done">${woIco('check')}Done</span> · `:''}Exercise ${ei+1} of ${nEx}</div>
+        <button class="wo-page-title" onclick="openExerciseDetail(${ei})">${escapeHtml(exName)}</button>
+        <div class="wo-page-meta">${equip?escapeHtml(equip)+' · ':''}${escapeHtml(ex.reps||'')}${timed?'s':' reps'} · ${woRestLabel(ex.rest)} rest</div>
       </div>
-      ${allDone?`<span class="wo-done-badge" aria-label="Exercise complete">${woIco('check')}</span>`:''}
-      <button class="wo-icon-btn wo-ex-more" onclick="event.stopPropagation();openExMenu(${ei})" aria-label="Exercise options">${woIco('more')}</button>
+      <button class="wo-icon-btn wo-ex-more" onclick="openExMenu(${ei})" aria-label="Exercise options">${woIco('more')}</button>
     </div>
-    <div class="wo-ex-card-body">
-      ${ex.recal&&!doneCount?`<div class="wo-recal-note">${woIco('sparkles')}<span>${escapeHtml(ex.recal.reason)}</span></div>`:''}
-      ${woTargetLine(ex)}
-      ${ex.cue?`<div class="wo-ex-cue-line" onclick="this.classList.toggle('open')">${escapeHtml(ex.cue)}</div>`:''}
-      ${ex.warmup?`<div class="wo-ex-warmup">Warm-up: ${escapeHtml(ex.warmup)}</div>`:''}
-      ${woIntensityLine(ex)}
-      ${noteHtml}
-      ${pbLine}
-      <div class="wo-sets">
-        <div class="wo-sets-header"><span>Set</span><span>Previous</span><span>kg</span><span>${repsLbl}</span><span></span></div>
-        ${setsHtml}
-      </div>
-      <button class="wo-add-set-btn" onclick="addSet(${ei})">${woIco('plus')}Add set</button>
-      <div id="wo-effort-slot-${ei}" class="wo-effort-slot" style="display:none"></div>
+    <div class="wo-page-hero">${mmHero([exName])}<div class="wo-page-target">${target}${tech}</div></div>
+    ${ex.recal&&!doneCount?`<div class="wo-recal-note">${woIco('sparkles')}<span>${escapeHtml(ex.recal.reason)}</span></div>`:''}
+    ${savedNote?`<div class="wo-ex-note" onclick="openNoteModal(${ei})">${woIco('note')}<span class="wo-ex-note-text">${escapeHtml(savedNote)}</span></div>`:''}
+    <div class="wo-sets">
+      <div class="wo-sets-header"><span>Set</span><span>Previous</span><span>kg</span><span>${timed?'Secs':'Reps'}</span><span></span></div>
+      ${setsHtml}
     </div>
-  </div>`;
+    <button class="wo-add-set-btn" onclick="addSet(${ei})">${woIco('plus')}Add set</button>
+    <div id="wo-effort-slot-${ei}" class="wo-effort-slot" style="display:none"></div>
+    <details class="wo-howto"><summary>How to do it${woIco('chevron','wo-howto-chev')}</summary><div class="wo-howto-body">${how}</div></details>
+  </section>`;
 }
 
 function renderCardioSection(){
-  const el=gv('wo-cardio-section');if(!el||!_woSession?.cardio)return;
+  const page=gv('wo-cardio-page');
+  const el=gv('wo-cardio-section');if(!el)return;
+  if(!_woSession?.cardio){if(page)page.style.display='none';el.innerHTML='';return;}
+  if(page)page.style.display='';
   const c=_woSession.cardio;
   el.innerHTML=`<div class="wo-cardio-card ${c.done?'done':''}">
-    <div class="wo-cardio-hdr">
-      <div class="wo-cardio-icon-big">${getExIcon(c.machine, c.iconSlug) || c.icon || ''}</div>
-      <div class="wo-cardio-hdr-txt">
-        <div class="wo-cardio-card-title">${escapeHtml(c.machine)}</div>
-        <div class="wo-ex-card-meta">Cardio finisher</div>
-      </div>
-      <button class="wo-set-done-btn wo-cardio-done-btn ${c.done?'active':''}" onclick="toggleCardioDone()" aria-label="Mark cardio done" aria-pressed="${!!c.done}">${woIco('check')}</button>
+    <div class="wo-page-head">
+      <div class="wo-page-kicker">${c.done?`<span class="wo-kicker-done">${woIco('check')}Done</span> · `:''}Finisher</div>
+      <div class="wo-page-title-static">${escapeHtml(c.machine)}</div>
     </div>
     <div class="wo-cardio-specs">
       ${woCardioSpecs(c).map(sp=>`<div class="wo-cs"><div class="wo-cs-v">${escapeHtml(sp.v)}</div><div class="wo-cs-l">${escapeHtml(sp.l)}</div></div>`).join('')}
     </div>
-    <div class="wo-cardio-rat">${escapeHtml(c.rationale||'')}</div>
+    <p class="wo-cardio-rat">${escapeHtml(c.rationale||'')}</p>
+    <button class="wo-btn ${c.done?'wo-btn-gray':'wo-btn-primary'} wo-btn-lg" onclick="toggleCardioDone()">${c.done?'Mark as not done':'Mark cardio done'}</button>
   </div>`;
+  woRenderOverview();
 }
 
 // ── Set logging ──
@@ -5293,9 +5175,9 @@ function toggleSetDone(ei,si){
     if(exDone){
       const c=gv('wo-ex-'+ei);if(c)c.classList.add('just-complete');
       woHaptic([12,50,24]);
-      if(curAfter>=0&&curAfter!==ei){
-        setTimeout(()=>{const n=gv('wo-ex-'+curAfter);if(n)n.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'start'});},420);
-      }
+      // Move on to the next exercise (or the finish page) once this one is complete.
+      const nextPage=curAfter>=0?curAfter:woPages().length-1;
+      if(nextPage!==ei)setTimeout(()=>woGoTo(nextPage),650);
     }
   }
 }
@@ -5433,8 +5315,7 @@ function addSuggestedExercise(index) {
     if (btn) { btn.textContent = '✓ Added'; btn.disabled = true; }
   }
   setTimeout(() => {
-    const newExEl = gv(`wo-ex-${_woSession.exercises.length - 1}`);
-    if (newExEl) newExEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    woGoTo(_woSession.exercises.length - 1);
   }, 100);
 }
 
@@ -5564,6 +5445,7 @@ function toggleCardioDone(){
   if(!_woSession?.cardio)return;
   _woSession.cardio.done=!_woSession.cardio.done;
   if(_woSession.cardio.done)woHaptic(15);
+  setTimeout(woRenderPager,0);
   woSave(WO_KEY,_woSession);
   renderCardioSection();
 }
@@ -5591,7 +5473,10 @@ function woUpNext(){
   if(c===_restTimerState.ei)return `Set ${si+1} of ${ex.sets.length}${load?' · '+load:''}`;
   return escapeHtml(ex.swappedTo||ex.name);
 }
-function woRestGoto(){ if(_currentPage!=='workout')showPage('workout',gv('nb-workout')); }
+function woRestGoto(){
+  if(_currentPage!=='workout')showPage('workout',gv('nb-workout'));
+  const c=woCurrentEx();setTimeout(()=>woGoTo(c<0?woPages().length-1:c),60);
+}
 
 function _restDraw(force) {
   const st = _restTimerState;
@@ -6201,7 +6086,7 @@ function renderHistoryDetail(session){
     <div class="wo-det-muscles">${(session.muscleGroups||[]).map(m=>`<span class="wo-muscle-chip">${m}</span>`).join('')}</div>
   </div>
   <div class="wo-det-ex-list">
-    <div class="wo-det-section-lbl">Exercises — tap for progression</div>
+    <div class="wo-det-section-lbl">Exercises · tap for progress</div>
     ${exHtml}
   </div>`;
 }
