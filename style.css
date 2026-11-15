@@ -2120,6 +2120,8 @@ button.wo-set-num:active { background: var(--surface-2); }
 
 .wo-det-ex-list .wo-det-section-lbl { margin: 0; padding: 14px 16px 4px; font-size: 13px; font-weight: 600; letter-spacing: 0; color: var(--text-2); }
 
+.wo-focus { color: var(--brand-text); font-weight: 600; }
+
 /* ── Live recalibration ── */
 .wo-recal-banner {
   position: fixed; z-index: 400; left: 50%; top: calc(10px + env(safe-area-inset-top, 0px));

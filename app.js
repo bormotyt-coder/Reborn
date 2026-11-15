@@ -3830,6 +3830,7 @@ const MM_FRONT={
   chest:'<path d="M34 44Q42 40 49 43V58Q41 62 34 56Z"/><path d="M66 44Q58 40 51 43V58Q59 62 66 56Z"/>',
   delts:'<ellipse cx="28" cy="43.5" rx="6.3" ry="7"/><ellipse cx="72" cy="43.5" rx="6.3" ry="7"/>',
   biceps:'<ellipse cx="22" cy="63" rx="3.6" ry="11"/><ellipse cx="78" cy="63" rx="3.6" ry="11"/>',
+  obliques:'<path d="M35 62L41 63.5V96Q37.5 91 36 83Q34.5 73 35 62Z"/><path d="M65 62L59 63.5V96Q62.5 91 64 83Q65.5 73 65 62Z"/>',
   abs:'<path d="M42.5 63h15v31q-7.5 6-15 0z"/>',
   quads:'<ellipse cx="41.3" cy="136" rx="6" ry="19"/><ellipse cx="58.7" cy="136" rx="6" ry="19"/>',
   shins:'<ellipse cx="41.2" cy="174" rx="3.6" ry="11"/><ellipse cx="58.8" cy="174" rx="3.6" ry="11"/>',
@@ -3858,7 +3859,7 @@ function mmRegionsOf(muscle,pat){
     case 'Hamstrings':return['hams'];
     case 'Glutes':return['glutes'];
     case 'Calves':return['calves'];
-    case 'Core':return['abs'];
+    case 'Core':return pat==='cl'||pat==='cr'?['obliques']:['abs'];
   }
   return[];
 }
@@ -3868,6 +3869,8 @@ function mmHighlight(names){
     const m=WoEngine.musclesOf(n);if(!m)return;
     mmRegionsOf(m.primary,m.pat).forEach(r=>p.add(r));
     if(m.pat==='hg'){p.add('hams');p.add('glutes');sec.add('lowback');}
+    if(m.pat==='cl'||m.pat==='cr')sec.add('abs');     // oblique work braces the abs too
+    if(m.pat==='cx')sec.add('obliques');               // anti-extension holds load the sides
     m.secondary.forEach(x=>mmRegionsOf(x,m.pat).forEach(r=>{if(!p.has(r))sec.add(r);}));
   });
   return {p,s:sec};
@@ -3883,7 +3886,7 @@ function mmThumb(names){
   const first=[...hi.p][0];
   if(!first)return null;
   const view=MM_BACK_REGIONS.has(first)?'back':'front';
-  const crop=['quads','glutes','hams'].includes(first)?'14 96 72 72':first==='calves'?'14 134 72 66':first==='abs'?'14 36 72 72':'10 26 80 80';
+  const crop=['quads','glutes','hams'].includes(first)?'14 96 72 72':first==='calves'?'14 134 72 66':(first==='abs'||first==='obliques')?'14 36 72 72':'10 26 80 80';
   return mmSvg(view,hi,crop);
 }
 // Hero: front and back side by side.
@@ -4744,6 +4747,13 @@ function woShowCoachNote(){
   if(!note)return;
   woSheet({title:'About this session',message:escapeHtml(note),actions:[{label:'Done',style:'cancel'}]});
 }
+// "8-10 reps", "30-45s", "10 each side" — never "eachs" or "each side reps".
+function woRepsLabel(ex,short){
+  const r=String(ex.reps||'').trim();
+  if(!r)return '';
+  if(/[a-z]/i.test(r))return r;                       // already carries its unit
+  return ex.unit==='sec'?r+'s':(short?r:r+' reps');
+}
 function woRestLabel(sec){
   sec=parseInt(sec)||0;
   if(sec<60)return sec+'s';
@@ -4794,7 +4804,7 @@ function renderWorkoutPreview(animate){
         <div class="wo-ex-icon">${getExIcon(ex.name, ex.iconSlug) || ex.icon || ''}</div>
         <div class="wo-ex-info">
           <div class="wo-ex-name">${escapeHtml(ex.name)}</div>
-          <div class="wo-ex-meta">${woEquipOf(ex.name)?escapeHtml(woEquipOf(ex.name))+' · ':''}<span class="tnum">${ex.sets} × ${escapeHtml(ex.reps)}${ex.unit==='sec'?'s':''}</span></div>
+          <div class="wo-ex-meta">${ex.focus?`<span class="wo-focus">${escapeHtml(ex.focus)}</span> · `:''}${woEquipOf(ex.name)?escapeHtml(woEquipOf(ex.name))+' · ':''}<span class="tnum">${ex.sets} × ${escapeHtml(woRepsLabel(ex,true))}</span></div>
           ${woBadges(ex)}
           ${woTargetLine(ex,true)}
           <div class="wo-ex-more-info">
@@ -5050,9 +5060,9 @@ function renderExerciseCard(ex,ei){
   return `<section class="wo-page wo-ex-card${allDone?' complete':''}${isCurrent?' current':''}" id="wo-ex-${ei}" data-ei="${ei}" aria-label="${escapeAttr(exName)}">
     <div class="wo-page-top">
       <div class="wo-page-head">
-        <div class="wo-page-kicker">${allDone?`<span class="wo-kicker-done">${woIco('check')}Done</span> · `:''}Exercise ${ei+1} of ${nEx}</div>
+        <div class="wo-page-kicker">${allDone?`<span class="wo-kicker-done">${woIco('check')}Done</span> · `:''}${ex.isAutoCore?'Core first · ':''}Exercise ${ei+1} of ${nEx}</div>
         <button class="wo-page-title" onclick="openExerciseDetail(${ei})">${escapeHtml(exName)}</button>
-        <div class="wo-page-meta">${equip?escapeHtml(equip)+' · ':''}${escapeHtml(ex.reps||'')}${timed?'s':' reps'} · ${woRestLabel(ex.rest)} rest</div>
+        <div class="wo-page-meta">${ex.focus?escapeHtml(ex.focus)+' · ':''}${equip?escapeHtml(equip)+' · ':''}${escapeHtml(woRepsLabel(ex))} · ${woRestLabel(ex.rest)} rest</div>
       </div>
       <button class="wo-icon-btn wo-ex-more" onclick="openExMenu(${ei})" aria-label="Exercise options">${woIco('more')}</button>
     </div>
@@ -5110,7 +5120,8 @@ function setExerciseSet(ei,si,field,val){
 function toggleSetDone(ei,si){
   if(!_woSession)return;
   const ex=_woSession.exercises[ei];
-  const set=ex.sets[si];
+  const set=ex&&ex.sets[si];
+  if(!set)return;
   const name=ex.swappedTo||ex.name;
   const timed=ex.unit==='sec';
   const curBefore=woCurrentEx();

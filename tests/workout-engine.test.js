@@ -105,7 +105,7 @@ test('plans never duplicate an exercise and stay on-split', () => {
     assert.strictEqual(new Set(names).size, names.length, 'dupes in plan ' + i);
     p.exercises.forEach(e => assert(SPLIT_OK[p.splitCategory].includes(e.muscle), e.name + ' (' + e.muscle + ') off-split on ' + p.splitCategory));
     assert.deepStrictEqual(p.muscleGroups, E.SPLIT_MUSCLES[p.splitCategory]);
-    assert(p.exercises[p.exercises.length - 1].isAutoCore, 'core finisher missing');
+    assert(p.exercises[0].isAutoCore && p.exercises[1].isAutoCore, 'core block must open the session');
   });
 });
 test('rotation follows Push → Pull → Arms & Shoulders → Legs', () => {
@@ -131,14 +131,39 @@ test('≥50% of lifts differ from the last same-split session — every time, an
     });
   });
 });
-test('core finisher never repeats the previous session\'s core move', () => {
+test('core moves never repeat from the previous session of the same split', () => {
   const { plans } = simulate(40, { recovery: 70 });
   const lastBySplit = {};
   plans.forEach(p => {
-    const core = p.exercises[p.exercises.length - 1].name;
-    if (lastBySplit[p.splitCategory]) assert.notStrictEqual(core, lastBySplit[p.splitCategory]);
+    const core = p.exercises.filter(e => e.isAutoCore).map(e => e.name);
+    if (lastBySplit[p.splitCategory]) core.forEach(n => assert(!lastBySplit[p.splitCategory].includes(n), n + ' repeated'));
     lastBySplit[p.splitCategory] = core;
   });
+});
+
+test('core comes FIRST, every session: one abs move, then one obliques move', () => {
+  const { plans } = simulate(48);
+  plans.forEach(p => {
+    const [a, o] = p.exercises;
+    assert(a.isAutoCore && a.focus === 'Abs' && ['cf', 'cx'].includes(E.byName(a.name).pat), 'first should be abs: ' + a.name);
+    assert(o.isAutoCore && o.focus === 'Obliques' && ['cl', 'cr'].includes(E.byName(o.name).pat), 'second should be obliques: ' + o.name);
+    assert(!p.exercises.slice(2).some(e => e.isAutoCore), 'no core after the main work');
+  });
+});
+
+test('obliques slot rotates through real oblique work (side bends, side planks, rotations)', () => {
+  const { plans } = simulate(64);
+  const seen = new Set(plans.map(p => p.exercises[1].name));
+  assert(seen.size >= 6, 'obliques slot too repetitive: ' + [...seen].join(', '));
+  assert(!seen.has('Bird Dog'), 'Bird Dog is a stability drill, not oblique work');
+});
+
+test('Legs day keeps core to 2 sets per move so the trunk is fresh for squats and hinges', () => {
+  const { plans } = simulate(32, { recovery: 75 });
+  plans.filter(p => p.splitCategory === 'Legs').forEach(p => p.exercises.filter(e => e.isAutoCore).forEach(e => {
+    assert(e.sets <= 2, e.name + ' has ' + e.sets + ' sets on Legs day');
+    if (e.targets) assert(e.targets.length === e.sets);
+  }));
 });
 test('across one 16-session block the lifter sees 80+ different exercises', () => {
   const { plans } = simulate(16, { recovery: 70 });
@@ -367,7 +392,7 @@ console.log('\nRecovery gating');
 test('poor recovery → short, light session with no max-effort lifts and no HIIT', () => {
   const { plans } = simulate(32, { recovery: 25 });
   plans.forEach(p => {
-    assert(p.exercises.length <= 6, 'too many exercises: ' + p.exercises.length);
+    assert(p.exercises.length <= 7, 'too many exercises: ' + p.exercises.length);   // 5 lifts + 2 core
     p.exercises.forEach(e => assert(E.byName(e.name).cost < 3, e.name + ' is max-effort'));
     assert(p.cardio.duration <= 15 && !/Sprint|Interval/.test(p.cardio.machine));
   });
@@ -378,7 +403,7 @@ test('low recovery (34–49) drops max-effort lifts and trims compound sets', ()
 });
 test('great recovery (≥80) gets the bonus slot and may get HIIT', () => {
   const { plans } = simulate(32, { recovery: 90 });
-  assert(plans.every(p => p.exercises.length === 9 || p.block.deload), 'expected 8 slots + core');
+  assert(plans.every(p => p.exercises.length === 10 || p.block.deload), 'expected 8 slots + 2 core');
   assert(plans.some(p => /Sprint|Interval/.test(p.cardio.machine)), 'HIIT never offered at 90% recovery');
 });
 test('no recovery entered → treated as moderate, and says so', () => {

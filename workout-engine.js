@@ -289,7 +289,12 @@
     ['Toes-to-Bar', 'cf', 'i', 'bw', 2, 0, 'Hang tight and curl your pelvis up as the toes drive to the bar — control the descent to keep tension through the abs.', { core: 1, bw: 1, reps: '6-10', sets: 3, rest: 60 }],
     ['Bicycle Crunch', 'cr', 'i', 'bw', 1, 0, 'Shoulder blades off the floor, slow elbow-to-knee rotations — feel the obliques twist while the abs stay braced.', { core: 1, bw: 1, reps: '15 each side', sets: 3, rest: 30 }],
     ['Cable Woodchop', 'cr', 'i', 'cable', 1, 0, 'Rotate from the ribcage, not the arms — pull diagonally across your body, pivoting the back foot, and feel the obliques drive it.', { core: 1, reps: '10 each side', sets: 3, rest: 30 }],
-    ['Bird Dog', 'cr', 'i', 'bw', 1, 0, 'Extend the opposite arm and leg while keeping your hips square — pause at the top and keep the spine perfectly still.', { core: 1, bw: 1, reps: '10 each side', sets: 3, rest: 30 }],
+    ['Bird Dog', 'cx', 'i', 'bw', 1, 0, 'Extend the opposite arm and leg while keeping your hips square — pause at the top and keep the spine perfectly still.', { core: 1, bw: 1, reps: '10 each side', sets: 3, rest: 30 }],
+    ['Dumbbell Side Bend', 'cl', 'i', 'db', 1, 1, 'Dumbbell in one hand, free hand on your head — lean as far as you can toward the weight to stretch the opposite side, then crunch up using only your obliques.', { core: 1, reps: '12-15 each side', sets: 3, rest: 30 }],
+    ['Cable Side Bend', 'cl', 'i', 'cable', 1, 1, 'Stand side-on to a low cable, let it pull you into a deep side stretch, then crunch your ribs toward your hip on the far side — no twisting.', { core: 1, reps: '12-15 each side', sets: 3, rest: 30 }],
+    ['Side Plank Hip Dip', 'cl', 'i', 'bw', 1, 0, 'From a side plank, lower your hip toward the floor and drive it back up past straight — the obliques do the lifting.', { core: 1, bw: 1, reps: '12-15 each side', sets: 3, rest: 30 }],
+    ['Hanging Oblique Knee Raise', 'cr', 'i', 'bw', 1, 0, 'Hang still, then raise your knees up and across toward one shoulder — curl the pelvis and alternate sides without swinging.', { core: 1, bw: 1, reps: '8-10 each side', sets: 3, rest: 45 }],
+    ['Landmine Rotation', 'cr', 'i', 'bb', 1, 0, 'Arms long, rotate the bar from hip to hip in an arc — turn through the ribcage and pivot the back foot; the obliques start and stop the bar.', { core: 1, reps: '8-10 each side', sets: 3, rest: 45 }],
     ['Copenhagen Plank', 'cl', 'i', 'bw', 2, 0, 'Top foot on a bench, body in a straight line — lift the hips and hold; the inner thigh and obliques work hard to keep you up.', { core: 1, bw: 1, unit: 'sec', reps: '15-25s each', sets: 3, rest: 45 }],
     ['Stability Ball Rollout', 'cx', 'i', 'other', 1, 0, 'Forearms on the ball, roll out only as far as you can keep the ribs down — feel the abs brace against the extension.', { core: 1, bw: 1, reps: '10-12', sets: 3, rest: 45 }],
     ['L-Sit Hold', 'cf', 'i', 'bw', 2, 0, 'Press down tall through your hands and lift the legs straight out — squeeze the abs and quads for the whole hold.', { core: 1, bw: 1, unit: 'sec', reps: '10-20s', sets: 3, rest: 45 }],
@@ -514,9 +519,17 @@
       { id: 'G8', pats: ['lg', 'ga', 'gb'], p: 9, bonus: true },
     ],
   };
-  const CORE_SLOT = { id: 'CORE', pats: ['cx', 'cf', 'cr', 'cl'], role: 'i', core: true, p: 99 };
+  const CORE_SLOT = { id: 'CORE', pats: ['cx', 'cf', 'cr', 'cl'], role: 'i', core: true, p: 99 };   // legacy sessions
+  // Core opens every session (it's the part that gets skipped when it comes last):
+  // one move for the front of the stomach, one for the obliques at the sides.
+  const CORE_ABS = { id: 'CORE_A', pats: ['cf', 'cx'], role: 'i', core: true, p: 98, focus: 'Abs' };
+  const CORE_OBL = { id: 'CORE_O', pats: ['cl', 'cr'], role: 'i', core: true, p: 99, focus: 'Obliques' };
+  const CORE_SLOTS = [CORE_ABS, CORE_OBL];
+  function isCoreSlot(id) { return id === 'CORE' || id === 'CORE_A' || id === 'CORE_O'; }
   function slotById(split, id) {
     if (id === 'CORE') return CORE_SLOT;
+    if (id === 'CORE_A') return CORE_ABS;
+    if (id === 'CORE_O') return CORE_OBL;
     return (SLOTS[split] || []).find(s => s.id === id) || null;
   }
 
@@ -702,6 +715,7 @@
       isNew: prog.kind === 'new',
       warmup: slot && slot.warm && first ? warmupText(first.w) : null,
       isAutoCore: !!e.core,
+      focus: e.core ? (e.pat === 'cl' || e.pat === 'cr' ? 'Obliques' : 'Abs') : null,
       alternatives: [],
     };
   }
@@ -887,18 +901,25 @@
       chosen[slot.id] = e;
     });
 
-    // Core finisher (always included; rotates by novelty).
-    const coreSlot = CORE_SLOT;
+    // Core block first (always included; rotates by novelty): abs, then obliques.
     const coreAvoid = new Set();
     if (lastSame) (lastSame.s.exercises || []).forEach(ex => coreAvoid.add(canon(ex.swappedTo || ex.name)));
-    const coreE = pickFor(coreSlot, st, ctx, coreAvoid);
+    const coreEx = [];
+    CORE_SLOTS.forEach(cs => {
+      const e = pickFor(cs, st, ctx, coreAvoid);
+      if (!e) return;
+      takeInto(st, e);
+      const ex = buildExercise(e, cs, ctx);
+      // Legs day: keep the trunk fresh enough to brace heavy squats and hinges.
+      if (split === 'Legs' && ex.sets > 2) { ex.sets = 2; if (ex.targets) ex.targets = ex.targets.slice(0, 2); }
+      coreEx.push(ex);
+    });
 
-    const exercises = slots.filter(s => chosen[s.id]).map(s => {
+    const exercises = coreEx.concat(slots.filter(s => chosen[s.id]).map(s => {
       const ex = buildExercise(chosen[s.id], s, ctx);
       ex.held = heldSlots.has(s.id);
       return ex;
-    });
-    if (coreE) { takeInto(st, coreE); exercises.push(buildExercise(coreE, coreSlot, ctx)); }
+    }));
 
     assignTechniques(exercises, ctx, st);
 
@@ -941,6 +962,7 @@
     const bits = [];
     bits.push((B.deload ? 'Deload week' : B.phaseName + ' block · week ' + (B.week + 1) + '/4') + ' — ' + B.blurb + '.');
     bits.push(T.rec != null ? 'Recovery ' + T.rec + '% — ' + T.note + '.' : 'No recovery entered — ' + T.note + '.');
+    if (exercises.some(e => e.isAutoCore)) bits.push('Core comes first so it never gets skipped — abs, then obliques. It builds the muscle under your stomach and love handles; the fat over them comes off with your calorie deficit, not with crunches.');
     const up = exercises.filter(e => e.progression === 'up' && !e.isAutoCore).slice(0, 2);
     if (up.length) bits.push('Time to add load: ' + up.map(e => e.name + ' → ' + e.targets[0].w + 'kg').join(', ') + '.');
     else if (stats.total && stats.neverDone === stats.total) bits.push('Everything here is new to you — start light (about 2 reps in reserve) to find working weights.');
@@ -1131,7 +1153,7 @@
     const libOf = ex => byName(nameOf(ex));
     const baseBySlot = new Map(base.filter(b => b.slot).map(b => [b.slot, b]));
     // Open = an engine-chosen lift the lifter hasn't touched or pinned.
-    const isOpen = ex => !!ex.slot && ex.slot !== 'CORE' && !ex.swappedTo && !ex.addedByUser && !ex.keep &&
+    const isOpen = ex => !!ex.slot && !isCoreSlot(ex.slot) && !ex.swappedTo && !ex.addedByUser && !ex.keep &&
       !touchedEx(ex) && !!libOf(ex) && !!slotById(split, ex.slot);
     const open = exs.map(isOpen);
 
